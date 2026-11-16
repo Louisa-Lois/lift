@@ -1,0 +1,25 @@
+packages:
+  - apps/*
+  - packages/*
+  - evals
+  - e2e
+
+# One version of each library the whole repo shares. A package uses it with "catalog:"
+# instead of a version number. Add a library here when a second package starts using it.
+catalog:
+  "@biomejs/biome": 2.6.8
+  "@types/node": ^24.19.2
+  fastify: ^5.12.8
+  tsup: ^8.5.1
+  tsx: ^4.23.15
+  turbo: 2.11.11
+  # TypeScript 7 (the native compiler) has no JavaScript API yet, which Next.js and drizzle-kit
+  # need. Stay on 6.x, the last JavaScript release, until they support 7.
+  typescript: 6.0.3
+  vitest: ^5.1.0
+  yjs: ^13.6.33
+  zod: ^4.6.7
+
+# Dependencies allowed to run install scripts (pnpm blocks all others).
+onlyBuiltDependencies:
+  - esbuild

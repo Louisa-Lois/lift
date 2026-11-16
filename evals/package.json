@@ -1,0 +1,10 @@
+{
+  "name": "@lift/evals",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The 30-repo evaluation of the AI planner and autofix (WS3)",
+  "type": "module",
+  "scripts": {
+    "eval": "node -e \"console.error('pnpm eval is not built yet: see AI-05 in docs/prd/03-ai-agent.md'); process.exit(1)\""
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@lift/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Playwright end-to-end test of the demo script (WS5)",
+  "type": "module",
+  "scripts": {
+    "demo:check": "node -e \"console.error('pnpm demo:check is not built yet: see QA-06 and QA-09 in docs/prd/05-quality-delivery.md'); process.exit(1)\""
+  }
+}

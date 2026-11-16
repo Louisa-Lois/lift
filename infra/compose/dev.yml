@@ -1,0 +1,42 @@
+# Local development stack: `pnpm stack:up` starts it, `pnpm stack:down` stops it (data is kept in
+# named volumes; add -v to `docker compose down` to wipe it).
+# INF-06 adds BuildKit and a Traefik that serves deployed apps at http://{name}.apps.localhost.
+# Ports bind to 127.0.0.1 only. If 5432 or 6379 is taken on your machine, set LIFT_PG_PORT or
+# LIFT_REDIS_PORT in your shell and change DATABASE_URL or REDIS_URL in .env to match.
+name: lift-dev
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: lift
+      POSTGRES_PASSWORD: lift
+      POSTGRES_DB: lift
+    ports:
+      - "127.0.0.1:${LIFT_PG_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lift -d lift"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${LIFT_REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:

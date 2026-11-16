@@ -1,0 +1,30 @@
+{
+  "name": "@lift/cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The lift command-line tool",
+  "type": "module",
+  "bin": {
+    "lift": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@lift/shared": "workspace:*",
+    "commander": "^15.1.0"
+  },
+  "devDependencies": {
+    "@lift/config": "workspace:*",
+    "@types/node": "catalog:",
+    "tsup": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

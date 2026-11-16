@@ -1,0 +1,27 @@
+{
+  "name": "@lift/api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Lift REST API: auth, projects, services, deployments, logs, live events and the worker's internal API",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@lift/shared": "workspace:*",
+    "fastify": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@lift/config": "workspace:*",
+    "@types/node": "catalog:",
+    "tsup": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

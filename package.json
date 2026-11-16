@@ -1,0 +1,30 @@
+{
+  "name": "lift",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.9",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "env:init": "node infra/scripts/dev-env.mjs",
+    "stack:up": "docker compose -f infra/compose/dev.yml up -d --wait",
+    "stack:down": "docker compose -f infra/compose/dev.yml down",
+    "db:generate": "pnpm --filter @lift/db db:generate",
+    "db:migrate": "pnpm --filter @lift/db db:migrate",
+    "db:seed": "pnpm --filter @lift/db db:seed",
+    "eval": "pnpm --filter @lift/evals eval",
+    "demo:check": "pnpm --filter @lift/e2e demo:check"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "turbo": "catalog:"
+  }
+}

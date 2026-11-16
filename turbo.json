@@ -1,0 +1,26 @@
+{
+  "$schema": "./node_modules/turbo/schema.json",
+  "ui": "stream",
+  "envMode": "loose",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "env": ["NEXT_PUBLIC_*"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "transit": {
+      "dependsOn": ["^transit"]
+    },
+    "typecheck": {
+      "dependsOn": ["transit"]
+    },
+    "test": {
+      "dependsOn": ["transit"],
+      "outputs": ["coverage/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
