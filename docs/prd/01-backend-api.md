@@ -1,12 +1,12 @@
 # PRD 1 · Back end & API
 
-> Read together with `docs/contracts.md`. Owner: Team Member 1, paired with WS4. Paste the kickoff prompt at the bottom into your coding agent to start.
+> Read together with `docs/contracts.md`. Built by Hakim until the demo works (target Nov 26). `docs/start-here.md` has the current dates, which replace the ones below. Paste the kickoff prompt at the bottom into your coding agent to start.
 
 ## Goal, scope and inspiration
 
 **WS1 builds the API that every client and the worker go through: accounts, projects, services, deployments, variables, databases, domains, logs, live events and the live editor's back end.** By Nov 23 every demo step works by hand through it; by Nov 28 the AI agent and the editor drive it too.
 
-- **Owner:** Team Member 1, paired with WS4. **Reviewers:** WS2 for anything the dashboard calls, WS4 for internal routes.
+- **Builder:** Hakim. David reads the back-end pull requests, so he can explain the API at the presentation, and may take on hardening (BE-21) after the handoff.
 - **Owns:** `apps/api`, `apps/collab`, `packages/db`; co-owns `packages/shared` under the interface rule.
 - **Used by:** WS2 (dashboard and editor), WS3 (agent tools, MCP), WS4 (worker), WS5 (CLI, tests).
 
@@ -83,7 +83,7 @@ All public routes sit under `/api/v1`, need a session or bearer token unless mar
 | Method and path | What it does | Role | Used by |
 | --- | --- | --- | --- |
 | `GET /auth/github/start?next=` | Redirect to GitHub with a `state` cookie; `next` is a same-site path to return to | public | web |
-| `GET /auth/github/callback` | Exchange the code, upsert the user, set `lift_session`, redirect to `next` or `/` | public | web |
+| `GET /auth/github/callback` | Exchange the code, upsert the user, set `lift_session`, redirect to `next` or `/projects` | public | web |
 | `POST /auth/logout` | End the session | any | web |
 | `POST /auth/cli` | Start a CLI login: returns `{ code, verifyUrl, pollSecret, expiresAt }` | public | cli |
 | `GET /auth/cli/:code` | Poll with `Authorization: Bearer {pollSecret}`: `pending`, `denied`, `expired`, or `approved` with a new token | public | cli |
@@ -138,7 +138,7 @@ Worker-only internal routes are listed in `docs/contracts.md`. The agent service
 
 1. `GET /auth/github/start` sets a random `state` cookie (10 minutes) and redirects to GitHub with scopes `read:user user:email repo admin:repo_hook`.
 2. The callback checks `state`, exchanges the code, fetches the profile and primary email, upserts the user and stores the GitHub token encrypted.
-3. It creates a session, sets `lift_session` (httpOnly, Secure, SameSite=Lax, 14 days, sliding) and redirects to the `next` path given to `/auth/github/start` (only same-site paths), or to `/`.
+3. It creates a session, sets `lift_session` (httpOnly, Secure, SameSite=Lax, 14 days, sliding) and redirects to the `next` path given to `/auth/github/start` (only same-site paths), or to `/projects`.
 
 ### Creating a service
 

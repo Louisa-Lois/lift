@@ -1,13 +1,13 @@
 # PRD 5 · CLI, quality & delivery
 
-> Read together with `docs/contracts.md`. Owner: Team Member 5. Paste the kickoff prompt at the bottom into your coding agent to start.
+> Read together with `docs/contracts.md`. David owns the CLI (`docs/briefs/david-cli.md`); Esbert owns everything else here (`docs/briefs/esbert-quality-delivery.md`). `docs/start-here.md` has the current dates, which replace the ones below. Paste the kickoff prompt at the bottom into your coding agent to start.
 
 ## Goal, scope and inspiration
 
-**WS5 builds the `lift` command-line tool and owns everything that proves the product works and gets it submitted: repo tooling, CI, the end-to-end demo test, the security checklist, the demo script and video, the slides and the report.** Tooling is live on Nov 16; the full demo runs in CI by Nov 28.
+**WS5 builds the `lift` command-line tool and owns everything that proves the product works and gets it submitted: repo tooling, CI, the end-to-end demo test, the security checklist, the demo script and video, the slides and the report.** Tooling arrived with the starter repo on Nov 16; the full demo runs in CI by Nov 28.
 
-- **Owner:** Team Member 5, who also floats to whichever workstream falls behind. **Reviewers:** each owner for their part of the demo.
-- **Owns:** `apps/cli`, `e2e/`, `.github/` (WS4 co-owns the deploy job), `packages/config`, `docs/demo.md`, the report and the slides.
+- **Owners:** David for the CLI; Esbert for everything else here. **Reviewer:** Hakim.
+- **Owns:** David: `apps/cli`. Esbert: `e2e/`, `.github/` (Hakim owns the deploy job), `packages/config`, `docs/demo.md`, the report and the slides.
 
 | Inspiration | What we take |
 | --- | --- |
@@ -50,12 +50,12 @@ A single Node binary (`apps/cli`, bundled with tsup), built on `commander`, with
 
 ## Repo tooling, CI and testing strategy
 
-### Set up on Nov 16, before anyone writes features
+### Repo tooling
 
-- Workspace: `pnpm-workspace.yaml`, `turbo.json` (tasks `build`, `dev`, `lint`, `typecheck`, `test`, `eval`), `biome.json`, `tsconfig.base.json`, and presets in `packages/config`.
+The starter repo (Nov 16) already has the workspace (`pnpm-workspace.yaml` with the version catalog, `turbo.json`, `biome.json`, `tsconfig.base.json` and the presets in `packages/config`) and the agent brief files (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`). Esbert owns them from here and adds:
+
 - Pre-commit with lefthook: Biome on staged files and a typecheck of changed packages.
-- `AGENTS.md`, `CLAUDE.md` and `GEMINI.md` as described in `docs/contracts.md`.
-- `CODEOWNERS`: `apps/web` to TM2; `apps/api`, `apps/collab` and `packages/db` to TM1; `apps/agent`, `apps/mcp` and `evals` to TM3; `apps/worker` and `infra` to TM4; `apps/cli`, `e2e`, `.github` and `packages/config` to TM5; `packages/shared` to all five.
+- `CODEOWNERS`, with everyone's GitHub username, following the ownership table in `AGENTS.md`: Louisa's theme, landing-page and brand paths; David's `apps/cli`; Lyse's `evals/` and `apps/agent/src/prompts/`; Esbert's `.github/`, `e2e/`, `docs/demo.md`, `docs/report/`, `packages/config` and the root tooling files; Hakim on everything else, including `packages/shared`.
 - Branch protection on `main`; a PR template (what and why, requirement ID, screenshots, tests, "agent-written: yes/no", "contract change: yes/no"); issue templates for bugs, requirements and interface changes.
 
 ### CI workflows
@@ -108,7 +108,7 @@ Problem · What Lift does · Live demo · Architecture · The AI layer and its e
 
 ### Report
 
-Problem and users · Architecture and decisions (linking `docs/adr`) · The AI layer and evaluation results with numbers · The live editor · Testing and security · What broke and what we learned · Individual contributions by workstream · Future work. Drafted from Nov 24, final on Dec 1.
+Problem and users · Architecture and decisions (linking `docs/adr`) · The AI layer and evaluation results with numbers · The live editor · Testing and security · What broke and what we learned · Individual contributions by person · Future work. Drafted from Nov 24, final on Dec 1.
 
 ### Submission on Dec 2
 
@@ -122,23 +122,23 @@ Problem and users · Architecture and decisions (linking `docs/adr`) · The AI l
 
 ### By Nov 16 and 17
 
-- [ ] **QA-01** Workspace tooling, pre-commit, agent brief files, CODEOWNERS, templates, branch protection, `ci.yml`
+- [ ] **QA-01** Pre-commit, CODEOWNERS, templates, branch protection and `ci.yml`, on top of the starter repo's workspace tooling and agent brief files
 - [ ] **QA-02** GitHub organisation `lift-demo`, the bot user and the four demo repos
 
 ### By Nov 19 (hello world live)
 
-- [ ] **QA-03** CLI skeleton: `login --token`, `whoami`, `status`, `--json`, exit codes
+- [ ] **QA-03** (David) CLI skeleton: `login --token`, `whoami`, `status`, `--json`, exit codes
 - [ ] **QA-04** `deploy.yml` with WS4, so staging receives every merge
 
 ### By Nov 23 (everything works by hand)
 
-- [ ] **QA-05** CLI `link`, `up`, `logs`, `env`, `db`, `rollback`, `redeploy` and `restart` against the real API
+- [ ] **QA-05** (David) CLI `link`, `up`, `logs`, `env`, `db`, `rollback`, `redeploy` and `restart` against the real API
 - [ ] **QA-06** Playwright: the manual demo path (sign in, deploy, variables, database, rollback)
 - [ ] **QA-07** Security checklist v1 and `docs/demo.md` v1
 
 ### By Nov 28 (AI and editor done)
 
-- [ ] **QA-08** CLI browser login, `init` with the AI plan, and `ask`
+- [ ] **QA-08** (David) CLI browser login, `init` with the AI plan, and `ask`
 - [ ] **QA-09** Playwright: the full demo, including the editor in two browser contexts and the AI steps; `e2e.yml` running nightly
 - [ ] **QA-10** Slides and report drafts; fallback account prepared
 
@@ -160,8 +160,8 @@ Problem and users · Architecture and decisions (linking `docs/adr`) · The AI l
 You are working in the Lift monorepo. Before anything else, read AGENTS.md, docs/contracts.md
 and docs/prd/05-quality-delivery.md.
 
-Scope: apps/cli, e2e/, .github/, packages/config, docs/demo.md. The CLI uses only the typed
-client in packages/shared.
+Scope: apps/cli, e2e/, .github/, packages/config, docs/demo.md and the root tooling files.
+The CLI uses only the typed client in packages/shared.
 
 Task: implement requirement <QA-XX> only.
 1. Restate it and list the files and commands involved.

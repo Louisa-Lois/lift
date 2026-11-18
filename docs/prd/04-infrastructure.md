@@ -1,13 +1,13 @@
 # PRD 4 · Infrastructure & worker
 
-> Read together with `docs/contracts.md`. Owner: Team Member 4, paired with WS1. Paste the kickoff prompt at the bottom into your coding agent to start.
+> Read together with `docs/contracts.md`. Owner: Hakim, who builds the rest of the demo path too. `docs/start-here.md` has the current dates, which replace the ones below. Paste the kickoff prompt at the bottom into your coding agent to start.
 
 ## Goal, scope and inspiration
 
 **WS4 builds the machines and the worker: two AWS virtual machines defined in Terraform, HTTPS routing for the dashboard and every deployed app, and the worker agent that builds images, runs containers safely, ships logs and metrics, and provisions databases.** By Nov 19 a pushed repo is live at its own HTTPS address; by Nov 23 the worker does everything the manual demo needs.
 
-- **Owner:** Team Member 4, paired with WS1. **Reviewers:** WS1 for the job contract, WS5 for the deploy pipeline.
-- **Owns:** `infra/`, `apps/worker`, and `.github/workflows/deploy.yml` together with WS5.
+- **Owner:** Hakim, who builds the rest of the demo path too. **Reviewer:** Esbert, for the deploy pipeline.
+- **Owns:** `infra/`, `apps/worker`, and `.github/workflows/deploy.yml`.
 - **Depends on:** the job and internal-API contracts in `docs/contracts.md`.
 
 | Inspiration | What we take |

@@ -1,12 +1,37 @@
 # Start here
 
-Nov 16, 2026. Read this page, then [contracts.md](contracts.md), then your own PRD in [prd/](prd/).
+Updated Nov 18, 2026. Read this page, then your brief in [briefs/](briefs/). Hakim builds from [contracts.md](contracts.md) and the PRDs in [prd/](prd/).
 
-## What's in the repo today
+## How we're building Lift
 
-The starter repo. Every app and package in `docs/contracts.md` exists, starts, answers a health check and passes `pnpm check`; each one's README says what it does today and which requirement comes next. Nothing beyond that is built yet.
+Hakim builds the whole demo path himself, with Claude Code, until it works end to end (target Nov 26): the API, the worker, the servers, the dashboard, the AI planner and autofix, and the live editor. Fitting five people's parts together was the biggest risk in the plan, so one person owns everything that has to fit together.
 
-The shared contracts in `packages/shared` come next, as one pull request (BE-00) that every owner reviews before they freeze on Nov 18. Until then, build what doesn't depend on them, and wait for them before writing your own types.
+Everyone else works in parallel on parts that don't touch his code, then takes over polish after the handoff on Nov 26. Each brief lists your tasks with dates, the folders you may change, and a kickoff prompt for your coding agent.
+
+## Who's who
+
+| Person | Until Nov 26 | From the handoff on Nov 26 | Brief |
+| --- | --- | --- | --- |
+| Hakim | Builds the demo path end to end | Fixes what breaks as everyone's work lands; reviews pull requests | The PRDs in [prd/](prd/) |
+| Louisa | Brand, theme and the landing page | Polishes the dashboard; visuals for the report, slides and video | [louisa-design.md](briefs/louisa-design.md) |
+| David | The `lift` CLI, against sample data first | CLI browser login and AI commands; API hardening if time | [david-cli.md](briefs/david-cli.md) |
+| Lyse | The AI test set and the AI's instructions | Runs the evaluation and improves the prompts | [lyse-ai-evals.md](briefs/lyse-ai-evals.md) |
+| Esbert | Repo rules, CI, demo repos, demo script, report outline | End-to-end tests, rehearsals, video, submission | [esbert-quality-delivery.md](briefs/esbert-quality-delivery.md) |
+
+## Dates
+
+| When | Hakim's demo path | Everyone else |
+| --- | --- | --- |
+| Nov 18 | Shared contracts (BE-00); servers planned | Start the first task in your brief |
+| Nov 19–21 | Deploying works: sign in, pick a repo, build it, live at its own address, live logs. Locally first, then on the servers | Brand and theme in code; CLI basics; the AI test set; demo repos and CI |
+| Nov 22 | Variables, Postgres, rollback, API tokens | CLI moves to the real API; prompt drafts; demo script v1 |
+| Nov 24 | AI plan from a pasted repo URL; autofix of the three seeded failures | Landing page done; evaluation runs start |
+| Nov 26 | Live editor: two people, one file, commit and deploy. **The demo path is complete: handoff** | Polish starts; CLI browser login; end-to-end tests |
+| Nov 27–28 | Fixes as everyone's work lands; extras only if there's time | Polish, final evaluation numbers, report and slide drafts |
+| Nov 29 – Dec 1 | Freeze: fixes only | Daily demo runs, video on Nov 30, report final on Dec 1 |
+| Dec 2 | Submission | |
+
+When a date slips, Hakim drops extras first: ops chat, the MCP server, Redis, metrics and usage, then CLI browser login.
 
 ## Set up your machine
 
@@ -20,57 +45,19 @@ The shared contracts in `packages/shared` come next, as one pull request (BE-00)
    pnpm dev           # web, api, agent, collab and worker
    ```
 
-   http://localhost:3000 should show the placeholder page, and http://localhost:3000/api/v1/health should answer `{"status":"ok"}`.
-3. Register your own GitHub OAuth app and put its ID and secret in `.env`; the steps are in `.env.example`. You need it once sign-in lands (BE-03, Nov 19).
+   http://localhost:3000 should show the start page, and http://localhost:3000/api/v1/health should answer `{"status":"ok"}`.
+3. To sign in to your local copy once sign-in lands (Nov 19–21), register your own GitHub OAuth app and put its ID and secret in `.env`; the steps are in `.env.example`.
 4. Open the repo in your coding tool. It reads `AGENTS.md`: Codex and Cursor directly, Claude Code through `CLAUDE.md`, Gemini CLI through `GEMINI.md`.
-
-## Your first tasks
-
-### Back end & API (Team Member 1, with Team Member 4)
-
-- **First:** BE-00, the shared contracts and the v1 database schema, as one pull request every owner reviews, tagged `contracts-v1` on Nov 18.
-- **Then:** routes in the order the front end needs them: sign-in, projects, services, deployments, the log stream (BE-01 to BE-08, by Nov 19).
-
-### Front end (Team Member 2)
-
-- **Now:** spend an hour in the Railway, Vercel and Render dashboards with the design table from your PRD open.
-- **First tasks:** FE-01 (app frame, colours, fonts, shadcn/ui and the switch that turns mocks on). Then the log viewer from FE-05: it appears on four screens, and the PRD's fake log stream lets you finish it before the API exists.
-- **Works against:** mocks built from the sample data in `packages/shared` once BE-00 lands; each screen moves to the real API as its routes ship.
-
-### AI agent (Team Member 3)
-
-- **Now:** get an Anthropic API key with a monthly spending cap. Shortlist the 30 evaluation repos and fix the exact commit of each.
-- **First tasks:** AI-00, the plan, action and diagnosis schemas, as a pull request into `packages/shared` reviewed by Team Member 1 (due Nov 18). Then AI-01; `apps/agent` already runs.
-- **Works against:** saved copies of a few repos' files and recorded model replies, so tests never call the model.
-
-### Infrastructure & worker (Team Member 4, with Team Member 1)
-
-- **Now (INF-00):**
-  - Buy the domain and move it to Cloudflare first; the switch can take up to a day.
-  - Set up the AWS account and the budget alarm.
-  - Check what the credits allow: regions, instance sizes and the EC2 vCPU limit. Demo week needs 6 vCPUs across the two servers.
-- **First tasks:**
-  - Agree the job payloads and internal routes with Team Member 1 before the Nov 18 freeze.
-  - INF-06: add BuildKit and the `*.apps.localhost` Traefik to `infra/compose/dev.yml`.
-  - INF-01: Terraform for the two servers.
-  - INF-04 and INF-05: the build and deploy jobs on local Docker.
-- **Works against:** test jobs queued by a small script and a tiny fake of the internal API, so the worker runs before the real routes do.
-
-### CLI, quality & delivery (Team Member 5)
-
-- **Now:** QA-02, the `lift-demo` GitHub org, the bot account and the four demo repos. Then turn every requirement ID in the PRDs into a GitHub issue, grouped by the Nov 19, 23 and 28 checkpoints, so the team works off one board.
-- **First tasks:** the rest of QA-01 on top of this repo: pre-commit checks, `ci.yml`, CODEOWNERS, pull request and issue templates, branch protection. The root tooling (Biome, Turborepo, the TypeScript presets) is already here and is yours from now on. Then QA-03; `apps/cli` already runs.
-- **Works against:** a mocked API in the CLI's tests, built from the same sample data.
 
 ## How to work with your coding agent
 
-1. Pull `main`, then create a branch named `ws{N}/{REQ-ID}-short-name`.
-2. Paste the kickoff prompt from the end of your PRD, with one requirement ID.
-3. Read the agent's plan before it writes code. If it reaches outside your folders or into `packages/shared`, stop it and open an `interface` issue instead.
-4. Once `pnpm check` passes, open a pull request the same day, reviewed by the person your PRD names. Keep pull requests small, merge daily, and update your branch from `main` each morning.
+1. Pull `main`, then create a branch named after yourself and your task: `louisa/UI-02-landing-page`.
+2. Paste the kickoff prompt from your brief, with one task ID.
+3. Read the agent's plan before it writes code. It must stay inside the folders your brief lists; if it needs something outside them, stop and ask Hakim.
+4. Once `pnpm check` passes, open a pull request the same day. Hakim reviews it. Keep pull requests small, and update your branch from `main` each morning.
 
 ## Rhythm
 
 - A 10-minute check-in at the same time every day (a group-chat message works): what got merged, what's next, what's blocked.
-- If you're blocked on another workstream, build against mocks and say so in the check-in.
-- Checkpoints: **Nov 18** contracts frozen · **Nov 19** hello world live · **Nov 23** everything works by hand · **Nov 28** AI and editor done · **Nov 29 to Dec 1** freeze · **Dec 2** submission. At each checkpoint everyone runs through the demo together.
+- Hakim posts in the chat when a piece of the demo path starts working, so whoever is waiting on it can switch from sample data to the real thing.
+- From Nov 26 the whole team runs through the demo together every day.
