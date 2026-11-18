@@ -1,0 +1,13 @@
+# The worker's default certificate: one Let's Encrypt wildcard for *.apps.{domain}, obtained and
+# renewed by DNS-01. Every app router with tls=true is served by it. DOMAIN comes from the
+# container's environment (Traefik renders Go templates in file-provider configuration).
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+  stores:
+    default:
+      defaultGeneratedCert:
+        resolver: le
+        domain:
+          main: '*.apps.{{ env "DOMAIN" }}'

@@ -1,0 +1,225 @@
+# Control plane VM (INF-02): Traefik for https://app.{domain}, the Lift services, Postgres, Redis.
+#
+# Started by infra/scripts/lift-release.sh, which passes three env files for interpolation:
+#   /opt/lift/host.env        DOMAIN, PRIVATE_IP, … (cloud-init, from Terraform; not secret)
+#   /opt/lift/.env            secrets, mode 600 (every key is listed in control.env.example)
+#   <release>/release.env     IMAGE_TAG, LIFT_IMAGE_PREFIX, … (written by each deploy)
+# Each container gets only the variables it needs: the Anthropic key reaches the agent alone.
+# On the VM: sudo /opt/lift/current/scripts/lift-release.sh compose ps | logs -f api | …
+name: lift
+
+x-service: &service
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+
+# Node apps answer health checks with Node's own fetch: the slim images have no curl.
+x-node-health: &node-health
+  interval: 10s
+  timeout: 5s
+  retries: 6
+  start_period: 30s
+
+services:
+  # Read-only view of the Docker API for Traefik (GET on containers, networks, events, version).
+  socket-proxy:
+    <<: *service
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    environment:
+      CONTAINERS: 1
+      NETWORKS: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [socket]
+
+  traefik:
+    <<: *service
+    image: traefik:v3.7.16
+    depends_on: [socket-proxy]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:?set CF_DNS_API_TOKEN in /opt/lift/.env}
+    volumes:
+      # A stable copy of infra/traefik made by lift-release.sh, so a deploy that leaves the config
+      # unchanged does not restart Traefik. The label makes Compose restart it when it does change.
+      - ${LIFT_CONFIG_DIR:-/opt/lift/config}/traefik/control:/etc/traefik:ro
+      - letsencrypt:/letsencrypt
+    labels:
+      lift.traefik-config: ${TRAEFIK_CONFIG_SHA:-unset}
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks: [edge, socket]
+
+  web:
+    <<: *service
+    image: ${LIFT_IMAGE_PREFIX:?}/lift-web:${IMAGE_TAG:?}
+    environment:
+      NODE_ENV: production
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.web.rule=Host(`app.${DOMAIN:?}`)
+      - traefik.http.routers.web.priority=1
+      - traefik.http.routers.web.entrypoints=websecure
+      - traefik.http.routers.web.tls.certresolver=le
+      - traefik.http.services.web.loadbalancer.server.port=3000
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      <<: *node-health
+    networks: [edge, internal]
+
+  api:
+    <<: *service
+    image: ${LIFT_IMAGE_PREFIX:?}/lift-api:${IMAGE_TAG:?}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+      API_PORT: 4000
+      PUBLIC_URL: https://app.${DOMAIN:?}
+      APPS_DOMAIN: apps.${DOMAIN:?}
+      DATABASE_URL: postgres://lift:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in /opt/lift/.env}@postgres:5432/lift
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in /opt/lift/.env}@redis:6379
+      AGENT_URL: http://agent:4100
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in /opt/lift/.env}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY in /opt/lift/.env}
+      WORKER_TOKEN: ${WORKER_TOKEN:?set WORKER_TOKEN in /opt/lift/.env}
+      AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN:?set AGENT_SERVICE_TOKEN in /opt/lift/.env}
+      COLLAB_SECRET: ${COLLAB_SECRET:?set COLLAB_SECRET in /opt/lift/.env}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:?set GITHUB_CLIENT_ID in /opt/lift/.env}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:?set GITHUB_CLIENT_SECRET in /opt/lift/.env}
+    ports:
+      # The worker's way in to /internal/v1 (docs/contracts.md). Bound to the private IP; the
+      # security group admits port 4000 from the worker only. Traefik routes /api, never /internal.
+      - "${PRIVATE_IP:?}:4000:4000"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.api.rule=Host(`app.${DOMAIN:?}`) && PathPrefix(`/api`)
+      - traefik.http.routers.api.priority=10
+      - traefik.http.routers.api.entrypoints=websecure
+      - traefik.http.routers.api.tls.certresolver=le
+      - traefik.http.services.api.loadbalancer.server.port=4000
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/v1/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      <<: *node-health
+    networks: [edge, internal]
+
+  collab:
+    <<: *service
+    image: ${LIFT_IMAGE_PREFIX:?}/lift-collab:${IMAGE_TAG:?}
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      NODE_ENV: production
+      COLLAB_PORT: 4200
+      DATABASE_URL: postgres://lift:${POSTGRES_PASSWORD:?}@postgres:5432/lift
+      COLLAB_SECRET: ${COLLAB_SECRET:?}
+    labels:
+      # wss://app.{domain}/collab. Traefik passes WebSocket upgrades through as they are.
+      - traefik.enable=true
+      - traefik.http.routers.collab.rule=Host(`app.${DOMAIN:?}`) && PathPrefix(`/collab`)
+      - traefik.http.routers.collab.priority=10
+      - traefik.http.routers.collab.entrypoints=websecure
+      - traefik.http.routers.collab.tls.certresolver=le
+      - traefik.http.services.collab.loadbalancer.server.port=4200
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4200/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      <<: *node-health
+    networks: [edge, internal]
+
+  # Internal only: no router, no published port. The API calls it at http://agent:4100.
+  agent:
+    <<: *service
+    image: ${LIFT_IMAGE_PREFIX:?}/lift-agent:${IMAGE_TAG:?}
+    depends_on:
+      redis: { condition: service_healthy }
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+      AGENT_PORT: 4100
+      API_URL: http://api:4000
+      AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN:?}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY in /opt/lift/.env}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?}@redis:6379
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4100/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      <<: *node-health
+    networks: [internal]
+
+  # The MCP server over Streamable HTTP at https://app.{domain}/mcp (AI-11, cut list). Its image is
+  # built on every deploy, but it only starts with COMPOSE_PROFILES=mcp in /opt/lift/.env, once
+  # apps/mcp ships dist/http.js. Until then it serves stdio only, which needs no container.
+  mcp:
+    <<: *service
+    profiles: [mcp]
+    image: ${LIFT_IMAGE_PREFIX:?}/lift-mcp:${IMAGE_TAG:?}
+    command: ["node", "dist/http.js"]
+    environment:
+      NODE_ENV: production
+      MCP_PORT: 4300
+      LIFT_API_URL: http://api:4000
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.mcp.rule=Host(`app.${DOMAIN:?}`) && PathPrefix(`/mcp`)
+      - traefik.http.routers.mcp.priority=10
+      - traefik.http.routers.mcp.entrypoints=websecure
+      - traefik.http.routers.mcp.tls.certresolver=le
+      - traefik.http.services.mcp.loadbalancer.server.port=4300
+    networks: [edge, internal]
+
+  postgres:
+    <<: *service
+    image: postgres:17-alpine
+    shm_size: 256mb
+    environment:
+      POSTGRES_USER: lift
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: lift
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lift -d lift"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [internal]
+
+  redis:
+    <<: *service
+    image: redis:7-alpine
+    # The password comes from the environment rather than the command line Compose renders.
+    command: ["sh", "-c", 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"']
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?}
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?}
+    ports:
+      # BullMQ queues and log streams for the worker, on the private IP; the security group admits
+      # port 6379 from the worker only.
+      - "${PRIVATE_IP:?}:6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [internal]
+
+networks:
+  edge:
+    name: lift-control-edge
+  internal:
+    name: lift-control-internal
+  socket:
+    name: lift-control-socket
+    internal: true
+
+volumes:
+  pgdata:
+  redisdata:
+  letsencrypt:

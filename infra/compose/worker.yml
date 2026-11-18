@@ -1,0 +1,130 @@
+# Worker VM (INF-03): the apps router with the *.apps.{domain} wildcard, BuildKit, the worker agent
+# and the shared Postgres for users' databases. Users' app containers are not in this file: the
+# worker agent creates them with dockerode on the lift-edge network (docs/prd/04-infrastructure.md).
+#
+# Started by infra/scripts/lift-release.sh with /opt/lift/host.env, /opt/lift/.env (every key is
+# listed in worker.env.example) and the release's release.env, like control.yml.
+# On the VM: sudo /opt/lift/current/scripts/lift-release.sh compose ps | logs -f worker | …
+name: lift
+
+x-service: &service
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+
+services:
+  # Read-only view of the Docker API for Traefik (GET on containers, networks, events, version).
+  socket-proxy:
+    <<: *service
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    environment:
+      CONTAINERS: 1
+      NETWORKS: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [socket]
+
+  traefik-apps:
+    <<: *service
+    image: traefik:v3.7.16
+    depends_on: [socket-proxy]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:?set CF_DNS_API_TOKEN in /opt/lift/.env}
+      DOMAIN: ${DOMAIN:?}
+    volumes:
+      - ${LIFT_CONFIG_DIR:-/opt/lift/config}/traefik/worker:/etc/traefik:ro
+      - letsencrypt:/letsencrypt
+    labels:
+      lift.traefik-config: ${TRAEFIK_CONFIG_SHA:-unset}
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks: [edge, socket]
+
+  # Builds run here, not in the worker container. Reachable only on lift-build, which no app joins.
+  buildkit:
+    restart: unless-stopped
+    image: moby/buildkit:v0.34.2
+    privileged: true
+    command: ["--addr", "tcp://0.0.0.0:1234", "--addr", "unix:///run/buildkit/buildkitd.sock"]
+    volumes:
+      - buildkit:/var/lib/buildkit
+    healthcheck:
+      test: ["CMD", "buildctl", "--addr", "unix:///run/buildkit/buildkitd.sock", "debug", "workers"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks: [build]
+
+  # The worker agent (apps/worker). It holds the Docker socket and publishes no ports. It runs as
+  # root in its container because the socket is root's anyway; it gives no extra power on top.
+  worker:
+    <<: *service
+    image: ${LIFT_IMAGE_PREFIX:?}/lift-worker:${IMAGE_TAG:?}
+    user: root
+    depends_on:
+      buildkit: { condition: service_healthy }
+      lift-pg: { condition: service_healthy }
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+      CONTROL_API_URL: http://${CONTROL_PRIVATE_IP:?}:4000
+      WORKER_TOKEN: ${WORKER_TOKEN:?set WORKER_TOKEN in /opt/lift/.env (same value as the control plane)}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in /opt/lift/.env (same value as the control plane)}@${CONTROL_PRIVATE_IP:?}:6379
+      APPS_DOMAIN: apps.${DOMAIN:?}
+      BUILDKIT_HOST: tcp://buildkit:1234
+      # Superuser for lift-pg, used to create and drop users' databases (INF-10).
+      LIFT_PG_URL: postgres://postgres:${LIFT_PG_PASSWORD:?set LIFT_PG_PASSWORD in /opt/lift/.env}@lift-pg:5432/postgres
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/lift:/var/lib/lift
+    networks:
+      # 172.30.0.0/24: the one Docker subnet INF-11's firewall lets reach the control plane's
+      # private IP on 4000 and 6379.
+      system: {}
+      build: {}
+
+  # Shared Postgres 17 for users' databases. The worker connects it to each project's network when
+  # that project gets a database (INF-10). Those connections are lost if Compose recreates this
+  # container (a new image or settings), so reconciliation (INF-12) must re-attach them.
+  lift-pg:
+    <<: *service
+    image: postgres:17-alpine
+    container_name: lift-pg
+    shm_size: 256mb
+    environment:
+      POSTGRES_PASSWORD: ${LIFT_PG_PASSWORD:?}
+    volumes:
+      - lift-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [system]
+
+networks:
+  # Shared by Traefik and every app container. Created by lift-release.sh, not Compose, because
+  # app containers the worker creates are attached to it and Compose must never try to remove it.
+  edge:
+    name: lift-edge
+    external: true
+  system:
+    name: lift-system
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+  build:
+    name: lift-build
+  socket:
+    name: lift-worker-socket
+    internal: true
+
+volumes:
+  letsencrypt:
+  buildkit:
+  lift-pg-data:
