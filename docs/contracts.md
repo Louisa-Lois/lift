@@ -125,9 +125,9 @@ Everything in this section exists as code in `packages/shared` and is frozen as 
 | ProjectMember | composite | projectId, userId, role: `owner` · `editor` · `viewer` | WS1 |
 | Service | `svc_` | projectId, name, slug, type: `web` · `static`, repo {owner, name, branch}, rootDir, builder: `railpack` · `dockerfile`, buildCommand, startCommand, port, healthcheckPath, cpu, memoryMb, subdomain | WS1 |
 | Deployment | `dep_` | serviceId, status, trigger: `push` · `manual` · `rollback` · `agent` · `editor` · `cli`, commitSha, commitMessage, imageTag, containerId, errorCode, errorMessage, rollbackOf, timestamps | WS1 |
-| Variable | `var_` | serviceId, key, value (encrypted at rest, masked in responses), source: `user` · `database` · `agent` · `system` | WS1 |
-| Database | `db_` | projectId, type: `postgres` · `redis`, name, status: `provisioning` · `ready` · `failed` · `deleting` | WS1 + WS4 |
-| Domain | `dom_` | serviceId, hostname, kind: `generated` · `custom`, status | WS1 + WS4 |
+| Variable | `var_` | serviceId, key, value (encrypted at rest, masked in responses), source: `user` · `database` · `agent` · `system`, databaseId (when the value came from a database) | WS1 |
+| Database | `db_` | projectId, type: `postgres` · `redis`, name, status: `provisioning` · `ready` · `failed` · `deleting`, envVar (default `DATABASE_URL` or `REDIS_URL`) | WS1 + WS4 |
+| Domain | `dom_` | serviceId, hostname, kind: `generated` · `custom`, status: `pending` · `active` · `failed` | WS1 + WS4 |
 | Event | `evt_` | projectId, actorType: `user` · `agent` · `system` · `worker`, actorId, type, data, createdAt | WS1 |
 | ApiToken | `tok_` | userId, name, prefix, scopes, projectId (optional), lastUsedAt | WS1 |
 | OnboardingPlan | `pln_` | repo, summary, services[], databases[], variables[], warnings[], confidence | WS3 (schema), WS1 (storage) |
@@ -137,6 +137,8 @@ Everything in this section exists as code in `packages/shared` and is frozen as 
 | EvalRun, EvalResult | `evr_`, `evx_` | per-run summary, per-repo outcome | WS3 |
 
 **Deployment status** is one of `queued`, `building`, `deploying`, `active`, `failed`, `canceled`, `superseded`. Only one deployment per service is `active`. The full state machine is in the back-end PRD.
+
+Tables the data model above gives no prefix use `cli_` (CLI logins), `dpe_` (deployment timeline entries), `ecm_` (editor commits), `msg_` (agent messages) and `dgn_` (diagnoses). `system` variables (`PORT`, `LIFT_*`) are never stored: they appear only in the worker's runtime environment, never in the variables routes.
 
 ### IDs, names and formats
 
@@ -150,42 +152,42 @@ Everything in this section exists as code in `packages/shared` and is frozen as 
 
 - Base path `/api/v1`, JSON only, described at `/api/v1/openapi.json`, generated from the route schemas.
 - Auth: browser session cookie `lift_session`, or `Authorization: Bearer lift_pat_…` for the CLI, MCP and scripts. The agent service uses `lift_svc_…` plus an `X-Lift-Act-As: usr_…` header, accepted only with that token.
-- Errors are `application/problem+json`: `{ type, title, status, detail, code, fields? }`. `code` is stable: `unauthenticated`, `forbidden`, `not_found`, `validation_failed`, `conflict`, `rate_limited`, `github_error`, `upstream_unavailable`, `internal`.
-- Lists use cursors: `?limit=50&cursor=…` returns `{ data: [...], nextCursor: "…" or null }`.
-- Writes return the full resource. Long-running actions (deploy, provision a database) return `202 Accepted` with the resource in its first status (`queued`, `provisioning`).
+- Errors are `application/problem+json`: `{ type, title, status, detail, code, fields? }`. `code` is stable: `unauthenticated` (401), `forbidden` (403), `not_found` (404), `validation_failed` (400), `conflict` (409), `rate_limited` (429), `github_error` (502), `upstream_unavailable` (503), `internal` (500). `fields` maps a field's dot path (`repo.owner`) to its message.
+- Lists use cursors: `?limit=50&cursor=…` (at most 100) returns `{ data: [...], nextCursor: "…" or null }`. Small lists (variables, members, databases, domains, branches) return everything with `nextCursor: null`.
+- Writes return the full resource. Long-running actions (deploy, provision a database) return `202 Accepted` with the resource in its first status (`queued`, `provisioning`). Deletes return `204`, except a database, which returns `202` with status `deleting`.
 - Roles: `viewer` reads; `editor` reads and writes; `owner` also manages members and deletes the project.
 
 ### Real-time events (Server-Sent Events)
 
 | Stream | Path | Event types | Payload |
 | --- | --- | --- | --- |
-| Project activity | `GET /api/v1/projects/:projectId/events/stream` | `deployment.created`, `deployment.status_changed`, `service.updated`, `database.status_changed`, `variables.changed`, `agent.action_proposed`, `agent.action_completed`, `editor.committed` | The changed resource, plus `previousStatus` on status changes |
-| Deployment logs | `GET /api/v1/deployments/:deploymentId/logs/stream` | `log`, `end` | `{ ts, stream: build · deploy · runtime · system, line }` |
+| Project activity | `GET /api/v1/projects/:projectId/events/stream` | `deployment.created`, `deployment.status_changed`, `service.created`, `service.updated`, `service.deleted`, `service.restarted`, `database.status_changed`, `variables.changed` (keys only), `project.updated`, `project.deleted`, `member.changed`, `agent.action_proposed`, `agent.action_completed`, `editor.committed` | The full event `{ id, projectId, actorType, actorId, type, data, createdAt }`, as `GET /projects/:id/events` lists it; `data` is the changed resource, plus `previousStatus` on status changes |
+| Deployment logs | `GET /api/v1/deployments/:deploymentId/logs/stream` | `log`, `end` | `log`: `{ ts, stream: build · deploy · runtime · system, line }`; `end`: `{ status }` |
 | Service logs | `GET /api/v1/services/:serviceId/logs/stream` | `log` | Same shape, runtime only |
 
-Every event carries an `id` (its Redis Stream entry ID) so clients resume with `Last-Event-ID`; servers send a heartbeat comment every 15 seconds. Schemas live in `packages/shared/src/events.ts`.
+Every event carries an `id` (its Redis Stream entry ID) so clients resume with `Last-Event-ID`; project events go through a Redis Stream too (`events:prj:{projectId}`), not pub/sub, so all three resume the same way. Servers send a heartbeat comment every 15 seconds. Clients ignore event types they don't know, so a new type is an additive change. Log snapshots (`GET …/logs`) return `{ data: [{ id, ts, stream, line }] }`, so a client can open the stream from the last snapshot line. Schemas live in `packages/shared/src/events.ts` and `packages/shared/src/schemas/event.ts`.
 
 ### Worker jobs (control plane to worker)
 
-Three BullMQ queues on the control plane's Redis. Payloads never contain secrets: the worker fetches them over the internal API when it needs them.
+Three BullMQ queues on the control plane's Redis, plus `lift-agent`, where the API puts an `autofix` job (`{ deploymentId }`) for the agent service. Payloads never contain secrets: the worker fetches them over the internal API when it needs them. The schemas are strict, so an unknown field fails.
 
 | Queue | Job | Payload (Zod schema in `packages/shared/src/jobs.ts`) |
 | --- | --- | --- |
 | `lift-build` | `build` | `deploymentId, serviceId, projectId, repo {owner, name, branch}, commitSha, rootDir, builder, dockerfilePath?` |
-| `lift-deploy` | `deploy` | `deploymentId, serviceId, projectId, imageTag, port, healthcheckPath, cpu, memoryMb, hostnames[]` |
-| `lift-ops` | `stop` · `restart` · `remove_service` · `provision_db` · `deprovision_db` | A union keyed on `op`, each with the IDs it acts on |
+| `lift-deploy` | `deploy` | `deploymentId, serviceId, serviceSlug, projectId, imageTag, port, healthcheckPath, cpu, memoryMb, hostnames[]` |
+| `lift-ops` | `stop` · `restart` · `remove_service` · `provision_db` · `deprovision_db` | A union keyed on `op`, each with only the IDs it acts on: `stop` and `restart` take `deploymentId, serviceId, projectId` (`stop` also cancels a running build); `remove_service` takes `serviceId, projectId`; the database ops take `databaseId, projectId, type`. A Postgres database and its role are named after the database ID |
 
 | Worker to control plane (internal API) | Purpose |
 | --- | --- |
-| `GET /internal/v1/deployments/:id/build-context` | Short-lived GitHub clone token, build settings, build-time variables |
-| `GET /internal/v1/deployments/:id/runtime-env` | Decrypted runtime variables plus system variables |
-| `POST /internal/v1/deployments/:id/status` | `{ status, message?, imageTag?, containerId?, errorCode?, at }` |
+| `GET /internal/v1/deployments/:id/build-context` | GitHub clone token (the project owner's OAuth token, not short-lived), build settings, build-time variables |
+| `GET /internal/v1/deployments/:id/runtime-env` | `{ variables: [{ key, value, source }], envHash }`: decrypted runtime variables plus system variables |
+| `POST /internal/v1/deployments/:id/status` | `{ status, message?, imageTag?, containerId?, errorCode?, at }`: `deploying` needs `imageTag`, `active` needs `containerId`, `failed` needs `errorCode`. Repeats are accepted; a report the state machine refuses (a canceled deployment) gets `409`, and the worker stops |
 | `GET /internal/v1/databases/:id/provision-context` | Generated credentials for a new database |
-| `POST /internal/v1/databases/:id/status` | `{ status, host?, port?, message? }` |
-| `POST /internal/v1/metrics` | `{ samples: MetricSample[] }`, every 15 seconds |
-| `GET /internal/v1/worker/desired-state` | Every deployment that should be running, for reconciliation |
+| `POST /internal/v1/databases/:id/status` | `{ status: ready · failed, host?, port?, message? }`; after `deprovision_db` the worker reports only a failure |
+| `POST /internal/v1/metrics` | `{ samples: MetricSample[] }`, every 15 seconds; `cpuPct` is a percentage of the service's CPU limit, `netRxKb` and `netTxKb` are KB per interval |
+| `GET /internal/v1/worker/desired-state` | Every deployment that should be running (with `serviceSlug` and `envHash`) and every ready database, for reconciliation |
 
-Internal routes listen only on the control plane's private IP, never behind the public router, and require `Authorization: Bearer {WORKER_TOKEN}`.
+Internal routes listen only on the control plane's private IP, never behind the public router, and require `Authorization: Bearer {WORKER_TOKEN}` (the agent's two internal routes require `AGENT_SERVICE_TOKEN` instead).
 
 **Logs** go straight from the worker into Redis Streams: `logs:dep:{deploymentId}` for build and deploy output (capped near 5,000 lines) and `logs:svc:{serviceId}` for runtime output (near 20,000 lines). Each entry has the fields `ts`, `stream` and `line`.
 

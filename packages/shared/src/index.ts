@@ -1,26 +1,25 @@
 /**
- * @lift/shared: the contracts every Lift app shares.
+ * @lift/shared: the contracts every Lift app shares, frozen as contracts v1 on Nov 18 (git tag
+ * `contracts-v1`; see docs/contracts.md). Change this package only through an issue labelled
+ * `interface`; after the freeze, only additive changes go in without every owner's approval.
  *
- * Contracts v1 land here in BE-00 (IDs, enums, schemas, errors, events, job payloads, the typed
- * client and fixtures) and freeze on Nov 18 as the git tag `contracts-v1`; see docs/contracts.md.
- * Change this package only through an issue labelled `interface`.
+ * Sample data for mocks and tests is a separate entry point: `@lift/shared/fixtures`.
  */
+
+export * from "./client";
+export * from "./enums";
+export * from "./errors";
+export * from "./events";
+export * from "./ids";
+export * from "./internal";
+export * from "./jobs";
+export * from "./schemas";
 
 /** Base path of every public API route. */
 export const API_BASE_PATH = "/api/v1";
 
 /** Base path of the internal routes the worker and the agent service call. Never routed publicly. */
 export const INTERNAL_BASE_PATH = "/internal/v1";
-
-/** BullMQ queues on the control plane's Redis. */
-export const QUEUE_NAMES = {
-  build: "lift-build",
-  deploy: "lift-deploy",
-  ops: "lift-ops",
-  agent: "lift-agent",
-} as const;
-
-export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 
 /** Ports in development. Each container listens on the same number in production. */
 export const DEV_PORTS = {
