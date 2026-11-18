@@ -41,14 +41,14 @@
 **Terraform** (`infra/terraform`)
 
 - Providers `aws` and `cloudflare`. State in an S3 bucket with native lock files (`use_lockfile = true`); state is never committed.
-- Resources: a security group per VM, with no rule for port 22; two `aws_instance`s with `metadata_options { http_tokens = "required", http_put_response_hop_limit = 1 }`, no key pair and an SSM-only instance profile each; two Elastic IPs; cloud-init user data that installs Docker, writes `/opt/lift/host.env` and installs a systemd unit that brings the current release up at boot; Cloudflare records `app` and `*.apps` (DNS only, not proxied); an `aws_budgets_budget` of $50 a month emailing at 80% and 100%, plus a budget action that stops both instances at $120; GitHub's OIDC provider and the deploy role `lift-github-deploy`.
-- Variables: `domain`, `alert_emails`, `github_repository`, plus `region`, `worker_instance_type` and the budget amounts with defaults. Outputs: both IPs, the URLs, the SSM session command for each VM, the deploy role ARN and the GitHub Actions variables the deploy workflow reads.
+- Resources: a security group per VM, with no rule for port 22; two `aws_instance`s with `metadata_options { http_tokens = "required", http_put_response_hop_limit = 1 }`, no key pair and an SSM-only instance profile each; two Elastic IPs; cloud-init user data that installs Docker, writes `/opt/lift/host.env` and installs a systemd unit that brings the current release up at boot; Cloudflare records `app` and `*.apps` (DNS only, not proxied); an `aws_budgets_budget` of $50 a month emailing at 80% and 100%, plus a budget action that stops both instances at $120, both counting spend before credits (`include_credit = false`); GitHub's OIDC provider and the deploy role `lift-github-deploy`.
+- Variables: `domain`, `alert_emails`, `github_repository` and `github_oidc_sub_prefix`, plus `region`, `worker_instance_type` and the budget amounts with defaults. Outputs: both IPs, the URLs, the SSM session command for each VM, the deploy role ARN and the GitHub Actions variables the deploy workflow reads.
 - The default VPC is fine; put both instances in the same subnet so they talk over private IPs.
 
 **Access without SSH.** Neither VM accepts SSH: there is no key pair and port 22 is closed in both security groups. Each VM's instance profile allows the SSM agent (preinstalled on Ubuntu's AMIs) and nothing else.
 
 - **Your shell:** `aws ssm start-session --profile lift --target {instance-id}` (Terraform prints the exact command). It needs the AWS CLI's Session Manager plugin and runs with your own IAM identity, so CloudTrail records who opened it.
-- **Deploys:** the role `lift-github-deploy` trusts GitHub's OIDC tokens from this repo's `production` environment only. It may call `ssm:SendCommand` with the `AWS-RunShellScript` document on these two instances and read the results; it has no other permissions, and GitHub holds no AWS keys. Restrict the `production` environment to the `main` branch in the repo settings.
+- **Deploys:** the role `lift-github-deploy` trusts exactly one GitHub OIDC subject: jobs on this repo's `main` branch, `repo:{owner}@{owner-id}/{repo}@{repo-id}:ref:refs/heads/main`. The IDs come from the repo's immutable subject claims, so a renamed or recreated repo can't take over the role. It may call `ssm:SendCommand` with the `AWS-RunShellScript` document on these two instances and read the results; it has no other permissions, and GitHub holds no AWS keys. The repo is private under GitHub Free, which offers neither environments nor branch protection, so anyone who can push to `main` can deploy. If the repo gains environments (public, or an owner on Pro), switch the trust to `environment:production` and restrict that environment to `main`.
 
 **VM layout.** `/opt/lift/host.env` holds the facts cloud-init writes (role, domain, private IPs); `/opt/lift/.env` (mode 600) holds the secrets, filled in by hand; each deploy unpacks `infra/compose`, `infra/traefik` and `infra/scripts` into `/opt/lift/releases/{sha}`, and `/opt/lift/current` points at the running one. `infra/scripts/lift-release.sh` runs Compose with all three env files, so every command on a VM uses the same settings.
 
@@ -146,7 +146,7 @@
 | Two public IPv4 addresses (AWS has charged for each since 2024) | about $7 |
 | S3 backups and data transfer | under $2 |
 
-Student credits should cover this. To spend less, `infra/scripts/stop.sh` stops both instances at night (Elastic IPs keep the addresses) and `start.sh` brings them back; reconciliation restores every app on boot.
+Credits can pay the bill, but the budget counts spending before credits, so they never hide it. At these rates both VMs running all month cost about $119, just under the $120 stop. To spend less, `infra/scripts/stop.sh` stops both instances at night (Elastic IPs keep the addresses) and `start.sh` brings them back; reconciliation restores every app on boot.
 
 ### Operations
 

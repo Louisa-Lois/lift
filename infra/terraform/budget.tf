@@ -1,4 +1,5 @@
-# $50 a month, emailing at 80% and 100% of actual spend; at $120 actual, AWS Budgets stops both VMs.
+# $50 a month, emailing at 80% and 100% of actual spend before credits; at $120, AWS Budgets stops
+# both VMs.
 # Budgets data lags actual spend by up to a day, so treat these as guardrails, not a hard cap.
 
 resource "aws_budgets_budget" "monthly" {
@@ -7,6 +8,12 @@ resource "aws_budgets_budget" "monthly" {
   limit_amount = tostring(var.monthly_budget_usd)
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
+
+  # Count spending before credits, so leftover credits can't hide it from the alerts or the stop
+  # action. Every other cost type keeps the AWS default.
+  cost_types {
+    include_credit = false
+  }
 
   dynamic "notification" {
     for_each = [80, 100]

@@ -75,12 +75,13 @@ data "aws_iam_policy_document" "github_assume" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # Only jobs that run in this repo's deploy environment. Restrict that environment to the main
-    # branch in the repo settings; otherwise any branch could use it.
+    # Exactly one subject: this repo (pinned by owner and repo IDs) and, by default, a job on the
+    # main branch that references no environment. Pull requests never match: their tokens carry
+    # pull_request, not a branch ref.
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:environment:${var.github_environment}"]
+      values   = ["${var.github_oidc_sub_prefix}:${var.github_deploy_context}"]
     }
   }
 }
