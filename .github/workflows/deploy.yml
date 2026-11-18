@@ -1,17 +1,20 @@
-# Platform deploy (INF-07, WS4 with WS5). Every push to main:
+# Platform deploy (INF-07). Every push to main:
 #   1. builds the six images and pushes them to GHCR, tagged with the commit SHA;
 #   2. runs database migrations on the control plane, then rolls out to the control plane and the
 #      worker, through SSM Run Command (infra/scripts/ssm-deploy.sh).
 # There is no SSH and there are no AWS keys in GitHub: the roll-out job assumes the role
-# lift-github-deploy (infra/terraform/iam.tf) by OIDC. That role trusts only jobs running in the
-# `production` environment, which must be restricted to the main branch in the repo settings.
+# lift-github-deploy (infra/terraform/iam.tf) by OIDC. The role trusts exactly one token subject,
+# this repo's main branch, so the roll-out job sets no `environment:` (a job in an environment gets
+# a different subject). To require a production environment instead, change github_deploy_context
+# in Terraform and add the environment here in the same change.
 #
 # Repository variables, printed by `terraform output github_variable_commands`:
 #   AWS_DEPLOY_ROLE_ARN, AWS_REGION, LIFT_DOMAIN, LIFT_CONTROL_INSTANCE_ID, LIFT_WORKER_INSTANCE_ID
 # Secrets: none beyond the built-in GITHUB_TOKEN. App secrets live in /opt/lift/.env on each VM.
 #
-# Roll back: Actions → deploy → Run workflow, with the SHA of an earlier commit on main. Migrations
-# only go forward, so rolling back past one needs a look at the schema first.
+# Roll back: Actions → deploy → Run workflow from main (the role trusts only main), with the SHA
+# of an earlier commit on main. Migrations only go forward, so rolling back past one needs a look
+# at the schema first.
 name: deploy
 
 on:
@@ -134,9 +137,6 @@ jobs:
     name: Migrate and roll out
     needs: [release, images]
     runs-on: ubuntu-24.04
-    environment:
-      name: production
-      url: https://app.${{ vars.LIFT_DOMAIN }}
     permissions:
       contents: read
       id-token: write
