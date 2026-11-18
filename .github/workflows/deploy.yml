@@ -1,0 +1,162 @@
+# Platform deploy (INF-07, WS4 with WS5). Every push to main:
+#   1. builds the six images and pushes them to GHCR, tagged with the commit SHA;
+#   2. runs database migrations on the control plane, then rolls out to the control plane and the
+#      worker, through SSM Run Command (infra/scripts/ssm-deploy.sh).
+# There is no SSH and there are no AWS keys in GitHub: the roll-out job assumes the role
+# lift-github-deploy (infra/terraform/iam.tf) by OIDC. That role trusts only jobs running in the
+# `production` environment, which must be restricted to the main branch in the repo settings.
+#
+# Repository variables, printed by `terraform output github_variable_commands`:
+#   AWS_DEPLOY_ROLE_ARN, AWS_REGION, LIFT_DOMAIN, LIFT_CONTROL_INSTANCE_ID, LIFT_WORKER_INSTANCE_ID
+# Secrets: none beyond the built-in GITHUB_TOKEN. App secrets live in /opt/lift/.env on each VM.
+#
+# Roll back: Actions → deploy → Run workflow, with the SHA of an earlier commit on main. Migrations
+# only go forward, so rolling back past one needs a look at the schema first.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit on main to deploy (empty means the head of main)
+        required: false
+        default: ""
+
+# One deploy at a time; a newer push replaces a deploy that is still waiting, never a running one.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Resolve the release
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.release.outputs.sha }}
+      prefix: ${{ steps.release.outputs.prefix }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check the repository variables
+        env:
+          AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          LIFT_DOMAIN: ${{ vars.LIFT_DOMAIN }}
+          LIFT_CONTROL_INSTANCE_ID: ${{ vars.LIFT_CONTROL_INSTANCE_ID }}
+          LIFT_WORKER_INSTANCE_ID: ${{ vars.LIFT_WORKER_INSTANCE_ID }}
+        run: |
+          missing=0
+          for name in AWS_DEPLOY_ROLE_ARN AWS_REGION LIFT_DOMAIN LIFT_CONTROL_INSTANCE_ID LIFT_WORKER_INSTANCE_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::repository variable $name is not set (terraform output github_variable_commands)"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Pick the commit
+        id: release
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          sha=$(git rev-parse --verify --quiet "${INPUT_SHA:-$GITHUB_SHA}^{commit}") || {
+            echo "::error::unknown commit: ${INPUT_SHA:-$GITHUB_SHA}"
+            exit 1
+          }
+          # Only commits that reached main through review, so a manual run cannot ship a branch.
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::$sha is not on main"
+            exit 1
+          fi
+          echo "sha=$sha" >>"$GITHUB_OUTPUT"
+          # GHCR names must be lowercase.
+          echo "prefix=ghcr.io/${OWNER,,}" >>"$GITHUB_OUTPUT"
+          echo "Deploying $sha" >>"$GITHUB_STEP_SUMMARY"
+
+  images:
+    name: Image lift-${{ matrix.app }}
+    needs: release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { app: web, target: web }
+          - { app: api, target: api }
+          - { app: collab, target: node-app }
+          - { app: agent, target: node-app }
+          - { app: mcp, target: node-app }
+          - { app: worker, target: worker }
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: infra/docker/Dockerfile
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          build-args: |
+            APP=${{ matrix.app }}
+            NEXT_PUBLIC_COLLAB_URL=wss://app.${{ vars.LIFT_DOMAIN }}/collab
+          push: true
+          tags: ${{ needs.release.outputs.prefix }}/lift-${{ matrix.app }}:${{ needs.release.outputs.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.release.outputs.sha }}
+          cache-from: type=gha,scope=lift-${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=lift-${{ matrix.app }}
+
+  rollout:
+    name: Migrate and roll out
+    needs: [release, images]
+    runs-on: ubuntu-24.04
+    environment:
+      name: production
+      url: https://app.${{ vars.LIFT_DOMAIN }}
+    permissions:
+      contents: read
+      id-token: write
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+          persist-credentials: false
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: lift-deploy-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Stage, migrate, roll out (SSM)
+        env:
+          CONTROL_INSTANCE_ID: ${{ vars.LIFT_CONTROL_INSTANCE_ID }}
+          WORKER_INSTANCE_ID: ${{ vars.LIFT_WORKER_INSTANCE_ID }}
+          SHA: ${{ needs.release.outputs.sha }}
+          PREFIX: ${{ needs.release.outputs.prefix }}
+        run: infra/scripts/ssm-deploy.sh "$SHA" "$PREFIX"
