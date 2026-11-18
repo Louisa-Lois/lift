@@ -55,21 +55,21 @@ Rules for this codebase: route handlers stay thin (validate, call a service, ret
 | --- | --- | --- |
 | `users` | `id`, `github_id` (unique), `login`, `name`, `email`, `avatar_url`, `github_token_enc` | GitHub scopes `read:user user:email repo admin:repo_hook` |
 | `sessions` | `id` (SHA-256 of the cookie value), `user_id`, `expires_at`, `ip`, `user_agent` | 14-day sliding expiry |
-| `api_tokens` | `id`, `user_id`, `name`, `prefix`, `token_hash`, `scopes[]`, `project_id?`, `last_used_at`, `revoked_at` | Plaintext shown once; scopes `read`, `deploy`, `admin` |
-| `cli_logins` | `id`, `code`, `poll_secret_hash`, `user_id?`, `token_id?`, `status`, `expires_at` | Browser approval for `lift login` |
+| `api_tokens` | `id`, `user_id`, `name`, `prefix`, `token_hash`, `scopes[]`, `project_id?`, `last_used_at`, `revoked_at` | Plaintext shown once; scopes `read`, `deploy`, `admin`; unique (`token_hash`) |
+| `cli_logins` | `id`, `code`, `poll_secret_hash`, `user_id?`, `token_id?`, `status`, `expires_at` | Browser approval for `lift login`; status `pending` · `approved` · `denied` · `expired`; unique (`code`) |
 | `projects` | `id`, `name`, `slug` (unique), `owner_id`, `deleted_at` | |
 | `project_members` | `project_id`, `user_id`, `role` | Primary key on both IDs |
 | `services` | `id`, `project_id`, `name`, `slug`, `type`, `repo_owner`, `repo_name`, `branch`, `root_dir`, `builder`, `dockerfile_path`, `build_command`, `start_command`, `port` (default 3000), `healthcheck_path` (default `/`), `cpu` (default 0.5), `memory_mb` (default 512), `subdomain` (unique), `autofix` (default true), `webhook_id`, `webhook_secret_enc`, `deleted_at` | Unique (`project_id`, `slug`) |
-| `deployments` | `id`, `service_id`, `project_id`, `status`, `trigger`, `commit_sha`, `commit_message`, `commit_author`, `image_tag`, `container_id`, `rollback_of`, `error_code`, `error_message`, `created_by_user_id?`, `created_by_action_id?`, `queued_at`, `started_at`, `finished_at` | Index (`service_id`, `queued_at` desc); partial unique index on (`service_id`, `commit_sha`) where trigger is `push` or `editor`, for webhook de-duplication |
+| `deployments` | `id`, `service_id`, `project_id`, `status`, `trigger`, `commit_sha`, `commit_message`, `commit_author`, `image_tag`, `container_id`, `rollback_of`, `error_code`, `error_message`, `created_by_user_id?`, `created_by_action_id?`, `queued_at`, `started_at`, `finished_at` | Index (`service_id`, `queued_at` desc); partial unique index on (`service_id`, `commit_sha`) where trigger is `push` or `editor`, for webhook de-duplication; partial unique index on (`service_id`) where status is `active` |
 | `deployment_events` | `id`, `deployment_id`, `status`, `message`, `at` | The per-deployment timeline |
 | `build_logs` | `deployment_id`, `content` | Copied from Redis when a deployment ends; max 1 MB |
-| `variables` | `id`, `service_id`, `key`, `value_enc`, `source`, `updated_at` | Unique (`service_id`, `key`) |
-| `databases` | `id`, `project_id`, `type`, `name`, `status`, `host`, `port`, `db_name`, `username`, `password_enc`, `deleted_at` | |
+| `variables` | `id`, `service_id`, `key`, `value_enc`, `source`, `database_id?`, `updated_at` | Unique (`service_id`, `key`); `database_id` says which database wrote the value |
+| `databases` | `id`, `project_id`, `type`, `name`, `status`, `host`, `port`, `db_name`, `username`, `password_enc`, `env_var`, `deleted_at` | For Postgres, `db_name` and `username` are the database ID |
 | `domains` | `id`, `service_id`, `hostname` (unique), `kind`, `status`, `verified_at` | The generated domain is created with its service |
 | `events` | `id`, `project_id`, `actor_type`, `actor_id`, `type`, `data` (jsonb) | Index (`project_id`, `created_at` desc); the audit log |
-| `metric_samples` | `service_id`, `ts`, `cpu_pct`, `mem_mb`, `net_rx_kb`, `net_tx_kb` | Kept 7 days |
+| `metric_samples` | `service_id`, `ts`, `cpu_pct`, `mem_mb`, `net_rx_kb`, `net_tx_kb` | Index (`service_id`, `ts`); kept 7 days |
 | `onboarding_plans` | `id`, `user_id`, `project_id?`, `repo_owner`, `repo_name`, `commit_sha`, `plan` (jsonb), `status` | `draft` · `applied` · `discarded` |
-| `agent_sessions`, `agent_messages`, `agent_actions`, `diagnoses` | defined with WS3 (AI PRD) | Tables live here so the API can serve them |
+| `agent_sessions`, `agent_messages`, `agent_actions`, `diagnoses` | defined with WS3 (AI PRD); drafts in BE-00, settled in AI-00 | Tables live here so the API can serve them |
 | `editor_documents` | `id`, `service_id`, `path`, `yjs_state` (bytea), `base_sha`, `updated_at` | Unique (`service_id`, `path`) |
 | `editor_commits` | `id`, `service_id`, `commit_sha`, `message`, `paths[]`, `author_user_id`, `deployment_id` | |
 | `eval_runs`, `eval_results` | defined with WS3 | |
@@ -82,12 +82,12 @@ All public routes sit under `/api/v1`, need a session or bearer token unless mar
 
 | Method and path | What it does | Role | Used by |
 | --- | --- | --- | --- |
-| `GET /auth/github/start` | Redirect to GitHub with a `state` cookie | public | web |
-| `GET /auth/github/callback` | Exchange the code, upsert the user, set `lift_session`, redirect to `/` | public | web |
+| `GET /auth/github/start?next=` | Redirect to GitHub with a `state` cookie; `next` is a same-site path to return to | public | web |
+| `GET /auth/github/callback` | Exchange the code, upsert the user, set `lift_session`, redirect to `next` or `/` | public | web |
 | `POST /auth/logout` | End the session | any | web |
 | `POST /auth/cli` | Start a CLI login: returns `{ code, verifyUrl, pollSecret, expiresAt }` | public | cli |
-| `GET /auth/cli/:code` | Poll with `pollSecret`: `pending`, or `approved` with a new token | public | cli |
-| `POST /auth/cli/:code/approve` | A signed-in user approves the code | any | web |
+| `GET /auth/cli/:code` | Poll with `Authorization: Bearer {pollSecret}`: `pending`, `denied`, `expired`, or `approved` with a new token | public | cli |
+| `POST /auth/cli/:code/approve` · `/deny` | A signed-in user approves or denies the code | any | web |
 | `POST /auth/session` | Exchange a personal token for a browser session (end-to-end tests, `lift open --dashboard`) | token | e2e, cli |
 | `GET /me` | Current user | any | all |
 | `GET /tokens` · `POST /tokens` · `DELETE /tokens/:id` | List, create (plaintext returned once), revoke | any | web, cli |
@@ -117,7 +117,7 @@ All public routes sit under `/api/v1`, need a session or bearer token unless mar
 | `GET /services/:id/domains` · `POST` · `DELETE /domains/:id` · `POST /domains/:id/verify` | Domains; custom ones are on the cut list | viewer, editor | web |
 | `GET /projects/:id/events?cursor=` · `GET /projects/:id/events/stream` | Activity history, live | viewer | web |
 | `GET /services/:id/editor/tree?ref=` | Files for the editor's tree | viewer | web |
-| `POST /services/:id/editor/session` | `{ path }` → `{ documentName, token, baseSha, readOnly }`; seeds the document from GitHub on first open | viewer | web |
+| `POST /services/:id/editor/session` | `{ path }` → `{ documentName, token, baseSha, readOnly, user: { id, name, color, avatarUrl } }`; seeds the document from GitHub on first open | viewer | web |
 | `GET /services/:id/editor/changes` | Files whose drafts differ from the last commit | viewer | web |
 | `POST /services/:id/editor/commit` | `{ message, paths? }` → `{ commitSha, deploymentId }` | editor | web |
 | `POST /services/:id/editor/discard` | `{ paths? }` resets drafts to the last commit | editor | web |
@@ -138,7 +138,7 @@ Worker-only internal routes are listed in `docs/contracts.md`. The agent service
 
 1. `GET /auth/github/start` sets a random `state` cookie (10 minutes) and redirects to GitHub with scopes `read:user user:email repo admin:repo_hook`.
 2. The callback checks `state`, exchanges the code, fetches the profile and primary email, upserts the user and stores the GitHub token encrypted.
-3. It creates a session, sets `lift_session` (httpOnly, Secure, SameSite=Lax, 14 days, sliding) and redirects to `/`.
+3. It creates a session, sets `lift_session` (httpOnly, Secure, SameSite=Lax, 14 days, sliding) and redirects to the `next` path given to `/auth/github/start` (only same-site paths), or to `/`.
 
 ### Creating a service
 
@@ -151,6 +151,8 @@ Worker-only internal routes are listed in `docs/contracts.md`. The agent service
 
 When a push arrives: verify `X-Hub-Signature-256` with that service's secret (401 if wrong); answer `ping`; ignore other events and other branches; skip if a deployment already exists for that service and commit from a push or the editor; otherwise create a deployment with `trigger: push` and enqueue a `build` job.
 
+`POST /services/:id/deployments` has no `trigger` field: the API sets it from the credential. A session is `manual`, a `lift_pat_` token is `cli`, and the agent's `lift_svc_` token is `agent`. Rollback, editor and push deployments set their own.
+
 | From | To | Triggered by | Notes |
 | --- | --- | --- | --- |
 | (new) | `queued` | API | Any older `queued` deployment of the same service becomes `canceled`: newest wins |
@@ -158,7 +160,7 @@ When a push arrives: verify `X-Hub-Signature-256` with that service's secret (40
 | `building` | `deploying` | worker status with `imageTag` | The API then enqueues the `deploy` job |
 | `deploying` | `active` | worker status with `containerId` | The previous `active` becomes `superseded`; the worker removes its container |
 | `queued`, `building`, `deploying` | `failed` | worker status with `errorCode` | Codes: `clone_failed`, `build_failed`, `build_timeout`, `image_missing`, `healthcheck_failed`, `crashed`. The API enqueues autofix when the service has it on |
-| `queued`, `building` | `canceled` | user | The worker stops a build that already started |
+| `queued`, `building` | `canceled` | user | The API enqueues a `stop` op so the worker stops a build that already started; a late worker report gets `409` |
 | (new rollback) | `deploying` | API | Copies `image_tag` from the chosen deployment and enqueues `deploy` directly |
 
 As a backstop, the API fails a deployment with `upstream_unavailable` after 20 minutes in `building` or 5 minutes in `deploying` without a status update.
@@ -166,26 +168,26 @@ As a backstop, the API fails a deployment with `upstream_unavailable` after 20 m
 ### Variables
 
 - Stored encrypted. Responses mask values as `••••` plus the last 4 characters unless `reveal=true` (editor role).
-- System variables are injected at runtime, never stored: `PORT` (the service's port), `LIFT_SERVICE_ID`, `LIFT_DEPLOYMENT_ID`, `LIFT_PUBLIC_URL`. Users cannot set `PORT` or keys starting with `LIFT_`.
+- System variables are injected at runtime, never stored: `PORT` (the service's port), `LIFT_SERVICE_ID`, `LIFT_DEPLOYMENT_ID`, `LIFT_PUBLIC_URL`. They appear only in `runtime-env`, never in the variables routes. Users cannot set `PORT` or keys starting with `LIFT_`, and neither can the agent: autofix fixes a wrong port with `PATCH /services/:id { port }`.
 - Changes are staged: every write emits `variables.changed` and returns `requiresRedeploy: true`; the next deployment picks them up, as on Railway.
 
 ### Databases
 
-1. `POST` inserts the database as `provisioning` with generated credentials (24-character random password, encrypted) and enqueues `provision_db`.
+1. `POST` inserts the database as `provisioning` with generated credentials (24-character random password, encrypted; for Postgres the database and role are named after the database ID) and enqueues `provision_db`.
 2. The worker fetches the credentials from `provision-context`, creates the database and reports `ready` with host and port.
-3. The API upserts `DATABASE_URL` (Postgres) or `REDIS_URL` (Redis) with `source: database` into every service in the project, unless a user-set variable with that key exists, and emits `variables.changed`.
-4. `DELETE` enqueues `deprovision_db` and removes the database-sourced variables.
+3. The API upserts the database's `env_var` (`DATABASE_URL` for Postgres or `REDIS_URL` for Redis, unless a plan chose another key) with `source: database` and `database_id` into every service in the project, unless a user-set variable with that key exists, and emits `variables.changed`.
+4. `DELETE` sets the database to `deleting` with `deleted_at` (it disappears from lists), enqueues `deprovision_db`, and removes the variables with that `database_id`. The worker reports only a failure.
 
 ### Logs, events, metrics and usage
 
 - Log snapshots read the Redis Stream with `XREVRANGE`; SSE uses `XREAD BLOCK` from the client's `Last-Event-ID`. When a deployment ends, its stream is copied into `build_logs`. Runtime search filters the last 20,000 lines without regard to case.
-- Events: insert into `events`, then `PUBLISH project:{projectId}`; the SSE endpoint subscribes and forwards, with a heartbeat every 15 s.
+- Events: insert into `events`, then `XADD events:prj:{projectId} MAXLEN ~ 1000` with the event as JSON (a Redis Stream rather than pub/sub, so the project stream resumes with `Last-Event-ID` like the log streams); the SSE endpoint reads with `XREAD BLOCK` and sends the whole event, with a heartbeat every 15 s.
 - Metrics arrive from the worker every 15 s; the metrics endpoint averages them per minute.
 - Usage: for each sample while a container is active, add `cpu × 15 s` vCPU-seconds and `memoryMb / 1024 × 15 s` GB-seconds, summed to hours. Estimated cost uses illustrative constants in `services/usage.ts` ($0.02 per vCPU-hour, $0.01 per GB-hour), labelled as illustrative in the UI.
 
 ### Worker reconciliation
 
-`GET /internal/v1/worker/desired-state` returns every `active` deployment with its image, port, limits, hostnames and a hash of its runtime environment. The worker calls it at start and every 60 s and fixes any drift, so a rebooted worker restores every app.
+`GET /internal/v1/worker/desired-state` returns every `active` deployment with its image, service slug, port, limits, hostnames and a hash of its runtime environment (the same `envHash` that `runtime-env` returns), plus every `ready` database, so the worker doesn't remove `lift-redis-*` containers. The worker calls it at start and every 60 s and fixes any drift, so a rebooted worker restores every app.
 
 ### Live editor back end
 
@@ -196,7 +198,7 @@ As a backstop, the API fails a deployment with `upstream_unavailable` after 20 m
 - **Persistence:** the Hocuspocus Database extension: `fetch` reads `yjs_state`, `store` upserts it (debounce 2 s, at most 10 s).
 - **Commit & deploy** (`POST /services/:id/editor/commit`):
     1. For each changed document, load its Yjs state and read the text.
-    2. Read the branch head. If a file changed upstream since its `base_sha`, return `409 conflict` listing those files; the user discards and reopens (merging is out of scope).
+    2. Read the branch head. If a file changed upstream since its `base_sha`, return `409 conflict` with each of those files as a key in `fields`; the user discards and reopens (merging is out of scope).
     3. Create blobs, a tree on top of the head's tree, and a commit with the user's message, then fast-forward the branch ref (GitHub Git Data API, with the user's token so the commit is theirs).
     4. Create a deployment with `trigger: editor` for that commit, so the webhook delivery that follows is skipped as a duplicate; update each document's `base_sha`; emit `editor.committed`.
 - **Limits:** text files up to 512 KB; binary files are read-only in the tree; up to 50 open documents per service; no creating, renaming or deleting files (cut list).
