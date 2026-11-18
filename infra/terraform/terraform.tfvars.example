@@ -11,5 +11,5 @@ github_oidc_sub_prefix = "repo:Louisa-Lois@231678881/lift@1460281207"
 # worker_instance_type        = "t3.large"   # t3.xlarge in demo week
 # monthly_budget_usd          = 50
 # stop_instances_at_usd       = 120
-# github_deploy_context       = "ref:refs/heads/main" # environment:production once the repo can use environments
+# github_deploy_context       = "ref:refs/heads/main" # or environment:production; deploy.yml must match
 # create_github_oidc_provider = true         # false if the account already has GitHub's OIDC provider

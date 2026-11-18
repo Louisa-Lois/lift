@@ -81,7 +81,7 @@ variable "github_oidc_sub_prefix" {
 }
 
 variable "github_deploy_context" {
-  description = "The rest of the `sub` claim the deploy role trusts: ref:refs/heads/main while the repo can't use environments (private under GitHub Free), or environment:production once it can (public, or the owner on Pro or Team) and that environment is restricted to main."
+  description = "The rest of the `sub` claim the deploy role trusts: ref:refs/heads/main (jobs on main that reference no environment), or environment:production (jobs in that environment, which must be restricted to main). The deploy job in .github/workflows/deploy.yml must match."
   type        = string
   default     = "ref:refs/heads/main"
 
