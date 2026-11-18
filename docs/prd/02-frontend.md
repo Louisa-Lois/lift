@@ -1,12 +1,12 @@
 # PRD 2 · Front end
 
-> Read together with `docs/contracts.md`. Owner: Team Member 2. Paste the kickoff prompt at the bottom into your coding agent to start.
+> Read together with `docs/contracts.md`. Built by Hakim until the demo works (target Nov 26); Louisa owns the brand, theme and landing page (`docs/briefs/louisa-design.md`). `docs/start-here.md` has the current dates, which replace the ones below. Paste the kickoff prompt at the bottom into your coding agent to start.
 
 ## Goal, scope and design references
 
 **WS2 builds the dashboard and the live editor: every screen a person uses to deploy, watch, fix and edit an app.** By Nov 23 every demo step can be clicked through; by Nov 28 the editor, the AI plan review and the agent chat are in.
 
-- **Owner:** Team Member 2. **Reviewers:** WS1 for API usage, WS3 for the AI screens.
+- **Builder:** Hakim, for every screen below. **Louisa** owns `src/styles/theme.css`, the landing page at `/`, the style guide and the brand assets, and polishes the dashboard after the handoff.
 - **Owns:** `apps/web`.
 - **Depends on:** WS1's API, streams and collab server; WS3's plan, chat and diagnosis endpoints. Mocks stand in for all of them until they are live.
 
@@ -32,7 +32,8 @@
 | Route | Screen | What is on it | Data |
 | --- | --- | --- | --- |
 | `/login` | Sign in | Logo, one-line pitch, "Continue with GitHub" | `GET /auth/github/start` |
-| `/` | Projects | Grid of project cards (name, service count, status dots, last deploy age); "New project" | `GET /projects` |
+| `/` | Landing page (Louisa) | Pitch, how it works, features, and a "Deploy from GitHub" button that goes to `/login` | none |
+| `/projects` | Projects | Grid of project cards (name, service count, status dots, last deploy age); "New project" | `GET /projects` |
 | `/new` | Deploy from GitHub | Searchable repo list (owner/name, private badge, last push) or a pasted GitHub URL; "Continue" starts the AI plan; "Configure manually" opens the plain form | `GET /github/repos`, `POST /agent/plans` |
 | `/new/plan/[planId]` | Review plan | The assistant's summary; editable service cards; database toggles; variables table with source badges; "Approve and deploy" | plan response, `POST /agent/plans/:id/apply` |
 | `/p/[projectId]` | Project canvas | Service and database cards in a grid; "+ New" menu (service from GitHub, Postgres, Redis); activity feed in a collapsible right rail | `GET /projects/:id`, project stream |
@@ -56,6 +57,8 @@
 - **Type:** Geist Sans for the interface, Geist Mono for logs, IDs and code (the `geist` package). 14 px base, 12.5 px logs.
 - **Shape and space:** 8 px radius, 4 px spacing scale, 36 px table rows, 1 px borders instead of shadows.
 - **Components:** shadcn/ui throughout: Button, Card, Sheet, Tabs, Table, Dialog, DropdownMenu, Command, Tooltip, Badge, Skeleton, and sonner for toasts.
+
+These are starting values. Louisa owns them in `src/styles/theme.css`, along with the status variables `--status-queued` to `--status-canceled`. Components use only the theme's classes and variables, never palette classes or hex values, so her theme restyles every screen.
 
 **Build these shared components first:** `AppShell` (top bar with logo, project switcher, ⌘K hint, user menu) · `StatusBadge` · `ServiceCard` · `DatabaseCard` · `DeploymentRow` · `LogViewer` · `Timeline` · `EnvTable` · `CopyButton` · `EmptyState` · `ConfirmDialog` · `DiffView` (Monaco diff editor) · `PresenceAvatars`.
 
@@ -153,7 +156,7 @@ Pages that update live are client components. There are no Next.js server action
 
 ### By Nov 19 (hello world live)
 
-- [ ] **FE-01** App shell, theme tokens, fonts, shadcn/ui set up, mocks switch
+- [ ] **FE-01** App shell; Tailwind CSS and shadcn/ui set up with every colour, font and radius as a variable in `src/styles/theme.css` (Louisa owns the values), including `--status-queued` to `--status-canceled`; the mocks switch. Build this first, since Louisa's theme work starts from it
 - [ ] **FE-02** Sign-in page and auth guard (`/me`, redirect with `next`)
 - [ ] **FE-03** Projects list and create project
 - [ ] **FE-04** New service from GitHub: repo picker and the manual configuration form
@@ -204,8 +207,8 @@ Task: implement requirement <FE-XX> only.
    Vercel, Render) without copying their branding.
 3. Add a component or Playwright test for its acceptance criteria.
 
-Rules: dark theme by default; colour is never the only signal; everything works by keyboard;
-no server actions; no new dependencies without saying why.
+Rules: dark theme by default; colours only from theme.css; colour is never the only signal;
+everything works by keyboard; no server actions; no new dependencies without saying why.
 
 Finish by running `pnpm lint && pnpm typecheck && pnpm --filter web test`, then summarise what
 changed and describe or screenshot the result.

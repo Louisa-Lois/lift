@@ -1,12 +1,12 @@
 # PRD 3 · AI agent
 
-> Read together with `docs/contracts.md`. Owner: Team Member 3. Paste the kickoff prompt at the bottom into your coding agent to start.
+> Read together with `docs/contracts.md`. Built by Hakim until the demo works (target Nov 26); Lyse owns the test set, the prompts' content and the evaluation (`docs/briefs/lyse-ai-evals.md`). `docs/start-here.md` has the current dates, which replace the ones below. Paste the kickoff prompt at the bottom into your coding agent to start.
 
 ## Goal, scope and inspiration
 
 **WS3 builds the AI that runs Lift: it reads a repository and proposes how to deploy it, fixes failed builds, answers questions and takes approved actions in chat, lets other coding agents use Lift through MCP, and proves all of it with a 30-repo evaluation.** The planner and failure classifier work by Nov 23; everything else by Nov 28.
 
-- **Owner:** Team Member 3. **Reviewers:** WS1 for tools and routes, WS2 for the screens that show AI output.
+- **Builder:** Hakim. **Lyse** owns `evals/` and the content of `src/prompts/*.md`, and runs the evaluation from Nov 24.
 - **Owns:** `apps/agent`, `apps/mcp`, `evals/`; the plan, action, diagnosis and chat-stream schemas in `packages/shared`; the content of the `/evals` page.
 - **Depends on:** WS1's public API (every tool is an API call) and its internal agent routes.
 
@@ -174,7 +174,7 @@ Every 5 minutes per active service: error lines per minute in runtime logs, rest
 ```
 
 - **20 healthy repos** across stacks: Next.js with and without a database, Express, Fastify, Vite static, Astro static, FastAPI, Flask, Django, Go `net/http`, and a Dockerfile-only app. Choose small, public, recently maintained repos and pin their commits.
-- **10 broken variants**, each with a `breakage` the runner applies before deploying: a missing required variable, a wrong port, an unsupported Node version, a start command pointing at a missing file, a dependency removed from `package.json`, a build that runs out of memory, and so on.
+- **10 broken variants**, each a branch in a fork under the `lift-demo` organisation with the breakage committed: a missing required variable, a wrong port, an unsupported Node version, a start command pointing at a missing file, a dependency removed from `package.json`, a build that runs out of memory, and so on.
 - `pnpm eval [--only id] [--concurrency 3]` plans, scores the plan against golden, applies it in a throwaway eval project, waits for the outcome, measures autofix success and attempts on the broken cases, records tokens and seconds, then sends the run to `POST /internal/v1/evals/runs`.
 - **Scores:** plan accuracy (services, port, equivalent commands, databases, recall of required variables), zero-touch deploy rate (healthy repos live with no edits), autofix success rate and median attempts, prompt-injection pass rate, and median seconds and tokens per case.
 - **The `/evals` page** (inside WS2's shell): four headline numbers, a per-repo table with pass and fail chips linking to each deployment, and the same numbers for earlier runs so improvement shows. Run it nightly from Nov 24 and keep every run.

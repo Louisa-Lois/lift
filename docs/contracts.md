@@ -1,26 +1,28 @@
 # Lift — Overview & contracts
 
-Nov 16, 2026 · Vitalik
+Nov 16, 2026, updated Nov 18 · Vitalik
 
-Five workstreams build Lift in one monorepo by Nov 28, then freeze until the Dec 2 deadline. This file fixes what everyone shares: the repo layout, the stack, the contracts between apps and the rules for changing them. Give your coding agent this file plus your own PRD from `docs/prd/`.
+Hakim builds the demo path end to end until it works (target Nov 26), and the rest of the team works in parallel from the briefs in `docs/briefs/`; `docs/start-here.md` has who does what and the dates. This file fixes what every app shares: the repo layout, the stack, the contracts between apps and the rules for changing them. Give your coding agent this file plus your brief (Hakim: the PRD you're building from).
 
-| # | Workstream | Owner | PRD file |
+| # | Workstream | Built by | PRD file |
 | --- | --- | --- | --- |
-| 1 | Back end & API | Team Member 1 (paired with WS4) | `docs/prd/01-backend-api.md` |
-| 2 | Front end | Team Member 2 | `docs/prd/02-frontend.md` |
-| 3 | AI agent | Team Member 3 | `docs/prd/03-ai-agent.md` |
-| 4 | Infrastructure & worker | Team Member 4 (paired with WS1) | `docs/prd/04-infrastructure.md` |
-| 5 | CLI, quality & delivery | Team Member 5 | `docs/prd/05-quality-delivery.md` |
+| 1 | Back end & API | Hakim | `docs/prd/01-backend-api.md` |
+| 2 | Front end | Hakim; Louisa owns the brand, theme and landing page | `docs/prd/02-frontend.md` |
+| 3 | AI agent | Hakim; Lyse owns the test set, prompts and evaluation | `docs/prd/03-ai-agent.md` |
+| 4 | Infrastructure & worker | Hakim | `docs/prd/04-infrastructure.md` |
+| 5 | CLI, quality & delivery | David (the CLI); Esbert (everything else) | `docs/prd/05-quality-delivery.md` |
+
+Louisa, David, Lyse and Esbert work from their briefs in `docs/briefs/`, which say which parts of these PRDs are theirs.
 
 ## How to use these PRDs with any coding agent
 
 Each teammate can use a different coding agent; the agents stay aligned because they all read the same files in the repo, not because they share a tool.
 
-1. **Put the PRDs in the repo.** This file lives at `docs/contracts.md`; each PRD lives at `docs/prd/0N-<name>.md`. The back-end pair commits them with the skeleton; from then on the repo copy is what agents read.
+1. **Put the PRDs in the repo.** This file lives at `docs/contracts.md`; each PRD lives at `docs/prd/0N-<name>.md`. They ship with the starter repo; from then on the repo copy is what agents read.
 2. **One agent brief for every tool.** The repo root has `AGENTS.md`: what Lift is, the layout, the commands, the rules. Codex and Cursor read `AGENTS.md` directly; `CLAUDE.md` holds the single line `@AGENTS.md` for Claude Code; `GEMINI.md` does the same for Gemini CLI. Never fork the brief per tool.
-3. **Start every session with your PRD's kickoff prompt** (the last section of each PRD). Give the agent one requirement ID at a time, such as `FE-07`, on a branch named after it.
-4. **Stay in your folders.** Your agent edits only what your PRD owns. Shared contracts in `packages/shared` change only through the interface rule below.
-5. **Don't wait on each other.** Until the real API is live, build against mocks and fixtures generated from `packages/shared`. Each PRD says what it can mock.
+3. **Start every session with your kickoff prompt:** the one in your brief, or for Hakim the one at the end of each PRD. Give the agent one task ID at a time, such as `UI-02`, on a branch named after it.
+4. **Stay in your folders.** Your agent edits only the paths `AGENTS.md` gives you. Shared contracts in `packages/shared` are Hakim's until the handoff on Nov 26, then follow the interface rule below.
+5. **Don't wait on each other.** Until the real API is live, build against the sample data in `@lift/shared/fixtures`. Each brief says what to build against.
 
 ## At a glance
 
@@ -87,7 +89,8 @@ lift/
 ├─ e2e/                       # WS5  Playwright demo script
 └─ docs/
    ├─ contracts.md            # this file
-   ├─ prd/                    # the five PRDs
+   ├─ prd/                    # the five PRDs: the full system spec
+   ├─ briefs/                 # what Louisa, David, Lyse and Esbert build, with dates and kickoff prompts
    ├─ adr/                    # one short file per decision
    └─ demo.md                 # WS5  the demo script, step by step
 ```
@@ -114,7 +117,7 @@ Exact versions are pinned in the lockfile when the skeleton lands on Nov 16. Upg
 
 ## Shared contracts
 
-Everything in this section exists as code in `packages/shared` and is frozen as **contracts v1 on Nov 18** (git tag `contracts-v1`). After that, changes are additive unless every affected owner agrees.
+Everything in this section exists as code in `packages/shared`, landed by BE-00 on Nov 18 (git tag `contracts-v1`). Until the handoff on Nov 26 Hakim changes it freely, except that the parts of the typed client and fixtures David's CLI uses only grow. From the handoff on, changes are additive unless everyone affected agrees.
 
 ### Data model
 
@@ -209,25 +212,16 @@ Every server also reads `HOST` (default `127.0.0.1`, or `0.0.0.0` when `NODE_ENV
 
 **Branches and reviews**
 
-- `main` is protected: pull requests only, one approving review from someone other than the author, CI green, squash merge.
-- Branch names follow `ws{N}/{REQ-ID}-short-name`, e.g. `ws2/FE-07-log-viewer`. Commit messages follow Conventional Commits (`feat(api): add rollback endpoint`).
+- `main` is protected: pull requests only, CI green, squash merge. Teammates' pull requests need Hakim's approval; until the handoff Hakim merges his own once CI is green.
+- Branch names follow `{person}/{ID}-short-name`, e.g. `louisa/UI-02-landing-page` or `hakim/BE-06-deployments`. Commit messages follow Conventional Commits (`feat(api): add rollback endpoint`).
 - A PR written mostly by an agent says so in its description, and the reviewer reads it as carefully as human code.
 
-**The interface rule.** Changes to `packages/shared`, `packages/db` migrations or `infra/` need an issue labelled `interface` and approval from the owner of every workstream that uses what changes. After Nov 18, only additive changes (new optional fields, new endpoints) go in without everyone's approval.
+**The interface rule** (from the handoff on Nov 26). Changes to `packages/shared`, `packages/db` migrations or `infra/` need an issue labelled `interface` and approval from everyone whose work uses what changes; only additive changes (new optional fields, new endpoints) go in without it. Until the handoff Hakim owns all three and changes them directly.
 
 **Definition of done** for any requirement: merged to `main` with tests; working on staging (or the local stack before staging exists); new commands or variables documented in the app's README and `.env.example`; anything shown in the demo has its line in `docs/demo.md`.
 
 **Secrets** never go in git, prompts or logs. `.env` files are git-ignored, and CI scans every push for leaked keys.
 
-## Integration checkpoints
+## Checkpoints
 
-At each milestone the whole team runs the demo path together on staging; each workstream's cell must work by that date. The dated timeline itself is in the proposal.
-
-| Checkpoint | WS1 Back end & API | WS2 Front end | WS3 AI agent | WS4 Infrastructure | WS5 CLI, quality & delivery |
-| --- | --- | --- | --- | --- | --- |
-| **Nov 18**, contracts v1 | `packages/shared` and DB schema v1 merged and tagged | Contracts reviewed; mocks running from fixtures | Plan, action and diagnosis schemas in `packages/shared` | Job and internal-API contracts reviewed | Repo tooling, CI and branch protection live |
-| **Nov 19**, hello world live | Sign-in, projects, services, deployments, push webhook, project and log streams | Sign-in, project list, new service form, deployment list, live log viewer | Agent service calling Claude; read tools working against the API | Both VMs up; wildcard HTTPS; worker builds a repo and serves it at its URL | CI green; platform deploy pipeline; CLI `login`, `whoami`, `status` |
-| **Nov 23**, everything works by hand | Variables, databases, rollback, runtime logs, metrics, usage, tokens, members, collab server | Project canvas, service panel, variables, databases, rollback, settings, usage, tokens | Planner valid on 10 repos; failure classifier; eval runner with all 30 cases | Zero-downtime swaps, runtime logs, metrics, databases, limits, firewall rules, reconciliation | CLI `up`, `logs`, `env`, `db`, `rollback`; end-to-end test of the manual path; security checklist v1 |
-| **Nov 28**, AI and editor done | Editor commits, agent routes and approvals, plan apply, rate limits | Live editor with presence and commit, plan review, agent chat, diagnosis card, evals page | Autofix loop, ops chat, MCP server, full 30-case eval run | Cleanup jobs, backups, uptime checks, load check | Full demo in CI; CLI browser login and `lift ask`; report and slides drafted |
-| **Nov 29 to Dec 1**, freeze | Fixes only | Polish and fixes | Eval reruns, prompt fixes | Stability, cost watch | Daily demo runs; video recorded; report finished |
-| **Dec 2**, deadline | | | | | Submission |
+The dated plan, with what Hakim and each teammate deliver by when, is in `docs/start-here.md`. The demo path is complete at the handoff on Nov 26; from then on the whole team runs the demo together every day, and Nov 29 to Dec 1 is a freeze, fixes only, before the Dec 2 deadline.
