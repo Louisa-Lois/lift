@@ -1,0 +1,127 @@
+#cloud-config
+# Lift ${role} VM, rendered by Terraform from infra/terraform/cloud-init.yaml.tftpl. Runs once, at
+# first boot. No secrets here: anyone who can describe the instance can read its user data.
+#
+# Layout it prepares (docs/prd/04-infrastructure.md, "VM layout"):
+#   /opt/lift/host.env       facts about this VM (this file writes it)
+#   /opt/lift/.env           secrets, mode 600, created empty here and filled in by hand
+#   /opt/lift/releases/<sha> each deploy's compose files, Traefik config and scripts
+#   /opt/lift/current        symlink to the release that is running
+#   lift.service             brings the current release up at boot
+
+package_update: true
+package_upgrade: true
+packages:
+  - ca-certificates
+  - curl
+  - jq
+  - rsync
+  - unattended-upgrades
+
+write_files:
+  - path: /opt/lift/host.env
+    permissions: "0644"
+    content: |
+      # Facts about this VM, written once by cloud-init from Terraform. Not secret.
+      # Secrets live in /opt/lift/.env (mode 600), which you create by hand.
+      LIFT_ROLE=${role}
+      DOMAIN=${domain}
+      APPS_DOMAIN=apps.${domain}
+      PRIVATE_IP=${private_ip}
+      CONTROL_PRIVATE_IP=${control_private_ip}
+
+  # Platform container logs are capped like app logs. live-restore keeps containers running while
+  # dockerd restarts. Networks Docker creates come from 10.200.0.0/14, away from the VPC's
+  # 172.31.0.0/16 and the worker's fixed lift-system network 172.30.0.0/24.
+  - path: /etc/docker/daemon.json
+    permissions: "0644"
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": { "max-size": "10m", "max-file": "3" },
+        "live-restore": true,
+        "default-address-pools": [{ "base": "10.200.0.0/14", "size": 24 }]
+      }
+
+  # Security updates install themselves; reboots stay manual.
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    permissions: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      Unattended-Upgrade::Automatic-Reboot "false";
+
+  # No inbound SSH: there is no key pair and port 22 is closed in the security group. sshd stays
+  # installed only as a break-glass path (EC2 Instance Connect after deliberately opening 22).
+  - path: /etc/ssh/sshd_config.d/60-lift.conf
+    permissions: "0644"
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+
+  - path: /etc/systemd/system/lift.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Lift ${role} compose stack (the release in /opt/lift/current)
+      Requires=docker.service
+      After=docker.service network-online.target
+      Wants=network-online.target
+      # Skipped until the first deploy has put a release in place.
+      ConditionPathExists=/opt/lift/current/scripts/lift-release.sh
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/opt/lift/current/scripts/lift-release.sh boot
+      TimeoutStartSec=600
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /usr/local/sbin/lift-bootstrap
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      # Installs Docker Engine and the Compose plugin, makes sure the SSM agent runs and prepares
+      # /opt/lift. Safe to run again by hand.
+      set -euo pipefail
+      export DEBIAN_FRONTEND=noninteractive
+
+      # The SSM agent ships as a snap on Canonical's AMIs; install it if an AMI ever drops it.
+      if ! snap list amazon-ssm-agent >/dev/null 2>&1; then
+        snap install amazon-ssm-agent --classic
+      fi
+      systemctl enable --now snap.amazon-ssm-agent.amazon-ssm-agent.service
+
+      # Docker Engine and the Compose plugin from Docker's apt repository.
+      if ! command -v docker >/dev/null 2>&1; then
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+        chmod a+r /etc/apt/keyrings/docker.asc
+        # shellcheck source=/dev/null
+        . /etc/os-release
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $UBUNTU_CODENAME stable" \
+          > /etc/apt/sources.list.d/docker.list
+        apt-get update -q
+        apt-get install -yq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+      fi
+      systemctl enable --now docker
+
+      systemctl reload ssh.service 2>/dev/null || true
+
+      install -d -m 0750 /opt/lift /opt/lift/releases /opt/lift/config
+      # The secrets file exists from the start with the right mode, so editing it keeps mode 600.
+      if [ ! -e /opt/lift/.env ]; then install -m 0600 /dev/null /opt/lift/.env; fi
+%{ if role == "worker" ~}
+      # Build directories (docs/prd/04-infrastructure.md, "Build job").
+      install -d -m 0700 /var/lib/lift /var/lib/lift/builds
+%{ endif ~}
+
+      systemctl daemon-reload
+      systemctl enable lift.service
+      echo "lift-bootstrap: ${role} ready; fill in /opt/lift/.env, then deploy"
+
+runcmd:
+  - [/usr/local/sbin/lift-bootstrap]

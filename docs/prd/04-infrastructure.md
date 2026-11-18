@@ -31,7 +31,9 @@
 | Runs | Traefik, web, api, collab, agent, mcp, Postgres (platform), Redis | Traefik (apps), worker agent, BuildKit, shared Postgres for users, per-project Redis, every deployed app |
 | Size | t3.medium (2 vCPU, 4 GB), 30 GB gp3 | t3.large (2 vCPU, 8 GB), 80 GB gp3; t3.xlarge (4 vCPU, 16 GB) in demo week for faster builds |
 | Public address | Elastic IP for `app.{domain}` | Elastic IP for `*.apps.{domain}` |
-| Inbound | 80 and 443 from anywhere; 22 from team IPs; 4000 and 6379 from the worker's security group only | 80 and 443 from anywhere; 22 from team IPs |
+| Private address | Fixed: host `.10` of the default subnet | Fixed: host `.11` of the default subnet |
+| Inbound | 80 and 443 from anywhere; 4000 and 6379 from the worker's security group only; no SSH | 80 and 443 from anywhere; no SSH |
+| Access | Instance profile with `AmazonSSMManagedInstanceCore` only: shells through SSM Session Manager, deploys through SSM Run Command | Same |
 | OS | Ubuntu 24.04, Docker Engine with the Compose plugin, unattended upgrades | Same |
 
 **Region:** `eu-west-1` (Ireland) by default; `af-south-1` (Cape Town) is closer to Accra but has to be enabled on the account first.
@@ -39,9 +41,16 @@
 **Terraform** (`infra/terraform`)
 
 - Providers `aws` and `cloudflare`. State in an S3 bucket with native lock files (`use_lockfile = true`); state is never committed.
-- Resources: a security group per VM; two `aws_instance`s with `metadata_options { http_tokens = "required", http_put_response_hop_limit = 1 }`; two Elastic IPs; cloud-init user data that installs Docker, creates `/opt/lift` and installs a systemd unit running `docker compose up -d`; Cloudflare records `app` and `*.apps` (DNS only, not proxied); an `aws_budgets_budget` of $50 a month emailing at 80% and 100%, plus a budget action that stops both instances at $120.
-- Variables: `domain`, `region`, `team_ssh_cidrs`, `worker_instance_type`, `alert_emails`. Outputs: both IPs, the URLs, SSH commands.
+- Resources: a security group per VM, with no rule for port 22; two `aws_instance`s with `metadata_options { http_tokens = "required", http_put_response_hop_limit = 1 }`, no key pair and an SSM-only instance profile each; two Elastic IPs; cloud-init user data that installs Docker, writes `/opt/lift/host.env` and installs a systemd unit that brings the current release up at boot; Cloudflare records `app` and `*.apps` (DNS only, not proxied); an `aws_budgets_budget` of $50 a month emailing at 80% and 100%, plus a budget action that stops both instances at $120; GitHub's OIDC provider and the deploy role `lift-github-deploy`.
+- Variables: `domain`, `alert_emails`, `github_repository`, plus `region`, `worker_instance_type` and the budget amounts with defaults. Outputs: both IPs, the URLs, the SSM session command for each VM, the deploy role ARN and the GitHub Actions variables the deploy workflow reads.
 - The default VPC is fine; put both instances in the same subnet so they talk over private IPs.
+
+**Access without SSH.** Neither VM accepts SSH: there is no key pair and port 22 is closed in both security groups. Each VM's instance profile allows the SSM agent (preinstalled on Ubuntu's AMIs) and nothing else.
+
+- **Your shell:** `aws ssm start-session --profile lift --target {instance-id}` (Terraform prints the exact command). It needs the AWS CLI's Session Manager plugin and runs with your own IAM identity, so CloudTrail records who opened it.
+- **Deploys:** the role `lift-github-deploy` trusts GitHub's OIDC tokens from this repo's `production` environment only. It may call `ssm:SendCommand` with the `AWS-RunShellScript` document on these two instances and read the results; it has no other permissions, and GitHub holds no AWS keys. Restrict the `production` environment to the `main` branch in the repo settings.
+
+**VM layout.** `/opt/lift/host.env` holds the facts cloud-init writes (role, domain, private IPs); `/opt/lift/.env` (mode 600) holds the secrets, filled in by hand; each deploy unpacks `infra/compose`, `infra/traefik` and `infra/scripts` into `/opt/lift/releases/{sha}`, and `/opt/lift/current` points at the running one. `infra/scripts/lift-release.sh` runs Compose with all three env files, so every command on a VM uses the same settings.
 
 **DNS and HTTPS.** The domain lives in Cloudflare for its free DNS API. A Cloudflare API token limited to editing DNS on that one zone lets Traefik on the worker get a wildcard certificate for `*.apps.{domain}` by DNS-01; the control plane gets `app.{domain}` the same way.
 
@@ -58,7 +67,7 @@
 | `postgres` | Postgres 17 | none | Volume `pgdata`; nightly `pg_dump` to S3 |
 | `redis` | Redis 7 | none publicly | `appendonly yes`, `requirepass`; published on `{private-ip}:6379` for the worker |
 
-**Platform deploys** (`deploy.yml`, with WS5): every merge to `main` builds the six images, pushes them to GitHub Container Registry tagged with the commit SHA, then SSHes to each VM and runs `docker compose pull && docker compose up -d` with `IMAGE_TAG` set. Migrations run first as a one-off `api migrate` container. Secrets live in GitHub Actions secrets and in `/opt/lift/.env` (mode 600) on each VM.
+**Platform deploys** (`deploy.yml`, with WS5): every merge to `main` builds the six images, pushes them to GitHub Container Registry tagged with the commit SHA, then assumes `lift-github-deploy` by OIDC and runs commands on each VM through SSM Run Command: unpack the release and `docker compose pull` on both, run migrations as a one-off `api migrate` container on the control plane, then `docker compose up -d` with `IMAGE_TAG` set on the control plane and then the worker. Secrets live only in `/opt/lift/.env` (mode 600) on each VM; the deploy itself needs no GitHub secrets, only repository variables (role ARN, region, instance IDs, domain).
 
 **Local stack** (`infra/compose/dev.yml`): Postgres, Redis, BuildKit and a Traefik routing `*.apps.localhost` to containers on your machine, so the worker runs locally exactly as it does on the VM.
 
@@ -121,7 +130,7 @@
 - [ ] **No spam:** drop outbound TCP 25 from Docker subnets.
 - [ ] **Limits on every app container:** CPU, memory, swap and process count; no privileged containers, host networking or host mounts; `no-new-privileges`; `NET_RAW` dropped.
 - [ ] **Docker socket** mounted only into the worker container, which has no inbound ports.
-- [ ] **SSH:** keys only, team IPs only, root login disabled.
+- [ ] **No SSH:** port 22 closed in both security groups and no key pair; shells and deploys go through SSM with IAM identities; the deploy role can only run commands on the two Lift VMs. sshd stays installed with root and password logins off, as a break-glass path only.
 - [ ] **Secrets:** `/opt/lift/.env` mode 600; the Cloudflare token limited to DNS on one zone; the Anthropic key only on the control plane.
 - [ ] **Firewall rules** live in `infra/scripts/firewall.sh`, installed by cloud-init and re-applied by a systemd unit after Docker starts.
 - [ ] **Abuse (cut list):** default 0.5 vCPU and 512 MB, maximum 1 vCPU and 1 GB; a default-size container above 90% CPU for 10 minutes is stopped and its project flagged.
@@ -154,7 +163,7 @@ Student credits should cover this. To spend less, `infra/scripts/stop.sh` stops 
 
 ### By Nov 19 (hello world live)
 
-- [ ] **INF-01** Terraform: both VMs, security groups, Elastic IPs, DNS, budget
+- [ ] **INF-01** Terraform: both VMs, security groups, Elastic IPs, DNS, budget, SSM access and the GitHub deploy role
 - [ ] **INF-02** Control-plane compose with Traefik, HTTPS for `app.{domain}`, path routing
 - [ ] **INF-03** Worker compose: Traefik with wildcard HTTPS, BuildKit
 - [ ] **INF-04** Worker agent build job: clone, Railpack, log streaming, status reports
