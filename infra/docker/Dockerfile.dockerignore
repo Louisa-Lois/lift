@@ -1,0 +1,21 @@
+# Build context for infra/docker/Dockerfile is the repo root. BuildKit reads this file in place of
+# a root .dockerignore. Secrets and local state must never reach an image layer.
+.git
+**/.env
+**/.env.*
+!.env.example
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+**/.DS_Store
+.lift
+playwright-report
+test-results
+infra/terraform
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfvars
+*.zip
