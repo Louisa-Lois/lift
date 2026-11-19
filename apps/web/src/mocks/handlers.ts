@@ -11,4 +11,5 @@ const api = (path: string) => `${API_BASE_PATH}${path}`;
 export const handlers = [
   http.get(api("/health"), () => HttpResponse.json({ status: "ok" })),
   http.get(api("/me"), () => HttpResponse.json(fixtures.me)),
+  http.post(api("/auth/logout"), () => new HttpResponse(null, { status: 204 })),
 ];

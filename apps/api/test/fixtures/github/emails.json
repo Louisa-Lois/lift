@@ -1,0 +1,9 @@
+[
+  {
+    "email": "4242+ama-owusu@users.noreply.github.com",
+    "primary": false,
+    "verified": true,
+    "visibility": null
+  },
+  { "email": "ama@example.com", "primary": true, "verified": true, "visibility": "private" }
+]

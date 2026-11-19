@@ -1,4 +1,4 @@
-import { DEV_PORTS, Hostname, SERVICE_TOKEN_PATTERN } from "@lift/shared";
+import { DEV_PORTS, GithubLogin, Hostname, SERVICE_TOKEN_PATTERN } from "@lift/shared";
 import { z } from "zod";
 
 /** An empty value in .env (`GITHUB_CLIENT_ID=`) counts as unset. */
@@ -18,6 +18,21 @@ const EncryptionKey = z
 const AgentServiceToken = z
   .string()
   .regex(SERVICE_TOKEN_PATTERN, "must be lift_svc_ plus 32 base64url characters");
+
+/** `vitalik-hakim, Louisa-Lois` → ["vitalik-hakim", "louisa-lois"]: GitHub logins ignore case. */
+const LoginList = z.preprocess(
+  unsetIfEmpty,
+  z
+    .string()
+    .optional()
+    .transform((value) =>
+      (value ?? "")
+        .split(",")
+        .map((login) => login.trim().toLowerCase())
+        .filter((login) => login !== ""),
+    )
+    .pipe(z.array(GithubLogin)),
+);
 
 /**
  * Every variable the API reads, validated once at startup; the process refuses to start on bad
@@ -44,6 +59,11 @@ const EnvSchema = z.object({
   COLLAB_SECRET: optional(Secret),
   GITHUB_CLIENT_ID: optional(z.string().min(1)),
   GITHUB_CLIENT_SECRET: optional(z.string().min(1)),
+  /**
+   * Sign-in is invite-only: only these GitHub logins may sign in. Empty means anyone, which only
+   * development and tests allow (a developer's own OAuth app is private anyway).
+   */
+  ALLOWED_GITHUB_LOGINS: LoginList,
 });
 
 /** Production never falls back to a default or runs without a secret. */
@@ -60,6 +80,7 @@ const PRODUCTION_REQUIRED = [
   "COLLAB_SECRET",
   "GITHUB_CLIENT_ID",
   "GITHUB_CLIENT_SECRET",
+  "ALLOWED_GITHUB_LOGINS",
 ] as const;
 
 export type Env = z.infer<typeof EnvSchema> & { HOST: string };
@@ -75,7 +96,16 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     if (missing.length > 0) {
       throw new Error(`Invalid environment for the API: production needs ${missing.join(", ")}`);
     }
+    if (env.ALLOWED_GITHUB_LOGINS.length === 0) {
+      throw new Error("Invalid environment for the API: ALLOWED_GITHUB_LOGINS lists no logins");
+    }
   }
   // Inside a container the server must listen on every interface; on a laptop, only on loopback.
   return { ...env, HOST: env.HOST ?? (env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1") };
+}
+
+/** Whether a GitHub login may sign in (case-insensitive); an empty list allows anyone. */
+export function isAllowedLogin(env: Pick<Env, "ALLOWED_GITHUB_LOGINS">, login: string): boolean {
+  const allowed = env.ALLOWED_GITHUB_LOGINS;
+  return allowed.length === 0 || allowed.includes(login.toLowerCase());
 }

@@ -20,6 +20,12 @@ if (checkOnly) {
 
 const app = buildServer(env);
 
+if (env.ALLOWED_GITHUB_LOGINS.length === 0) {
+  app.log.warn(
+    "ALLOWED_GITHUB_LOGINS is empty: anyone who can use this GitHub OAuth app can sign in (development only)",
+  );
+}
+
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, async () => {
     app.log.info({ signal }, "shutting down");
