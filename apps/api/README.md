@@ -23,7 +23,12 @@ The REST API every client and the worker go through. **Owner:** WS1 Back end & A
   - `GET /projects/:id/events` and `/events/stream` (Server-Sent Events): each event with its Redis Stream ID, resume with `Last-Event-ID`, a heartbeat every 15 seconds, `Cache-Control: no-transform`.
   - Autofix jobs are queued once the agent service consumes them (Nov 24).
 
-**Next:** BE-07 (deployment logs), BE-08 (push webhooks, after INF-11).
+- **Deployment logs (BE-07):**
+  - `GET /deployments/:id/logs?tail=` gives the last lines, oldest first, each with its stream entry ID.
+  - `GET /deployments/:id/logs/stream` replays from the first line (or after `Last-Event-ID`), follows live, and ends with one `end` event carrying the final status.
+  - When a deployment ends, the API appends an end marker to `logs:dep:{id}`, copies the lines to `build_logs` (NDJSON, the last 1 MB) and lets the stream expire after 7 days. After that, both routes read the copy.
+
+**Next:** BE-08 (push webhooks, after INF-11).
 
 | Command | What it does |
 | --- | --- |

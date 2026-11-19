@@ -23,6 +23,7 @@ import { accessProject, type ProjectRow } from "./access";
 import { canTransition } from "./deployment-state";
 import { type DbOrTx, type EventRow, publishEvents, recordEvent } from "./events";
 import type { Github, GithubCommit } from "./github";
+import { finishLogs } from "./logs";
 import type { ServiceRow } from "./services";
 
 export type DeploymentRow = typeof schema.deployments.$inferSelect;
@@ -241,6 +242,7 @@ export async function failDeployment(
   });
   if (!result) return null;
   await publishEvents(deps.redis, [result.event], deps.log);
+  await finishLogs(deps, deploymentId, "failed");
   return result.row;
 }
 
@@ -254,7 +256,10 @@ export async function startDeployment(
 ): Promise<DeploymentRow> {
   const { row, events, canceled } = await createDeploymentRows(deps.db, input);
   await publishEvents(deps.redis, events, deps.log);
-  for (const old of canceled) await dropQueuedBuild(deps.queues, old.id);
+  for (const old of canceled) {
+    await dropQueuedBuild(deps.queues, old.id);
+    await finishLogs(deps, old.id, "canceled");
+  }
   try {
     await enqueueBuild(deps.queues, buildJobFor(row, input.service));
   } catch (error) {
@@ -370,6 +375,10 @@ export async function applyReport(
     }
   });
   await publishEvents(deps.redis, result.events, deps.log);
+  const changed = result.events.length > 0;
+  if (changed && (result.row.status === "active" || result.row.status === "failed")) {
+    await finishLogs(deps, deploymentId, result.row.status);
+  }
   if (result.deployJob) {
     try {
       await enqueueDeploy(deps.queues, result.deployJob);
