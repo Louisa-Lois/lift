@@ -1,0 +1,70 @@
+# Traefik v3 static configuration for the worker's apps router (INF-03).
+# Mounted at /etc/traefik/traefik.yml by infra/compose/worker.yml. App containers bring their own
+# routers as labels (docs/prd/04-infrastructure.md, "Deploy job"): entry point websecure, tls=true,
+# no certificate resolver. They are all served by the one wildcard certificate in dynamic/tls.yml,
+# so deploying an app never asks Let's Encrypt for anything.
+
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+log:
+  level: INFO
+  format: json
+
+accessLog:
+  format: json
+  fields:
+    headers:
+      defaultMode: drop
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      aliasHeadersStrategy: delete
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+    http:
+      # Drop headers whose names alias another (X_Forwarded_For for X-Forwarded-For), so no client
+      # can spoof the forwarding headers Traefik sets.
+      aliasHeadersStrategy: delete
+    transport:
+      respondingTimeouts:
+        # Users' apps may stream, upload or hold WebSockets open; v3's 60 s default would cut them.
+        readTimeout: 0s
+  traefik:
+    address: ":8080"
+    http:
+      aliasHeadersStrategy: delete
+
+ping:
+  entryPoint: traefik
+
+# *.apps.{domain} by DNS-01 through Cloudflare (CF_DNS_API_TOKEN in the environment).
+certificatesResolvers:
+  le:
+    acme:
+      storage: /letsencrypt/acme.json
+      dnsChallenge:
+        provider: cloudflare
+        resolvers:
+          - "1.1.1.1:53"
+          - "1.0.0.1:53"
+
+providers:
+  # Only containers labelled traefik.enable=true, reached over the shared lift-edge network. The
+  # worker agent creates them; Traefik sees them through a read-only socket proxy.
+  docker:
+    endpoint: "tcp://socket-proxy:2375"
+    exposedByDefault: false
+    network: lift-edge
+  # The default (wildcard) certificate.
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true

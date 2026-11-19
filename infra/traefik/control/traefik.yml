@@ -1,0 +1,68 @@
+# Traefik v3 static configuration for the control plane (INF-02).
+# Mounted at /etc/traefik/traefik.yml by infra/compose/control.yml. Routers come from the labels on
+# web, api, collab and mcp there; nothing here depends on the domain.
+
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+log:
+  level: INFO
+  format: json
+
+# One JSON line per request on stdout (docker logs, capped by the daemon). Headers are dropped, so
+# cookies and Authorization headers never reach the log.
+accessLog:
+  format: json
+  fields:
+    headers:
+      defaultMode: drop
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      aliasHeadersStrategy: delete
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+    http:
+      # Drop headers whose names alias another (X_Forwarded_For for X-Forwarded-For), so no client
+      # can spoof the forwarding headers Traefik sets.
+      aliasHeadersStrategy: delete
+    transport:
+      respondingTimeouts:
+        # Traefik v3 defaults to 60 s, which cuts long uploads and long-lived collab WebSockets.
+        readTimeout: 0s
+  # Health check only (`traefik healthcheck --ping`); not published by Compose.
+  traefik:
+    address: ":8080"
+    http:
+      aliasHeadersStrategy: delete
+
+ping:
+  entryPoint: traefik
+
+# app.{domain} by DNS-01 through Cloudflare. Traefik reads CF_DNS_API_TOKEN from its environment;
+# the token needs Zone:Read and DNS:Edit on the one zone.
+certificatesResolvers:
+  le:
+    acme:
+      storage: /letsencrypt/acme.json
+      dnsChallenge:
+        provider: cloudflare
+        resolvers:
+          - "1.1.1.1:53"
+          - "1.0.0.1:53"
+
+# Docker through a read-only socket proxy (GET on containers, networks, events, version only), so
+# the container with public ports never holds the Docker socket itself.
+providers:
+  docker:
+    endpoint: "tcp://socket-proxy:2375"
+    exposedByDefault: false
+    network: lift-control-edge
