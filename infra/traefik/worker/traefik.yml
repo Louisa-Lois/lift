@@ -57,6 +57,14 @@ certificatesResolvers:
           - "1.1.1.1:53"
           - "1.0.0.1:53"
 
+# App containers run on this VM, so connecting to one takes well under a millisecond. A short dial
+# timeout means a request sent to a container that just went away (a swap, a crash) fails over
+# to another container within 2 s, through each router's retry middleware, instead of hanging
+# for the 30 s default.
+serversTransport:
+  forwardingTimeouts:
+    dialTimeout: 2s
+
 providers:
   # Only containers labelled traefik.enable=true, reached over the shared lift-edge network. The
   # worker agent creates them; Traefik sees them through a read-only socket proxy.

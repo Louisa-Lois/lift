@@ -17,8 +17,10 @@ export interface FakeDockerSetup {
   images?: string[];
   networks?: string[];
   probeRunning?: boolean;
-  /** What a started container does: keep running, or exit at once. */
-  behaviour?: "runs" | "exits";
+  /** What a started container does: keep running, exit at once, or get killed for memory. */
+  behaviour?: "runs" | "exits" | "oom";
+  /** The exit code when it exits (1 by default). */
+  exitCode?: number;
   logs?: string[];
   existing?: { id: string; name: string; labels: Record<string, string> }[];
 }
@@ -27,7 +29,7 @@ const running = (id: string, name: string): ContainerDetails => ({
   Id: id,
   Name: `/${name}`,
   RestartCount: 0,
-  State: { Status: "running", Running: true, Restarting: false, ExitCode: 0 },
+  State: { Status: "running", Running: true, Restarting: false, ExitCode: 0, OOMKilled: false },
   NetworkSettings: { Networks: { "lift-edge": { IPAddress: "172.18.0.9" } } },
 });
 
@@ -63,6 +65,9 @@ export function fakeDocker(setup: FakeDockerSetup = {}) {
       calls.push(`create:${name}`);
       return id;
     },
+    setRestartPolicy: async (id: string, name: "no" | "unless-stopped") => {
+      calls.push(`restart-policy:${id}:${name}`);
+    },
     startContainer: async (id: string) => {
       calls.push(`start:${id}`);
     },
@@ -72,10 +77,17 @@ export function fakeDocker(setup: FakeDockerSetup = {}) {
       }
       const container = find(idOrName);
       if (!container) return null;
-      if (setup.behaviour === "exits") {
+      if (setup.behaviour === "exits" || setup.behaviour === "oom") {
+        const oom = setup.behaviour === "oom";
         return {
           ...running(container.id, container.name),
-          State: { Status: "exited", Running: false, Restarting: false, ExitCode: 1 },
+          State: {
+            Status: "exited",
+            Running: false,
+            Restarting: false,
+            ExitCode: oom ? 137 : (setup.exitCode ?? 1),
+            OOMKilled: oom,
+          },
         };
       }
       return running(container.id, container.name);
@@ -95,6 +107,9 @@ export function fakeDocker(setup: FakeDockerSetup = {}) {
           Labels: container.labels,
           State: "running",
         })),
+    stopContainer: async (idOrName: string) => {
+      calls.push(`stop:${idOrName}`);
+    },
     removeContainer: async (idOrName: string) => {
       calls.push(`remove:${idOrName}`);
       const container = find(idOrName);

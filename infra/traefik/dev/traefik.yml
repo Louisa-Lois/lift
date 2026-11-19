@@ -31,6 +31,14 @@ api:
 ping:
   entryPoint: traefik
 
+# App containers run on this VM, so connecting to one takes well under a millisecond. A short dial
+# timeout means a request sent to a container that just went away (a swap, a crash) fails over
+# to another container within 2 s, through each router's retry middleware, instead of hanging
+# for the 30 s default.
+serversTransport:
+  forwardingTimeouts:
+    dialTimeout: 2s
+
 providers:
   docker:
     endpoint: "tcp://socket-proxy:2375"
