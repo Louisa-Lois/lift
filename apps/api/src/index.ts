@@ -1,5 +1,6 @@
 import { type Env, loadEnv } from "./env";
 import { buildServer } from "./server";
+import { failStuckDeployments } from "./services/deployments";
 
 // `node dist/index.js check-env` validates the environment and exits. The deploy runs it before
 // the rollout (infra/docker/api-entrypoint.sh), so a bad /opt/lift/.env stops the deploy while
@@ -26,9 +27,21 @@ if (env.ALLOWED_GITHUB_LOGINS.length === 0) {
   );
 }
 
+// The backstop (docs/prd/01-backend-api.md, "Deployments"): every minute, fail deployments the
+// worker stopped reporting on. Here rather than in buildServer, so tests run it by hand.
+const backstop = setInterval(() => {
+  failStuckDeployments({ db: app.db, redis: app.redis, queues: app.queues, log: app.log })
+    .then((ids) => {
+      if (ids.length > 0) app.log.warn({ deploymentIds: ids }, "failed stuck deployments");
+    })
+    .catch((error) => app.log.error({ err: error }, "the deployment backstop failed"));
+}, 60_000);
+backstop.unref();
+
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, async () => {
     app.log.info({ signal }, "shutting down");
+    clearInterval(backstop);
     await app.close();
     process.exit(0);
   });

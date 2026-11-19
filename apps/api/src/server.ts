@@ -1,4 +1,4 @@
-import { API_BASE_PATH } from "@lift/shared";
+import { API_BASE_PATH, INTERNAL_BASE_PATH, SSE_HEARTBEAT_MS } from "@lift/shared";
 import Fastify from "fastify";
 import {
   serializerCompiler,
@@ -13,7 +13,10 @@ import { registerErrorHandling } from "./plugins/errors";
 import { registerOpenApi } from "./plugins/openapi";
 import { registerQueues } from "./plugins/queues";
 import { registerRedis } from "./plugins/redis";
+import { internalDeploymentRoutes } from "./routes/internal/deployments";
 import { authRoutes } from "./routes/v1/auth";
+import { deploymentRoutes } from "./routes/v1/deployments";
+import { eventRoutes } from "./routes/v1/events";
 import { githubRoutes } from "./routes/v1/github";
 import { healthRoutes } from "./routes/v1/health";
 import { meRoutes } from "./routes/v1/me";
@@ -29,6 +32,8 @@ export interface ServerOptions {
   githubFetch?: typeof globalThis.fetch;
   /** BullMQ key prefix; tests use their own so they never see each other's jobs. */
   queuePrefix?: string;
+  /** How long an event stream may stay quiet before a heartbeat; tests shorten it. */
+  sseHeartbeatMs?: number;
 }
 
 /**
@@ -68,6 +73,19 @@ export function buildServer(env: Env, options: ServerOptions = {}) {
     secretBox,
   });
   app.register(serviceRoutes, { prefix: API_BASE_PATH, appsDomain: env.APPS_DOMAIN });
+  app.register(deploymentRoutes, { prefix: API_BASE_PATH, github, secretBox });
+  app.register(eventRoutes, {
+    prefix: API_BASE_PATH,
+    heartbeatMs: options.sseHeartbeatMs ?? SSE_HEARTBEAT_MS,
+  });
+
+  // The worker's routes: reachable only on the private IP, never through Traefik.
+  app.register(internalDeploymentRoutes, {
+    prefix: INTERNAL_BASE_PATH,
+    workerToken: env.WORKER_TOKEN,
+    appsDomain: env.APPS_DOMAIN,
+    secretBox,
+  });
 
   return app;
 }

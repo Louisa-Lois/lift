@@ -8,7 +8,7 @@ const TOKEN = fixture("token") as { access_token: string };
 const USER = fixture("user") as Record<string, unknown>;
 const EMAILS = fixture("emails") as unknown[];
 const REPOS = fixture("repos") as { name: string; owner: { login: string } }[];
-const BRANCHES = fixture("branches") as { name: string }[];
+const BRANCHES = fixture("branches") as { name: string; commit: { sha: string } }[];
 
 export interface RecordedCall {
   method: string;
@@ -73,6 +73,26 @@ export function fakeGithub(options: FakeGithubOptions = {}) {
     if (route === "GET api.github.com/user/repos") return page(REPOS, url);
     if (request.method === "DELETE" && url.pathname.startsWith("/applications/")) {
       return new Response(null, { status: 204 });
+    }
+    const commitPath = url.pathname.match(/^\/repos\/([^/]+)\/([^/]+)\/commits\/([^/]+)$/);
+    if (request.method === "GET" && url.host === "api.github.com" && commitPath) {
+      const [, owner = "", name = "", ref = ""] = commitPath;
+      if (!findRepo(decodeURIComponent(owner), decodeURIComponent(name))) {
+        return new Response("Not Found", { status: 404 });
+      }
+      // A branch name or one of the branches' head SHAs; GitHub answers 422 for an unknown SHA.
+      const wanted = decodeURIComponent(ref);
+      const head = BRANCHES.find((entry) => entry.name === wanted || entry.commit.sha === wanted);
+      if (!head)
+        return Response.json({ message: `No commit found for SHA: ${wanted}` }, { status: 422 });
+      return Response.json({
+        sha: head.commit.sha,
+        commit: {
+          message: `Update the ${head.name} landing page\n\nA body Lift doesn't keep.`,
+          author: { name: "Ama Owusu" },
+        },
+        author: { login: "ama-owusu" },
+      });
     }
     const repoPath = url.pathname.match(/^\/repos\/([^/]+)\/([^/]+)(\/branches(?:\/([^/]+))?)?$/);
     if (request.method === "GET" && url.host === "api.github.com" && repoPath) {

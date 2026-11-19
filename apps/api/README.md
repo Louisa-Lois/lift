@@ -14,8 +14,16 @@ The REST API every client and the worker go through. **Owner:** WS1 Back end & A
   - A non-member gets 404, and a role that's too low gets 403.
   - Every change writes an `events` row and appends it to the project's Redis Stream.
   - Deleting queues `remove_service` for the worker.
+- **Deployments (BE-06):**
+  - `POST /services/:id/deployments` resolves the commit (the branch head by default), queues it as `manual`, cancels any older queued deployment of the service, and queues the build job. Creating a service with `deploy: true` does the same.
+  - The state machine in `src/services/deployment-state.ts` is the PRD's table as data.
+  - The worker's routes under `/internal/v1` (build context, runtime environment, status reports) need `Authorization: Bearer {WORKER_TOKEN}`. A request with `X-Forwarded-*` headers gets 404, so nothing routed by Traefik reaches them. A refused report gets 409 and a repeated one 200.
+  - `deploying` queues the deploy job with the service's hostnames; `active` supersedes the previous active deployment.
+  - A backstop (in `src/index.ts`, every minute) fails deployments with no update for 20 minutes while building or 5 while deploying.
+  - `GET /projects/:id/events` and `/events/stream` (Server-Sent Events): each event with its Redis Stream ID, resume with `Last-Event-ID`, a heartbeat every 15 seconds, `Cache-Control: no-transform`.
+  - Autofix jobs are queued once the agent service consumes them (Nov 24).
 
-**Next:** BE-06 (deployments and the project events stream), BE-07 (deployment logs), BE-08 (push webhooks).
+**Next:** BE-07 (deployment logs), BE-08 (push webhooks, after INF-11).
 
 | Command | What it does |
 | --- | --- |
