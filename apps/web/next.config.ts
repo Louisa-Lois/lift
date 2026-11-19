@@ -18,6 +18,21 @@ const nextConfig: NextConfig = {
     if (process.env.NODE_ENV === "production") return [];
     return [{ source: "/api/:path*", destination: `${apiUrl}/api/:path*` }];
   },
+
+  // Security headers (docs/prd/02-frontend.md, "Non-functional"). A Content-Security-Policy
+  // follows once the pages that load avatars, the collab WebSocket and Monaco exist.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
