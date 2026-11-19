@@ -18,6 +18,7 @@
     "bullmq": "catalog:",
     "ioredis": "catalog:",
     "pino": "10.4.0",
+    "postgres": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

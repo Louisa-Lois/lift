@@ -88,6 +88,12 @@ function setup(
     async runtimeEnv() {
       throw new Error("not used by builds");
     },
+    async provisionContext() {
+      throw new Error("not used here");
+    },
+    async reportDatabase() {
+      throw new Error("not used here");
+    },
   } as InternalApi;
   const sink: LogSink = {
     write: (stream, line) => events.push(`${stream}:${line}`),

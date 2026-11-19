@@ -55,6 +55,12 @@ export function fakeDocker(setup: FakeDockerSetup = {}) {
       calls.push(`network:${name}:${JSON.stringify(labels)}`);
       networks.add(name);
     },
+    connectNetwork: async (network: string, container: string) => {
+      calls.push(`connect:${container}:${network}`);
+    },
+    disconnectNetwork: async (network: string, container: string) => {
+      calls.push(`disconnect:${container}:${network}`);
+    },
     removeNetwork: async (name: string) => {
       calls.push(`remove-network:${name}`);
       networks.delete(name);

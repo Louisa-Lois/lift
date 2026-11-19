@@ -15,6 +15,15 @@ const containers = ids(docker("ps", "--all", "--quiet", "--filter", "label=lift.
 if (containers.length > 0) docker("rm", "--force", ...containers);
 
 const networks = ids(docker("network", "ls", "--quiet", "--filter", "label=lift.project"));
+for (const network of networks) {
+  // lift-pg joins the network of each project with a database, and Docker won't remove a network
+  // that still has a container on it. The databases themselves stay in lift-pg.
+  try {
+    docker("network", "disconnect", "--force", network, "lift-pg");
+  } catch {
+    // Not on this one.
+  }
+}
 if (networks.length > 0) docker("network", "rm", ...networks);
 
 console.log(
