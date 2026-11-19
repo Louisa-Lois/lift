@@ -1,4 +1,11 @@
-import type { GithubBranch, GithubRepo } from "@lift/shared";
+import {
+  GITHUB_FILE_MAX_BYTES,
+  GITHUB_TREE_MAX_FILES,
+  type GithubBranch,
+  type GithubFile,
+  type GithubRepo,
+  type GithubTree,
+} from "@lift/shared";
 import { problem } from "../lib/problem";
 
 /** What the OAuth app asks for (docs/prd/01-backend-api.md, "Sign-in"). */
@@ -57,6 +64,40 @@ function toCommit(raw: RawCommit): GithubCommit {
   };
 }
 
+/** A repo file, or why Lift won't return it. */
+export type GithubContents =
+  | { kind: "file"; file: GithubFile }
+  | { kind: "not_found" }
+  | { kind: "folder" }
+  | { kind: "binary" }
+  | { kind: "too_large"; size: number };
+
+interface RawTree {
+  truncated: boolean;
+  tree: { path: string; type: string; size?: number }[];
+}
+
+interface RawContents {
+  type: string;
+  path: string;
+  sha: string;
+  size: number;
+  encoding?: string;
+  content?: string;
+}
+
+const utf8 = new TextDecoder("utf-8", { fatal: true });
+
+/** The file's text, or null for anything that isn't UTF-8 text (a NUL byte, or invalid UTF-8). */
+function textOf(bytes: Buffer): string | null {
+  if (bytes.includes(0)) return null;
+  try {
+    return utf8.decode(bytes);
+  } catch {
+    return null;
+  }
+}
+
 function toRepo(raw: RawRepo): GithubRepo {
   return {
     owner: raw.owner.login,
@@ -69,6 +110,8 @@ function toRepo(raw: RawRepo): GithubRepo {
 
 const hasNextPage = (response: Response) => /rel="next"/.test(response.headers.get("link") ?? "");
 const segment = (value: string) => encodeURIComponent(value);
+/** A repo path in a URL: each segment encoded, the slashes kept. */
+const pathSegments = (path: string) => path.split("/").map(segment).join("/");
 /** At most this many pages of 100 for lists Lift reads whole (branches, repo search). */
 export const GITHUB_MAX_PAGES = 5;
 
@@ -125,6 +168,15 @@ export function createGithub(options: GithubOptions) {
         "X-GitHub-Api-Version": "2022-11-28",
       },
     };
+  }
+
+  async function getRepo(token: string, owner: string, name: string): Promise<GithubRepo | null> {
+    const response = await callOrNull(
+      `GET /repos/${owner}/${name}`,
+      `${API}/repos/${segment(owner)}/${segment(name)}`,
+      api(token),
+    );
+    return response ? toRepo((await response.json()) as RawRepo) : null;
   }
 
   function requireOAuth(): { clientId: string; clientSecret: string } {
@@ -241,14 +293,7 @@ export function createGithub(options: GithubOptions) {
     },
 
     /** The repo if the user can read it, otherwise null. */
-    async getRepo(token: string, owner: string, name: string): Promise<GithubRepo | null> {
-      const response = await callOrNull(
-        `GET /repos/${owner}/${name}`,
-        `${API}/repos/${segment(owner)}/${segment(name)}`,
-        api(token),
-      );
-      return response ? toRepo((await response.json()) as RawRepo) : null;
-    },
+    getRepo,
 
     /** Every branch (up to 500), or null when the user can't read the repo. */
     async listBranches(token: string, owner: string, name: string): Promise<GithubBranch[] | null> {
@@ -338,6 +383,75 @@ export function createGithub(options: GithubOptions) {
       if (response.status === 404 || response.status === 422) return null;
       if (!response.ok) throw failure(what, response);
       return toCommit((await response.json()) as RawCommit);
+    },
+
+    /**
+     * The files at a branch, tag or commit (the default branch without `ref`): paths and sizes,
+     * at most 5,000, with the commit the ref resolved to. Null when the repo or the ref doesn't
+     * exist or the user can't read it. Folders and submodules aren't listed.
+     */
+    async getTree(
+      token: string,
+      owner: string,
+      name: string,
+      ref: string | undefined,
+    ): Promise<GithubTree | null> {
+      const wanted = ref ?? (await getRepo(token, owner, name))?.defaultBranch;
+      if (!wanted) return null;
+      const what = `GET /repos/${owner}/${name}/commits/${wanted}`;
+      const commitResponse = await send(
+        what,
+        `${API}/repos/${segment(owner)}/${segment(name)}/commits/${segment(wanted)}`,
+        api(token),
+      );
+      if (commitResponse.status === 404 || commitResponse.status === 422) return null;
+      if (!commitResponse.ok) throw failure(what, commitResponse);
+      const commit = (await commitResponse.json()) as {
+        sha: string;
+        commit: { tree: { sha: string } };
+      };
+
+      const treeResponse = await callOrNull(
+        `GET /repos/${owner}/${name}/git/trees/${commit.commit.tree.sha}`,
+        `${API}/repos/${segment(owner)}/${segment(name)}/git/trees/${commit.commit.tree.sha}?recursive=1`,
+        api(token),
+      );
+      if (!treeResponse) return null;
+      const raw = (await treeResponse.json()) as RawTree;
+      const blobs = raw.tree.filter((entry) => entry.type === "blob" && entry.path.length <= 1024);
+      return {
+        sha: commit.sha,
+        truncated: raw.truncated || blobs.length > GITHUB_TREE_MAX_FILES,
+        files: blobs
+          .slice(0, GITHUB_TREE_MAX_FILES)
+          .map((entry) => ({ path: entry.path, size: entry.size ?? 0 })),
+      };
+    },
+
+    /** One text file at a branch, tag or commit (the default branch without `ref`), up to 1 MB. */
+    async getContents(
+      token: string,
+      owner: string,
+      name: string,
+      path: string,
+      ref: string | undefined,
+    ): Promise<GithubContents> {
+      const query = ref ? `?ref=${segment(ref)}` : "";
+      const response = await callOrNull(
+        `GET /repos/${owner}/${name}/contents/${path}`,
+        `${API}/repos/${segment(owner)}/${segment(name)}/contents/${pathSegments(path)}${query}`,
+        api(token),
+      );
+      if (!response) return { kind: "not_found" };
+      const raw = (await response.json()) as RawContents | unknown[];
+      if (Array.isArray(raw) || raw.type === "dir") return { kind: "folder" };
+      if (raw.type !== "file") return { kind: "not_found" };
+      if (raw.size > GITHUB_FILE_MAX_BYTES || raw.encoding !== "base64") {
+        return { kind: "too_large", size: raw.size };
+      }
+      const content = textOf(Buffer.from(raw.content ?? "", "base64"));
+      if (content === null) return { kind: "binary" };
+      return { kind: "file", file: { path: raw.path, sha: raw.sha, size: raw.size, content } };
     },
   };
 }

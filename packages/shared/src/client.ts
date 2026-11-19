@@ -11,7 +11,7 @@ import { cursorPage, HealthResponse } from "./schemas/common";
 import { type CreateDatabaseBody, Database, DatabaseCredentials } from "./schemas/database";
 import { type CreateDeploymentBody, Deployment, DeploymentDetail } from "./schemas/deployment";
 import { isKnownProjectEvent } from "./schemas/event";
-import { GithubBranch, GithubRepo } from "./schemas/github";
+import { GithubBranch, GithubFile, GithubRepo, GithubTree } from "./schemas/github";
 import { DeploymentLogEnd, LogLine, LogSnapshot } from "./schemas/logs";
 import {
   type CreateProjectBody,
@@ -191,6 +191,16 @@ export function createLiftClient(options: LiftClientOptions) {
       branches: (owner: string, repo: string, params: ListParams = {}) =>
         call("GET", `/github/repos/${segment(owner)}/${segment(repo)}/branches`, GithubBranchPage, {
           query: listQuery(params),
+        }),
+      /** `GET /github/repos/:owner/:repo/tree?ref=`: without `ref`, the default branch. */
+      tree: (owner: string, repo: string, params: { ref?: string } = {}) =>
+        call("GET", `/github/repos/${segment(owner)}/${segment(repo)}/tree`, GithubTree, {
+          query: { ref: params.ref },
+        }),
+      /** `GET /github/repos/:owner/:repo/contents?path=&ref=`: one text file, at most 1 MB. */
+      contents: (owner: string, repo: string, path: string, params: { ref?: string } = {}) =>
+        call("GET", `/github/repos/${segment(owner)}/${segment(repo)}/contents`, GithubFile, {
+          query: { path, ref: params.ref },
         }),
     },
 

@@ -1,5 +1,5 @@
 import { API_BASE_PATH, SESSION_COOKIE } from "@lift/shared";
-import type { buildTestApp } from "./app";
+import { type buildTestApp, TEST_AGENT_TOKEN } from "./app";
 
 type TestApp = Awaited<ReturnType<typeof buildTestApp>>;
 
@@ -23,3 +23,8 @@ export async function signIn(app: TestApp): Promise<string> {
 
 /** Inject options for a signed-in request. */
 export const as = (session: string) => ({ cookies: { [SESSION_COOKIE]: session } });
+
+/** Inject options for the agent service acting as a user, as it calls the API from inside. */
+export const asAgent = (userId: string, token = TEST_AGENT_TOKEN) => ({
+  headers: { authorization: `Bearer ${token}`, "x-lift-act-as": userId },
+});

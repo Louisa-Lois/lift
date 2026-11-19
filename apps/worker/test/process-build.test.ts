@@ -191,6 +191,34 @@ describe("the build job", () => {
     expect(secrets()).not.toContain("production");
   });
 
+  it("gives Railpack the service's build and start commands, over variables of the same name", async () => {
+    const { deps, events } = setup({
+      context: {
+        buildCommand: "pnpm build:web",
+        startCommand: "node dist/server.js",
+        buildVariables: { GREETING: "hi", RAILPACK_START_CMD: "node old.js" },
+      },
+    });
+    let given: Record<string, string> = {};
+    const build = deps.buildImage;
+    deps.buildImage = async (input) => {
+      given = input.buildVariables;
+      return build ? build(input) : { code: 0, timedOut: false };
+    };
+    expect(await processBuild(job, deps)).toBe("deploying");
+    expect(given).toEqual({
+      GREETING: "hi",
+      RAILPACK_BUILD_CMD: "pnpm build:web",
+      RAILPACK_START_CMD: "node dist/server.js",
+    });
+    expect(systemLines(events)).toEqual(
+      expect.arrayContaining([
+        "Build command, from the service's settings: pnpm build:web",
+        "Start command, from the service's settings: node dist/server.js",
+      ]),
+    );
+  });
+
   it("clones, builds, then reports deploying with the image, every line flushed first", async () => {
     const { deps, events, reports, secrets } = setup();
     expect(await processBuild(job, deps)).toBe("deploying");

@@ -5,8 +5,15 @@ import { testEnv } from "./env";
 /** A fixed 32-byte key, so tests can decrypt what the API stored. */
 export const TEST_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
 
-/** Settings every signed-in test needs: GitHub OAuth, encryption and the cookie secret. */
+/** The agent service's token (AGENT_SERVICE_TOKEN) in tests. */
+export const TEST_AGENT_TOKEN = `lift_svc_${"a".repeat(32)}`;
+
+/**
+ * Settings every signed-in test needs: GitHub OAuth, encryption, the cookie secret and the agent
+ * service's token.
+ */
 export const AUTH_ENV = {
+  AGENT_SERVICE_TOKEN: TEST_AGENT_TOKEN,
   ENCRYPTION_KEY: TEST_ENCRYPTION_KEY,
   SESSION_SECRET: "t".repeat(64),
   GITHUB_CLIENT_ID: "test-client-id",
