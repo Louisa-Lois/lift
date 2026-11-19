@@ -48,8 +48,10 @@ function setup(
     probes?: ProbeResult[];
     stopOnActive?: boolean;
     jobs?: DeployJob[];
+    variables?: RuntimeEnv["variables"];
   } = {},
 ) {
+  const sinkSecrets: string[][] = [];
   const events: string[] = [];
   const reports: DeploymentStatusReport[] = [];
   const images = (options.jobs ?? [job]).map((each) => each.imageTag);
@@ -70,7 +72,8 @@ function setup(
   const probes = [...(options.probes ?? [ok])];
   const api = {
     async runtimeEnv(deploymentId: string) {
-      return env(deploymentId);
+      const base = env(deploymentId);
+      return options.variables ? { ...base, variables: options.variables } : base;
     },
     async reportStatus(_id: string, report: DeploymentStatusReport) {
       events.push(`report:${report.status}`);
@@ -92,7 +95,10 @@ function setup(
   const deps: DeployDeps = {
     api,
     docker,
-    logSink: () => sink,
+    logSink: (_id, secrets) => {
+      sinkSecrets.push([...secrets]);
+      return sink;
+    },
     appsDomain: "apps.localhost",
     probeContainer: "lift-probe",
     log: createLogger("silent"),
@@ -101,7 +107,7 @@ function setup(
     overlapMs: 0,
     probe: async () => probes.shift() ?? probes.at(-1) ?? refused,
   };
-  return { deps, events, reports, fake };
+  return { deps, events, reports, fake, sinkSecrets };
 }
 
 const OLD = {
@@ -172,6 +178,28 @@ describe("the deploy job", () => {
     expect(events).toContain("deploy:Error: Cannot find module 'next'");
     expect(fake.containers.get("new-2")?.removed).toBe(true);
     expect(fake.containers.get("old-1")?.removed).toBe(false);
+  });
+
+  it("scrubs the app's variables from its log, since a crashing app may print them", async () => {
+    const { deps, sinkSecrets } = setup({
+      variables: [
+        { key: "API_SECRET", value: "s3cr3t-value-1234", source: "user" },
+        {
+          key: "DATABASE_URL",
+          value: "postgres://db_x:pw-123456@lift-pg:5432/db_x",
+          source: "database",
+        },
+        { key: "NODE_ENV", value: "production", source: "user" },
+        { key: "LIFT_PUBLIC_URL", value: "http://web-demo.apps.localhost", source: "system" },
+        { key: "PORT", value: "3000", source: "system" },
+      ],
+    });
+    expect(await processDeploy(job, deps)).toBe("active");
+    // The log the deploy writes to scrubs secrets-looking values, but not Lift's own or plain words.
+    expect(sinkSecrets.at(-1)).toEqual([
+      "s3cr3t-value-1234",
+      "postgres://db_x:pw-123456@lift-pg:5432/db_x",
+    ]);
   });
 
   it("says so when the app runs out of memory", async () => {

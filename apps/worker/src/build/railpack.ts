@@ -1,16 +1,38 @@
 import { childEnv, type RunResult, run } from "../process";
 
-/** `railpack build` with plain progress, so every BuildKit step is a readable line. */
+/**
+ * Variables the build tools themselves read. Passing one to Railpack's environment would steer
+ * Railpack, git or Docker rather than the app's build, so these stay out of it (the app still gets
+ * them when it runs).
+ */
+const TOOL_VARIABLE =
+  /^(?:PATH|HOME|TMPDIR|LANG|LC_ALL|SSL_CERT_FILE|SSL_CERT_DIR|(?:HTTP|HTTPS|NO|ALL)_PROXY|DOCKER_\w*|BUILDKIT_\w*|LD_\w*)$/i;
+
+/** Splits a service's build variables into those Railpack gets and those the tools keep. */
+export function splitBuildVariables(variables: Record<string, string>): {
+  passed: Record<string, string>;
+  skipped: string[];
+} {
+  const passed: Record<string, string> = {};
+  const skipped: string[] = [];
+  for (const [key, value] of Object.entries(variables)) {
+    if (TOOL_VARIABLE.test(key)) skipped.push(key);
+    else passed[key] = value;
+  }
+  return { passed, skipped: skipped.sort() };
+}
+
+/**
+ * `railpack build` with plain progress, so every BuildKit step is a readable line. Variables go
+ * in by name only (`--env KEY`): Railpack reads a bare name's value from its own environment, so
+ * no value is ever in argv, where `ps` and error messages could show it.
+ */
 export function railpackArgs(
   dir: string,
   imageTag: string,
-  buildVariables: Record<string, string>,
+  variableKeys: readonly string[],
 ): string[] {
-  // Users' build-time variables arrive with BE-09; they will need a way in other than argv.
-  const env = Object.entries(buildVariables).flatMap(([key, value]) => [
-    "--env",
-    `${key}=${value}`,
-  ]);
+  const env = variableKeys.flatMap((key) => ["--env", key]);
   return ["build", dir, "--name", imageTag, "--progress", "plain", ...env];
 }
 
@@ -29,8 +51,9 @@ export interface ImageBuildInput {
  * is what ends it.
  */
 export function railpackBuild(input: ImageBuildInput): Promise<RunResult> {
-  return run("railpack", railpackArgs(input.dir, input.imageTag, input.buildVariables), {
-    env: childEnv({ BUILDKIT_HOST: input.buildkitHost }),
+  const { passed } = splitBuildVariables(input.buildVariables);
+  return run("railpack", railpackArgs(input.dir, input.imageTag, Object.keys(passed)), {
+    env: childEnv({ ...passed, BUILDKIT_HOST: input.buildkitHost }),
     timeoutMs: input.timeoutMs,
     onLine: input.onLine,
   });

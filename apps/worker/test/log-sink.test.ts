@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { REDIS_STREAMS } from "@lift/shared";
 import { Redis } from "ioredis";
 import { afterAll, describe, expect, it } from "vitest";
-import { createLogSink, MAX_LINE_BYTES, scrub } from "../src/log-sink";
+import { createLogSink, MAX_LINE_BYTES, scrub, variableSecrets } from "../src/log-sink";
 import { createLogger } from "../src/logger";
 
 // The local stack's Redis (pnpm stack:up), or CI's through REDIS_URL.
@@ -70,5 +70,18 @@ describe("the log sink", () => {
 
   it("leaves short strings alone, so a short secret can't blank every line", () => {
     expect(scrub("main branch", ["main"])).toBe("main branch");
+  });
+
+  it("treats a variable's value as a secret from 8 characters, unless it's a plain word", () => {
+    expect(
+      variableSecrets([
+        "production",
+        "development",
+        "s3cr3t-value",
+        "short-1",
+        "https://api.example.com",
+        "abcdefghij",
+      ]),
+    ).toEqual(["s3cr3t-value", "https://api.example.com"]);
   });
 });
