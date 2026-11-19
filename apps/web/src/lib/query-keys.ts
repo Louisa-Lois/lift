@@ -9,6 +9,7 @@ export const queryKeys = {
   variables: (serviceId: string) => ["variables", serviceId] as const,
   databases: (projectId: string) => ["databases", projectId] as const,
   usage: (projectId: string) => ["usage", projectId] as const,
+  tokens: ["tokens"] as const,
   githubRepos: (query: string) => ["github", "repos", query] as const,
   githubBranches: (owner: string, repo: string) => ["github", "branches", owner, repo] as const,
 };
