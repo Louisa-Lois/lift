@@ -1,4 +1,4 @@
-import { type BuildJob, type DeployJob, JOBS, OpsJob } from "@lift/shared";
+import { type AutofixJob, type BuildJob, type DeployJob, JOBS, OpsJob } from "@lift/shared";
 import type { Queues } from "../plugins/queues";
 
 /** Finished jobs stay a day (failed ones a week) for debugging, then BullMQ drops them. */
@@ -46,6 +46,18 @@ function opJobId(payload: OpsJob): string | undefined {
     case "restart":
       return undefined;
   }
+}
+
+/**
+ * `lift-agent` → `autofix` for a failed deployment (AI-06). The job ID makes it once per
+ * deployment, however often the failure is reported.
+ */
+export async function enqueueAutofix(queues: Queues, job: AutofixJob): Promise<void> {
+  const payload = JOBS.autofix.payload.parse(job);
+  await queues.agent.add(JOBS.autofix.name, payload, {
+    ...RETENTION,
+    jobId: `autofix-${payload.deploymentId}`,
+  });
 }
 
 /** Adds a `lift-ops` job; one that happens once gets a fixed job ID. */

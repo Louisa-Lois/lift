@@ -1,6 +1,7 @@
 import { type Db, schema } from "@lift/db";
 import {
   type ActorType,
+  AUTOFIX_ERROR_CODES,
   type BuildJob,
   type DeployJob,
   type Deployment,
@@ -18,7 +19,13 @@ import {
 import { and, asc, desc, eq, inArray, isNull, max } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 import type { Redis } from "ioredis";
-import { dropQueuedBuild, enqueueBuild, enqueueDeploy, enqueueOp } from "../jobs/enqueue";
+import {
+  dropQueuedBuild,
+  enqueueAutofix,
+  enqueueBuild,
+  enqueueDeploy,
+  enqueueOp,
+} from "../jobs/enqueue";
 import { problem } from "../lib/problem";
 import type { Queues } from "../plugins/queues";
 import { accessProject, type ProjectRow } from "./access";
@@ -151,6 +158,8 @@ export interface NewDeployment {
   trigger: DeploymentTrigger;
   commit: GithubCommit;
   actor: Actor;
+  /** The agent action that asked for it: an autofix redeploy (AI-06). */
+  createdByActionId?: string;
 }
 
 /**
@@ -214,6 +223,7 @@ export async function createDeploymentRows(
         commitMessage: commit.message,
         commitAuthor: commit.author,
         createdByUserId: actor.type === "user" ? actor.id : null,
+        createdByActionId: input.createdByActionId ?? null,
         queuedAt: now,
       })
       .returning();
@@ -402,9 +412,12 @@ export async function applyReport(
           ...step,
           set: { errorCode: report.errorCode, errorMessage: message, finishedAt: at },
         });
-        // Autofix (`lift-agent` → `autofix`) is queued here once the agent service consumes it
-        // (Nov 24); until then a queued job would wait for days and then fix a stale failure.
-        return { row: change.row, events: [change.event], deployJob: null };
+        // AI-06: the app's own failures go to autofix, on a service that has it on.
+        const autofix =
+          service.autofix &&
+          !service.deletedAt &&
+          (AUTOFIX_ERROR_CODES as readonly string[]).includes(report.errorCode);
+        return { row: change.row, events: [change.event], deployJob: null, autofix };
       }
     }
   });
@@ -412,6 +425,13 @@ export async function applyReport(
   const changed = result.events.length > 0;
   if (changed && (result.row.status === "active" || result.row.status === "failed")) {
     await finishLogs(deps, deploymentId, result.row.status);
+  }
+  if (changed && "autofix" in result && result.autofix) {
+    // After finishLogs, so the agent reads the whole log. A queue that's down only costs the
+    // diagnosis: the deployment has failed either way.
+    await enqueueAutofix(deps.queues, { deploymentId }).catch((error) =>
+      deps.log.error({ err: error, deploymentId }, "couldn't queue autofix"),
+    );
   }
   if (result.deployJob) {
     try {
