@@ -10,6 +10,8 @@ describe("exit codes and global error handling", () => {
       expect(exitCode).toBe(2);
       expect(stderr).toMatch(/unknown command/i);
       expect(stderr).toContain("lift --help");
+      const occurrences = (stderr.match(/unknown command/gi) || []).length;
+      expect(occurrences).toBe(1);
     } finally {
       cleanDir(configDir);
     }

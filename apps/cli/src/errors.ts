@@ -49,7 +49,7 @@ export function toCliError(error: unknown): CliError {
   if (error instanceof LiftApiError) {
     if (error.status === 401 || error.code === "unauthenticated") {
       return new NotSignedInError(
-        "Not signed in or token expired. Run `lift login`.",
+        error.detail || "Not signed in or token expired. Run `lift login`.",
         "Run `lift login --token <token>` to sign in.",
       );
     }

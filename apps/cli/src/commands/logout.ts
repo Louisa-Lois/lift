@@ -23,6 +23,9 @@ export async function logoutCommand(options: LogoutOptions, ctx?: OutputContext)
   if (ctx?.json) {
     printJson({ status: "ok" }, ctx);
   } else {
-    printText("Logged out.", ctx);
+    printText(
+      "Logged out. Saved credentials have been removed from this machine (revoke the token in dashboard settings if needed).",
+      ctx,
+    );
   }
 }

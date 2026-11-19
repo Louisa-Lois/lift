@@ -32,8 +32,9 @@ export async function loginCommand(options: LoginOptions, ctx?: OutputContext): 
     user = await client.me();
   } catch (err) {
     if (err instanceof LiftApiError && (err.status === 401 || err.code === "unauthenticated")) {
+      const message = err.detail || "Invalid or expired token. Run `lift login --token <token>`.";
       throw new NotSignedInError(
-        "Invalid or expired token. Run `lift login --token <token>`.",
+        message,
         "Check your token in the dashboard settings and run `lift login --token <token>`.",
       );
     }

@@ -7,6 +7,9 @@ import { createProgram } from "./program";
 
 const program = createProgram();
 program.exitOverride();
+program.configureOutput({
+  outputError: () => {},
+});
 
 try {
   await program.parseAsync(process.argv);

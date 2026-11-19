@@ -140,6 +140,7 @@ export async function runCli(
   program.configureOutput({
     writeOut: (text) => ctx.stdout?.(text),
     writeErr: (text) => ctx.stderr?.(text),
+    outputError: () => {},
   });
 
   try {
