@@ -130,6 +130,7 @@ export const projectRoutes: FastifyPluginAsyncZod<ProjectRoutesOptions> = async 
   app.delete(
     "/projects/:projectId",
     {
+      config: { role: "owner" },
       schema: {
         summary: "Delete a project with its services and databases (owners only)",
         tags: ["projects"],
