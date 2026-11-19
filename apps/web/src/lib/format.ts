@@ -15,3 +15,17 @@ export function timeAgo(iso: string, now: number = Date.now()): string {
     year: "numeric",
   });
 }
+
+/** "45s", then "2m 03s", then "1h 05m": how long a deployment took, or has taken so far. */
+export function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  if (total < 60) return `${total}s`;
+  const minutes = Math.floor(total / 60);
+  if (minutes < 60) return `${minutes}m ${String(total % 60).padStart(2, "0")}s`;
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
+}
+
+/** The time of day, "14:18:02", in the viewer's time zone. */
+export function clockTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-GB", { hour12: false });
+}

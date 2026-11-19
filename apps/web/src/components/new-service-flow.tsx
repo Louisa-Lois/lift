@@ -59,7 +59,13 @@ export function NewServiceFlow() {
             <NewServiceForm
               repo={repo}
               defaultProjectId={projectId}
-              onCreated={(service) => router.push(`/p/${service.projectId}`)}
+              onCreated={(service) =>
+                router.push(
+                  service.latestDeployment
+                    ? `/p/${service.projectId}/deployments/${service.latestDeployment.id}`
+                    : `/p/${service.projectId}`,
+                )
+              }
             />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
