@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { BuildJob, DeployJob, OpsJob, QUEUE_NAMES } from "@lift/shared";
 import { type Job, Worker } from "bullmq";
 import { Redis } from "ioredis";
+import postgres from "postgres";
 import { processBuild } from "./build/process-build";
 import { processDeploy } from "./deploy/process-deploy";
 import { createDocker } from "./docker";
@@ -64,6 +65,13 @@ async function start(env: Env): Promise<void> {
     redis.on("error", (error) => log.warn({ err: error }, "Redis connection problem"));
   }
 
+  // lift-pg's superuser, for users' databases (INF-10); production requires it.
+  const pg = env.LIFT_PG_URL
+    ? postgres(env.LIFT_PG_URL, { max: 2, idle_timeout: 60, onnotice: () => undefined })
+    : null;
+  if (!pg)
+    log.warn("LIFT_PG_URL isn't set, so the worker can't create databases (see .env.example)");
+
   const logSink = (deploymentId: string, secrets: string[]) =>
     createLogSink(logRedis, deploymentId, { secrets, log });
   const options = (concurrency: number) => ({ connection: queueRedis, concurrency });
@@ -96,7 +104,7 @@ async function start(env: Env): Promise<void> {
     ),
     new Worker(
       QUEUE_NAMES.ops,
-      (job: Job) => processOp(OpsJob.parse(job.data), { docker, log }),
+      (job: Job) => processOp(OpsJob.parse(job.data), { docker, log, api, pg }),
       options(4),
     ),
   ];
@@ -115,6 +123,7 @@ async function start(env: Env): Promise<void> {
     async () => {
       queueRedis.disconnect();
       logRedis.disconnect();
+      await pg?.end({ timeout: 5 });
     },
   );
   log.info(

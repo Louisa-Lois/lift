@@ -173,6 +173,36 @@ export function createDocker(socketPath: string = dockerSocketPath()) {
       });
     },
 
+    /** Attaches a container to a network (`docker network connect`); already attached is fine. */
+    async connectNetwork(network: string, container: string): Promise<void> {
+      const response = await send("POST", `/networks/${encodeURIComponent(network)}/connect`, {
+        Container: container,
+      });
+      if (response.status === 200) return;
+      const message = response.body.toString("utf8");
+      if (response.status === 403 && /already exists/i.test(message)) return;
+      throw new DockerApiError(
+        `Docker refused to connect ${container} to ${network}: ${message.trim()}`,
+        response.status,
+      );
+    },
+
+    /** Detaches a container from a network; one not attached, or a network that's gone, is fine. */
+    async disconnectNetwork(network: string, container: string): Promise<void> {
+      const response = await send("POST", `/networks/${encodeURIComponent(network)}/disconnect`, {
+        Container: container,
+        Force: true,
+      });
+      if (response.status === 200 || response.status === 404) return;
+      const message = response.body.toString("utf8");
+      // Engine 29 answers 500 "… is not connected to network …", even once the network is gone.
+      if (/not connected/i.test(message)) return;
+      throw new DockerApiError(
+        `Docker refused to disconnect ${container} from ${network}: ${message.trim()}`,
+        response.status,
+      );
+    },
+
     /** Removes a network; one that is already gone is fine. */
     async removeNetwork(name: string): Promise<void> {
       await call("DELETE", `/networks/${encodeURIComponent(name)}`, [204, 404]);

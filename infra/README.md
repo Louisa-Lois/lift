@@ -12,11 +12,12 @@ Everything that defines the machines and how Lift runs on them. **Owner:** WS4 I
 
 ## The local stack
 
-`pnpm stack:up` starts `compose/dev.yml`: Postgres and Redis for the apps, plus BuildKit, a Traefik for `*.apps.localhost` and `lift-probe` for the worker. The worker runs on your machine with `pnpm dev` and deploys apps the way it does on the worker VM, over plain HTTP instead of HTTPS.
+`pnpm stack:up` starts `compose/dev.yml`: Postgres and Redis for the apps, plus BuildKit, a Traefik for `*.apps.localhost`, `lift-probe` for the worker and `lift-pg` for users' databases. The worker runs on your machine with `pnpm dev` and deploys apps the way it does on the worker VM, over plain HTTP instead of HTTPS.
 
 | Port on 127.0.0.1 | What | To move it |
 | --- | --- | --- |
 | 5432 | Postgres (user, password and database `lift`) | `LIFT_PG_PORT`, and `DATABASE_URL` in `.env` |
+| 5433 | `lift-pg`, users' databases (superuser `postgres`, password `lift`); apps reach it as `lift-pg` on their project's network | `LIFT_USER_PG_PORT`, and `LIFT_PG_URL` |
 | 6379 | Redis | `LIFT_REDIS_PORT`, and `REDIS_URL` |
 | 1234 | BuildKit | `LIFT_BUILDKIT_PORT`, and `BUILDKIT_HOST` |
 | 80 | Deployed apps at `http://{service}-{project}.apps.localhost` | `LIFT_APPS_PORT`; apps then need the port in their URL |

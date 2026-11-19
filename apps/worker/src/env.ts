@@ -27,10 +27,17 @@ const EnvSchema = z
     BUILD_CONCURRENCY: z.coerce.number().int().min(1).max(4).default(1),
     /** Where health checks run from: a curl container on lift-edge (compose names it lift-probe). */
     PROBE_CONTAINER: z.string().min(1).default("lift-probe"),
+    /**
+     * lift-pg's superuser, which creates and drops users' databases (INF-10). worker.yml builds
+     * it from LIFT_PG_PASSWORD; in development the stack's lift-pg answers on localhost:5433.
+     */
+    LIFT_PG_URL: z.string().min(1).optional(),
   })
   .superRefine((env, ctx) => {
-    if (env.NODE_ENV === "production" && !env.WORKER_TOKEN) {
-      ctx.addIssue({ code: "custom", path: ["WORKER_TOKEN"], message: "required in production" });
+    for (const key of ["WORKER_TOKEN", "LIFT_PG_URL"] as const) {
+      if (env.NODE_ENV === "production" && !env[key]) {
+        ctx.addIssue({ code: "custom", path: [key], message: "required in production" });
+      }
     }
   })
   .transform((env) => ({

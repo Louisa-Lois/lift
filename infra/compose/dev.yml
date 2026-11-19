@@ -32,6 +32,25 @@ services:
       retries: 20
     restart: unless-stopped
 
+  # Users' databases, like lift-pg on the worker VM (INF-10). The worker on your machine reaches it
+  # on localhost:5433 as its superuser; apps reach it as lift-pg on their project's network. It
+  # keeps the image's pg_hba.conf: the VM's rules are checked there.
+  lift-pg:
+    image: postgres:17-alpine
+    container_name: lift-pg
+    environment:
+      POSTGRES_PASSWORD: lift
+    ports:
+      - "127.0.0.1:${LIFT_USER_PG_PORT:-5433}:5432"
+    volumes:
+      - lift-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes"]
@@ -114,5 +133,6 @@ networks:
 
 volumes:
   pgdata:
+  lift-pg-data:
   redisdata:
   buildkit:

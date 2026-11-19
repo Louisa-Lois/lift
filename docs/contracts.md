@@ -203,7 +203,7 @@ Internal routes listen only on the control plane's private IP, never behind the 
 | collab | 4200 | `wss://app.{domain}/collab` | `DATABASE_URL`, `COLLAB_SECRET` |
 | agent | 4100 | internal only | `API_URL`, `AGENT_SERVICE_TOKEN`, `ANTHROPIC_API_KEY`, `REDIS_URL` |
 | mcp | 4300 | `https://app.{domain}/mcp`, or local over stdio | `LIFT_API_URL`, `LIFT_TOKEN` |
-| worker | none | worker VM | `CONTROL_API_URL`, `WORKER_TOKEN`, `REDIS_URL`, `APPS_DOMAIN`, `BUILDKIT_HOST` |
+| worker | none | worker VM | `CONTROL_API_URL`, `WORKER_TOKEN`, `REDIS_URL`, `APPS_DOMAIN`, `BUILDKIT_HOST`, `LIFT_PG_URL` |
 | cli | none | developers' machines | `LIFT_API_URL`; token saved in `~/.lift/config.json` |
 
 Every server also reads `HOST` (default `127.0.0.1`, or `0.0.0.0` when `NODE_ENV=production`) and its own port variable: `API_PORT`, `AGENT_PORT`, `COLLAB_PORT` or `MCP_PORT`. `.env.example` lists every variable with a comment.

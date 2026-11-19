@@ -75,11 +75,20 @@ traefik_config_sha() {
   sha256sum "$RELEASE_DIR/traefik/$ROLE/traefik.yml" | cut -c1-12
 }
 
-# Copies this release's Traefik config to the stable path the containers mount. rsync replaces
-# files inside the directory, so a running Traefik sees new dynamic files without a restart.
+# Copies this release's Traefik config, and lift-pg's pg_hba.conf, to the stable paths the
+# containers mount. rsync replaces files inside each directory, so a running Traefik sees new
+# dynamic files without a restart, and lift-pg sees a new pg_hba.conf once it reloads.
 install_config() {
-  install -d -m 0755 "$CONFIG_DIR/traefik"
+  install -d -m 0755 "$CONFIG_DIR/traefik" "$CONFIG_DIR/lift-pg"
   rsync -a --delete "$RELEASE_DIR/traefik/" "$CONFIG_DIR/traefik/"
+  rsync -a --delete --chmod=D0755,F0644 "$RELEASE_DIR/compose/lift-pg/" "$CONFIG_DIR/lift-pg/"
+}
+
+# lift-pg reads pg_hba.conf when it starts; a changed file applies with a reload, not a restart.
+reload_lift_pg() {
+  [ "$ROLE" = worker ] || return 0
+  compose exec -T lift-pg psql -U postgres -tAc 'select pg_reload_conf()' >/dev/null ||
+    log "couldn't reload lift-pg's pg_hba.conf"
 }
 
 ensure_networks() {
@@ -171,6 +180,7 @@ cmd_up() {
   compose up --detach --remove-orphans --wait --wait-timeout 300
   # After compose up: the worker container is recreated with its route through lift-system first.
   install_firewall
+  reload_lift_pg
   activate
   prune
   compose ps --format 'table {{.Service}}\t{{.Status}}'

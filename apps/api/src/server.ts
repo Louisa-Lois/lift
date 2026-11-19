@@ -14,8 +14,10 @@ import { registerOpenApi } from "./plugins/openapi";
 import { registerQueues } from "./plugins/queues";
 import { registerRedis } from "./plugins/redis";
 import { routeGuard } from "./plugins/scopes";
+import { internalDatabaseRoutes } from "./routes/internal/databases";
 import { internalDeploymentRoutes } from "./routes/internal/deployments";
 import { authRoutes } from "./routes/v1/auth";
+import { databaseRoutes } from "./routes/v1/databases";
 import { deploymentRoutes } from "./routes/v1/deployments";
 import { eventRoutes } from "./routes/v1/events";
 import { githubRoutes } from "./routes/v1/github";
@@ -91,6 +93,7 @@ export function buildServer(env: Env, options: ServerOptions = {}) {
   });
   app.register(deploymentRoutes, { prefix: API_BASE_PATH, github, secretBox, publicUrl });
   app.register(variableRoutes, { prefix: API_BASE_PATH, secretBox });
+  app.register(databaseRoutes, { prefix: API_BASE_PATH, secretBox });
   app.register(webhookRoutes, { prefix: API_BASE_PATH, secretBox });
   const heartbeatMs = options.sseHeartbeatMs ?? SSE_HEARTBEAT_MS;
   app.register(eventRoutes, { prefix: API_BASE_PATH, heartbeatMs });
@@ -101,6 +104,11 @@ export function buildServer(env: Env, options: ServerOptions = {}) {
     prefix: INTERNAL_BASE_PATH,
     workerToken: env.WORKER_TOKEN,
     appsDomain: env.APPS_DOMAIN,
+    secretBox,
+  });
+  app.register(internalDatabaseRoutes, {
+    prefix: INTERNAL_BASE_PATH,
+    workerToken: env.WORKER_TOKEN,
     secretBox,
   });
 

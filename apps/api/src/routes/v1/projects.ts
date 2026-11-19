@@ -131,7 +131,7 @@ export const projectRoutes: FastifyPluginAsyncZod<ProjectRoutesOptions> = async 
     "/projects/:projectId",
     {
       schema: {
-        summary: "Delete a project and its services (owners only)",
+        summary: "Delete a project with its services and databases (owners only)",
         tags: ["projects"],
         params: ProjectParams,
       },
@@ -139,13 +139,24 @@ export const projectRoutes: FastifyPluginAsyncZod<ProjectRoutesOptions> = async 
     async (request, reply) => {
       const user = requireUser(request);
       const { project } = await accessProject(app.db, request.params.projectId, user.id, "owner");
-      const { services, event } = await deleteProjectRows(app.db, { project, actorId: user.id });
+      const { services, databases, event } = await deleteProjectRows(app.db, {
+        project,
+        actorId: user.id,
+      });
       await publishEvents(app.redis, [event], request.log);
       for (const service of services) {
         await enqueueOp(app.queues, {
           op: "remove_service",
           serviceId: service.id,
           projectId: project.id,
+        });
+      }
+      for (const database of databases) {
+        await enqueueOp(app.queues, {
+          op: "deprovision_db",
+          databaseId: database.id,
+          projectId: project.id,
+          type: database.type,
         });
       }
       return reply.code(204).send();
@@ -203,6 +214,7 @@ export const projectRoutes: FastifyPluginAsyncZod<ProjectRoutesOptions> = async 
         actorId: user.id,
         body: request.body,
         appsDomain,
+        secretBox,
       });
       await publishEvents(app.redis, [event], request.log);
       await ensureWebhook(

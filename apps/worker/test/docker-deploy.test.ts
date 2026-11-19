@@ -40,6 +40,12 @@ const api = {
   async buildContext() {
     throw new Error("not used");
   },
+  async provisionContext() {
+    throw new Error("not used here");
+  },
+  async reportDatabase() {
+    throw new Error("not used here");
+  },
 } as InternalApi;
 
 const log = createLogger("silent");

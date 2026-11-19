@@ -15,9 +15,16 @@ describe("the worker's environment", () => {
     expect(env.BUILD_DIR).toMatch(/lift-builds$/);
   });
 
-  it("needs WORKER_TOKEN in production, and builds in /var/lib/lift/builds there", () => {
+  it("needs WORKER_TOKEN and LIFT_PG_URL in production, and builds in /var/lib/lift/builds there", () => {
     expect(() => loadEnv({ NODE_ENV: "production" })).toThrow(/WORKER_TOKEN/);
-    const env = loadEnv({ NODE_ENV: "production", WORKER_TOKEN: "w".repeat(32) });
+    expect(() => loadEnv({ NODE_ENV: "production", WORKER_TOKEN: "w".repeat(32) })).toThrow(
+      /LIFT_PG_URL/,
+    );
+    const env = loadEnv({
+      NODE_ENV: "production",
+      WORKER_TOKEN: "w".repeat(32),
+      LIFT_PG_URL: "postgres://postgres:secret@lift-pg:5432/postgres",
+    });
     expect(env.BUILD_DIR).toBe("/var/lib/lift/builds");
   });
 

@@ -8,6 +8,7 @@ import {
   STREAM_PATHS,
 } from "./events";
 import { cursorPage, HealthResponse } from "./schemas/common";
+import { type CreateDatabaseBody, Database, DatabaseCredentials } from "./schemas/database";
 import { type CreateDeploymentBody, Deployment, DeploymentDetail } from "./schemas/deployment";
 import { isKnownProjectEvent } from "./schemas/event";
 import { GithubBranch, GithubRepo } from "./schemas/github";
@@ -57,6 +58,7 @@ const GithubRepoPage = cursorPage(GithubRepo);
 const GithubBranchPage = cursorPage(GithubBranch);
 const ApiTokenPage = cursorPage(ApiToken);
 const VariablePage = cursorPage(Variable);
+const DatabasePage = cursorPage(Database);
 /** A problem body whose `code` this version doesn't know: keep its text, take the code from the status. */
 const PartialProblem = z.object({
   type: z.string().optional(),
@@ -69,7 +71,7 @@ const segment = encodeURIComponent;
 const listQuery = (params: ListParams): Query => ({ limit: params.limit, cursor: params.cursor });
 
 /**
- * The typed client for the public API: methods for the routes BE-01 to BE-09 and BE-14 serve. Every response
+ * The typed client for the public API: methods for the routes BE-01 to BE-10 and BE-14 serve. Every response
  * is checked against its schema; an error response throws `LiftApiError`, a response that breaks
  * the contract throws `LiftContractError`, and network failures come through as fetch throws them.
  * Later routes get methods as they ship (an additive change).
@@ -249,6 +251,21 @@ export function createLiftClient(options: LiftClientOptions) {
       /** `PUT /services/:id/variables`: `{ variables: { KEY: value } }`; null deletes a key. */
       upsert: (serviceId: string, body: z.input<typeof UpsertVariablesBody>) =>
         call("PUT", `/services/${segment(serviceId)}/variables`, UpsertVariablesResponse, { body }),
+    },
+
+    /** BE-10: a project's Postgres database; once ready, its services get DATABASE_URL. */
+    databases: {
+      list: (projectId: string) =>
+        call("GET", `/projects/${segment(projectId)}/databases`, DatabasePage),
+      /** `POST /projects/:id/databases`: answers 202 with the database `provisioning`. */
+      create: (projectId: string, body: z.input<typeof CreateDatabaseBody>) =>
+        call("POST", `/projects/${segment(projectId)}/databases`, Database, { body }),
+      get: (databaseId: string) => call("GET", `/databases/${segment(databaseId)}`, Database),
+      /** `DELETE /databases/:id`: answers 202 with the database `deleting`. */
+      delete: (databaseId: string) => call("DELETE", `/databases/${segment(databaseId)}`, Database),
+      /** `GET /databases/:id/credentials` (editors): the connection string and password. */
+      credentials: (databaseId: string) =>
+        call("GET", `/databases/${segment(databaseId)}/credentials`, DatabaseCredentials),
     },
 
     /** BE-14: your personal tokens (`lift_pat_…`). */

@@ -1,16 +1,19 @@
 import {
   type BuildContext,
+  type DatabaseStatusReport,
+  type DatabaseStatusReportResponse,
   type DeploymentStatusReport,
   type DeploymentStatusReportResponse,
   INTERNAL_BASE_PATH,
   INTERNAL_ROUTES,
+  type ProvisionContext,
   type RuntimeEnv,
 } from "@lift/shared";
 import type { z } from "zod";
 
 /**
- * The API answered 409: the deployment moved on without us (canceled, superseded, or failed by
- * the backstop). The job stops quietly; it is not an error.
+ * The API answered 409: the deployment or database moved on without us (canceled, superseded,
+ * failed by the backstop, or deleted). The job stops quietly; it is not an error.
  */
 export class StopDeployment extends Error {
   override readonly name = "StopDeployment";
@@ -91,6 +94,14 @@ export function createInternalApi(options: InternalApiOptions) {
       report: DeploymentStatusReport,
     ): Promise<DeploymentStatusReportResponse> =>
       call(INTERNAL_ROUTES.deploymentStatus, deploymentId, report),
+    /** The credentials for a database being provisioned (409 once it's deleted). */
+    provisionContext: (databaseId: string): Promise<ProvisionContext> =>
+      call(INTERNAL_ROUTES.provisionContext, databaseId),
+    reportDatabase: (
+      databaseId: string,
+      report: DatabaseStatusReport,
+    ): Promise<DatabaseStatusReportResponse> =>
+      call(INTERNAL_ROUTES.databaseStatus, databaseId, report),
   };
 }
 

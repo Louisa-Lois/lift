@@ -49,7 +49,12 @@ The REST API every client and the worker go through. **Owner:** WS1 Back end & A
   - A value set by a user over one a database wrote becomes the user's.
   - `build-context` hands the worker every stored variable for the build; `runtime-env` gives them to the container with the four system ones, sorted, and `envHash` over all of them. Both decrypt only for WORKER_TOKEN.
 
-**Next:** the rest of the Nov 22 work: Postgres databases (BE-10) and rollback (BE-11).
+- **Databases (BE-10):**
+  - `POST /projects/:id/databases` with `{ type: "postgres" }` answers 202 with the database `provisioning`, a random 24-character password stored encrypted, and queues `provision_db`. One per project; Redis gets 400 until it ships.
+  - The worker fetches `provision-context` and reports `ready` with `lift-pg:5432`. The API then writes `DATABASE_URL` (`source: database`) into every service of the project, unless a user set that key; a service added later gets it too.
+  - `GET /databases/:id/credentials` (editors, admin tokens) shows the connection string once it's ready. `DELETE` answers 202 `deleting`, removes its `DATABASE_URL` from every service and queues `deprovision_db`; deleting the project does the same for its databases.
+
+**Next:** the rest of the Nov 22 work: rollback, cancel and restart (BE-11).
 
 | Command | What it does |
 | --- | --- |
