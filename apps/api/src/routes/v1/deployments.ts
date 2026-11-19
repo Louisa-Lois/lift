@@ -10,7 +10,7 @@ import {
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { numberCursor } from "../../lib/pagination";
-import { requireUser } from "../../plugins/auth";
+import { requireUser, triggerFor } from "../../plugins/auth";
 import type { SecretBox } from "../../services/crypto";
 import {
   accessDeployment,
@@ -61,6 +61,7 @@ export const deploymentRoutes: FastifyPluginAsyncZod<{
   app.post(
     "/services/:serviceId/deployments",
     {
+      config: { scope: "deploy" },
       schema: {
         summary: "Deploy a commit (the branch head unless `commitSha` is given)",
         description:
@@ -82,12 +83,12 @@ export const deploymentRoutes: FastifyPluginAsyncZod<{
         token,
       );
       const commit = await resolveCommit(github, token, service, request.body.commitSha);
-      // A session deploys as `manual`; API tokens (`cli`) and the agent's (`agent`) come later.
+      // A session deploys as `manual`, a personal token as `cli`; the agent's (`agent`) comes later.
       const row = await startDeployment(
         { db: app.db, redis: app.redis, queues: app.queues, log: request.log },
-        { service, trigger: "manual", commit, actor: { type: "user", id: user.id } },
+        { service, trigger: triggerFor(request), commit, actor: { type: "user", id: user.id } },
       );
-      if (!row) throw new Error("a manual deployment is never a duplicate");
+      if (!row) throw new Error("a manual or CLI deployment is never a duplicate");
       reply.code(202);
       return toDeployment(row);
     },

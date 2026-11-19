@@ -1,9 +1,11 @@
 import {
   API_BASE_PATH,
+  type ApiToken,
   appHostname,
   appUrl,
   CreateProjectBody,
   CreateServiceBody,
+  CreateTokenBody,
   type Deployment,
   type DeploymentDetail,
   ID_PREFIXES,
@@ -26,6 +28,8 @@ const APPS_DOMAIN = "apps.localhost";
  * Projects and services created with mocks on live in memory until the page reloads.
  */
 const projects: ProjectDetail[] = [fixtures.project];
+/** Personal tokens; a created one is listed without its plaintext, as the API does. */
+const tokens: ApiToken[] = [...fixtures.apiTokens];
 
 function problem(status: number, code: string, title: string, detail: string) {
   return HttpResponse.json(
@@ -262,6 +266,30 @@ export const handlers = [
     return HttpResponse.json(service, { status: 201 });
   }),
 
+  http.get(api("/tokens"), () => HttpResponse.json(fixtures.page(tokens))),
+  http.post(api("/tokens"), async ({ request }) => {
+    const parsed = CreateTokenBody.safeParse(await request.json());
+    if (!parsed.success) return invalid(issuesToFields(parsed.error.issues));
+    // A made-up token in the real format: lift_pat_ and 32 characters.
+    const token = `lift_pat_${newId("tok").slice(4)}mockmock`;
+    const { projectId: _projectId, ...body } = parsed.data;
+    const { token: _fixturePlaintext, ...template } = fixtures.createdApiToken;
+    const listed: ApiToken = {
+      ...template,
+      ...body,
+      id: newId("tok"),
+      prefix: token.slice(0, 12),
+      createdAt: new Date().toISOString(),
+    };
+    tokens.unshift(listed);
+    return HttpResponse.json({ ...listed, token }, { status: 201 });
+  }),
+  http.delete(api("/tokens/:tokenId"), ({ params }) => {
+    const token = tokens.find((candidate) => candidate.id === params.tokenId);
+    if (!token) return problem(404, "not_found", "Not found", `No token ${params.tokenId}.`);
+    token.revokedAt ??= new Date().toISOString();
+    return new HttpResponse(null, { status: 204 });
+  }),
   http.get(api("/github/repos"), ({ request }) => {
     const search = new URL(request.url).searchParams;
     const query = (search.get("query") ?? "").trim().toLowerCase();

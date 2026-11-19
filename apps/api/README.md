@@ -35,7 +35,15 @@ The REST API every client and the worker go through. **Owner:** WS1 Back end & A
   - A push to the service's branch deploys its head commit with `trigger: push`, once per commit: a redelivered push changes nothing.
   - Other branches, branch deletions, other repos and other events get a 202 with the reason, for GitHub's delivery log.
 
-**Next:** the Nov 22 work: variables (BE-09), Postgres databases, rollback and API tokens.
+- **API tokens (BE-14, tokens part):**
+  - `GET /tokens`, `POST /tokens` and `DELETE /tokens/:id`: personal tokens (`lift_pat_` and 32 characters) for the CLI, the MCP server and scripts. The plaintext is in the answer to `POST` only; the database keeps its SHA-256 and the first 12 characters. Revoking takes effect at the next request.
+  - Any route takes `Authorization: Bearer lift_pat_…` instead of the cookie, and a token wins over a cookie. A token whose login leaves `ALLOWED_GITHUB_LOGINS` stops working but isn't revoked; signing out with a token revokes nothing.
+  - Deny by default (`src/plugins/scopes.ts`): every `/api/v1` route needs a session or a token unless it is marked `config: { public: true }`. `test/auth-coverage.test.ts` walks every route to keep it that way.
+  - Scopes are levels: `read` (GET), `deploy` (also deploy, roll back, cancel and restart) and `admin` (everything the user's role allows, including creating tokens). A route names its scope with `config: { scope }`; the default is `read` for GET and `admin` otherwise. The project role is checked as for a session.
+  - A token deploys with `trigger: cli`, a session with `manual`. Tokens for one project (`projectId`) get 400 for now.
+  - The CLI's browser login (`/auth/cli…`) and `POST /auth/session` come after Nov 26.
+
+**Next:** the rest of the Nov 22 work: variables (BE-09), Postgres databases (BE-10) and rollback (BE-11).
 
 | Command | What it does |
 | --- | --- |

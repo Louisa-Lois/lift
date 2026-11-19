@@ -63,6 +63,11 @@ export const fixtureIds = {
     addRedis: fixtureId("act", "add-redis"),
   },
   editorCommit: fixtureId("ecm", "hero-copy"),
+  tokens: {
+    laptop: fixtureId("tok", "laptop"),
+    oldCi: fixtureId("tok", "old-ci"),
+    created: fixtureId("tok", "created"),
+  },
 } as const;
 
 /** The commits behind the demo deployments. */

@@ -53,6 +53,7 @@ export const authRoutes: FastifyPluginAsyncZod<AuthRoutesOptions> = async (
   app.get(
     "/auth/github/start",
     {
+      config: { public: true },
       schema: {
         summary: "Sign in with GitHub: redirects to GitHub, then back to the callback",
         tags: ["auth"],
@@ -74,6 +75,7 @@ export const authRoutes: FastifyPluginAsyncZod<AuthRoutesOptions> = async (
   app.get(
     "/auth/github/callback",
     {
+      config: { public: true },
       schema: {
         summary: "GitHub's OAuth callback: signs in and redirects to the dashboard",
         tags: ["auth"],
@@ -140,7 +142,11 @@ export const authRoutes: FastifyPluginAsyncZod<AuthRoutesOptions> = async (
 
   app.post(
     "/auth/logout",
-    { schema: { summary: "Sign out: ends this session", tags: ["auth"] } },
+    {
+      // Public: signing out works with an expired session, and with a token it revokes nothing.
+      config: { public: true },
+      schema: { summary: "Sign out: ends this session", tags: ["auth"] },
+    },
     async (request, reply) => {
       if (request.sessionId) await deleteSession(app.db, request.sessionId);
       reply.clearCookie(SESSION_COOKIE, cookieAttributes(env));

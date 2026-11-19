@@ -9,6 +9,7 @@ export const healthRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     "/health",
     {
+      config: { public: true },
       schema: {
         summary: "Postgres and Redis are reachable",
         tags: ["health"],

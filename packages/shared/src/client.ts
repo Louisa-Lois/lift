@@ -19,6 +19,7 @@ import {
   type UpdateProjectBody,
 } from "./schemas/project";
 import { type CreateServiceBody, Service, type UpdateServiceBody } from "./schemas/service";
+import { ApiToken, CreatedApiToken, type CreateTokenBody } from "./schemas/token";
 import { User } from "./schemas/user";
 
 export interface LiftClientOptions {
@@ -53,6 +54,7 @@ const ServicePage = cursorPage(Service);
 const DeploymentPage = cursorPage(Deployment);
 const GithubRepoPage = cursorPage(GithubRepo);
 const GithubBranchPage = cursorPage(GithubBranch);
+const ApiTokenPage = cursorPage(ApiToken);
 /** A problem body whose `code` this version doesn't know: keep its text, take the code from the status. */
 const PartialProblem = z.object({
   type: z.string().optional(),
@@ -65,7 +67,7 @@ const segment = encodeURIComponent;
 const listQuery = (params: ListParams): Query => ({ limit: params.limit, cursor: params.cursor });
 
 /**
- * The typed client for the public API: methods for the routes BE-01 to BE-08 serve. Every response
+ * The typed client for the public API: methods for the routes BE-01 to BE-08 and BE-14 serve. Every response
  * is checked against its schema; an error response throws `LiftApiError`, a response that breaks
  * the contract throws `LiftContractError`, and network failures come through as fetch throws them.
  * Later routes get methods as they ship (an additive change).
@@ -233,6 +235,18 @@ export function createLiftClient(options: LiftClientOptions) {
       /** `GET /deployments/:id/logs/stream`: `log` events, then one `end`. */
       streamLogs: (deploymentId: string, options?: StreamOptions) =>
         streamDeploymentLogs(deploymentId, options),
+    },
+
+    /** BE-14: your personal tokens (`lift_pat_…`). */
+    tokens: {
+      /** `GET /tokens`: newest first, revoked ones included; never a token's plaintext. */
+      list: (params: ListParams = {}) =>
+        call("GET", "/tokens", ApiTokenPage, { query: listQuery(params) }),
+      /** `POST /tokens`: the answer is the only place the token's plaintext ever appears. */
+      create: (body: z.input<typeof CreateTokenBody>) =>
+        call("POST", "/tokens", CreatedApiToken, { body }),
+      /** `DELETE /tokens/:id`: the token stops working at once. */
+      revoke: (tokenId: string) => callVoid("DELETE", `/tokens/${segment(tokenId)}`),
     },
 
     /** Absolute URLs for things the browser opens itself: EventSource, the sign-in redirect. */
