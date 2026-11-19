@@ -1,0 +1,972 @@
+{
+  "note": "Captured from the worker's own build and deploy code with real git, Railpack v0.43.0, BuildKit and Docker, on lift-broken-node at 25191bd.",
+  "repo": "Vitalik-Hakim/lift-broken-node",
+  "commitSha": "25191bd87c0e32dd6c813d6455139335440f57d6",
+  "errorCode": "build_failed",
+  "errorMessage": "Build failed after 1m 12s: railpack exited with code 1",
+  "entries": [
+    {
+      "id": "1763582400000-0",
+      "ts": "2026-11-19T20:08:52.979Z",
+      "stream": "system",
+      "line": "Cloning Vitalik-Hakim/lift-broken-node at 25191bd"
+    },
+    {
+      "id": "1763582400001-0",
+      "ts": "2026-11-19T20:08:54.521Z",
+      "stream": "system",
+      "line": "Cloned in 1.5s"
+    },
+    {
+      "id": "1763582400002-0",
+      "ts": "2026-11-19T20:08:54.521Z",
+      "stream": "system",
+      "line": "Building with Railpack"
+    },
+    {
+      "id": "1763582400003-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "                   "
+    },
+    {
+      "id": "1763582400004-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "╭─────────────────╮"
+    },
+    {
+      "id": "1763582400005-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "│ Railpack 0.43.0 │"
+    },
+    {
+      "id": "1763582400006-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "╰─────────────────╯"
+    },
+    {
+      "id": "1763582400007-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400008-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "  ⚠ Package-lock.json detected, assuming npm"
+    },
+    {
+      "id": "1763582400009-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "  → Specify the package manager and version explicitly https://railpack.com/config/recommendations#specify-the-node-package-manager-version"
+    },
+    {
+      "id": "1763582400010-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "  ↳ Detected Node"
+    },
+    {
+      "id": "1763582400011-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "  ↳ Using npm package manager"
+    },
+    {
+      "id": "1763582400012-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "  → Applying default exclude patterns: `node_modules`. Add a `.dockerignore` to customize https://railpack.com/config/excluding-files"
+    },
+    {
+      "id": "1763582400013-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "            "
+    },
+    {
+      "id": "1763582400014-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "  Packages  "
+    },
+    {
+      "id": "1763582400015-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "  ──────────"
+    },
+    {
+      "id": "1763582400016-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "  node  │  18.20.8  │  package.json > engines > node (18.x)"
+    },
+    {
+      "id": "1763582400017-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "            "
+    },
+    {
+      "id": "1763582400018-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "  Steps     "
+    },
+    {
+      "id": "1763582400019-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "  ──────────"
+    },
+    {
+      "id": "1763582400020-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "  ▸ install"
+    },
+    {
+      "id": "1763582400021-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "    $ npm install"
+    },
+    {
+      "id": "1763582400022-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "         "
+    },
+    {
+      "id": "1763582400023-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "  ▸ build"
+    },
+    {
+      "id": "1763582400024-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "    $ npm run build"
+    },
+    {
+      "id": "1763582400025-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "            "
+    },
+    {
+      "id": "1763582400026-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "  Deploy    "
+    },
+    {
+      "id": "1763582400027-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "  ──────────"
+    },
+    {
+      "id": "1763582400028-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": "    $ npm run start"
+    },
+    {
+      "id": "1763582400029-0",
+      "ts": "2026-11-19T20:08:54.705Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400030-0",
+      "ts": "2026-11-19T20:08:54.722Z",
+      "stream": "build",
+      "line": "  Starting Docker Build..."
+    },
+    {
+      "id": "1763582400031-0",
+      "ts": "2026-11-19T20:08:54.722Z",
+      "stream": "build",
+      "line": "  ────────────────────────"
+    },
+    {
+      "id": "1763582400032-0",
+      "ts": "2026-11-19T20:08:54.722Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400033-0",
+      "ts": "2026-11-19T20:08:54.723Z",
+      "stream": "build",
+      "line": " INFO cache imports: []"
+    },
+    {
+      "id": "1763582400034-0",
+      "ts": "2026-11-19T20:08:54.723Z",
+      "stream": "build",
+      "line": " INFO cache exports: []"
+    },
+    {
+      "id": "1763582400035-0",
+      "ts": "2026-11-19T20:08:54.913Z",
+      "stream": "build",
+      "line": "#1 [railpack] secrets hash"
+    },
+    {
+      "id": "1763582400036-0",
+      "ts": "2026-11-19T20:08:54.913Z",
+      "stream": "build",
+      "line": "#1 DONE 0.0s"
+    },
+    {
+      "id": "1763582400037-0",
+      "ts": "2026-11-19T20:08:54.913Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400038-0",
+      "ts": "2026-11-19T20:08:54.913Z",
+      "stream": "build",
+      "line": "#2 loading ."
+    },
+    {
+      "id": "1763582400039-0",
+      "ts": "2026-11-19T20:08:54.913Z",
+      "stream": "build",
+      "line": "#2 DONE 0.0s"
+    },
+    {
+      "id": "1763582400040-0",
+      "ts": "2026-11-19T20:08:54.913Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400041-0",
+      "ts": "2026-11-19T20:08:54.913Z",
+      "stream": "build",
+      "line": "#3 docker-image://ghcr.io/railwayapp/railpack-builder:mise-2026.10.14"
+    },
+    {
+      "id": "1763582400042-0",
+      "ts": "2026-11-19T20:08:54.913Z",
+      "stream": "build",
+      "line": "#3 resolve ghcr.io/railwayapp/railpack-builder:mise-2026.10.14"
+    },
+    {
+      "id": "1763582400043-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": "#3 resolve ghcr.io/railwayapp/railpack-builder:mise-2026.10.14 1.9s done"
+    },
+    {
+      "id": "1763582400044-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": "#3 DONE 1.9s"
+    },
+    {
+      "id": "1763582400045-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400046-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": "#4 docker-image://ghcr.io/railwayapp/railpack-runtime:mise-2026.10.14"
+    },
+    {
+      "id": "1763582400047-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": "#4 resolve ghcr.io/railwayapp/railpack-runtime:mise-2026.10.14 1.9s done"
+    },
+    {
+      "id": "1763582400048-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": "#4 DONE 1.9s"
+    },
+    {
+      "id": "1763582400049-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400050-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": "#5 mkdir /etc/mise"
+    },
+    {
+      "id": "1763582400051-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": "#5 CACHED"
+    },
+    {
+      "id": "1763582400052-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400053-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": "#1 [railpack] secrets hash"
+    },
+    {
+      "id": "1763582400054-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": "#1 DONE 0.0s"
+    },
+    {
+      "id": "1763582400055-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400056-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": "#2 loading ."
+    },
+    {
+      "id": "1763582400057-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": "#2 transferring context: 72.45kB 0.0s done"
+    },
+    {
+      "id": "1763582400058-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": "#2 DONE 0.0s"
+    },
+    {
+      "id": "1763582400059-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400060-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": "#6 create mise config"
+    },
+    {
+      "id": "1763582400061-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": "#6 DONE 0.0s"
+    },
+    {
+      "id": "1763582400062-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400063-0",
+      "ts": "2026-11-19T20:08:56.811Z",
+      "stream": "build",
+      "line": "#7 install mise packages: node"
+    },
+    {
+      "id": "1763582400064-0",
+      "ts": "2026-11-19T20:08:56.932Z",
+      "stream": "build",
+      "line": "#7 0.272 mise by @jdx – installing 1 tool"
+    },
+    {
+      "id": "1763582400065-0",
+      "ts": "2026-11-19T20:08:59.939Z",
+      "stream": "build",
+      "line": "#7 3.278 mise █░░░░░░░░░░░░░░░ 0/1 · 3.0s"
+    },
+    {
+      "id": "1763582400066-0",
+      "ts": "2026-11-19T20:08:59.939Z",
+      "stream": "build",
+      "line": "#7 3.278   node@18.20.8  downloading  2.3s  4.1/44.2 MB · 2.2 MB/s"
+    },
+    {
+      "id": "1763582400067-0",
+      "ts": "2026-11-19T20:09:02.943Z",
+      "stream": "build",
+      "line": "#7 6.282 mise ██░░░░░░░░░░░░░░ 0/1 · 6.0s"
+    },
+    {
+      "id": "1763582400068-0",
+      "ts": "2026-11-19T20:09:02.943Z",
+      "stream": "build",
+      "line": "#7 6.282   node@18.20.8  downloading  5.3s  10.4/44.2 MB · 2.1 MB/s"
+    },
+    {
+      "id": "1763582400069-0",
+      "ts": "2026-11-19T20:09:05.945Z",
+      "stream": "build",
+      "line": "#7 9.286 mise ████░░░░░░░░░░░░ 0/1 · 9.0s"
+    },
+    {
+      "id": "1763582400070-0",
+      "ts": "2026-11-19T20:09:05.945Z",
+      "stream": "build",
+      "line": "#7 9.286   node@18.20.8  downloading  8.3s  16.3/44.2 MB · 2.1 MB/s"
+    },
+    {
+      "id": "1763582400071-0",
+      "ts": "2026-11-19T20:09:08.945Z",
+      "stream": "build",
+      "line": "#7 12.29 mise ██████░░░░░░░░░░ 0/1 · 12.0s"
+    },
+    {
+      "id": "1763582400072-0",
+      "ts": "2026-11-19T20:09:08.945Z",
+      "stream": "build",
+      "line": "#7 12.29   node@18.20.8  downloading  11.3s  25.2/44.2 MB · 2.3 MB/s"
+    },
+    {
+      "id": "1763582400073-0",
+      "ts": "2026-11-19T20:09:11.946Z",
+      "stream": "build",
+      "line": "#7 15.29 mise ███████░░░░░░░░░ 0/1 · 15.0s"
+    },
+    {
+      "id": "1763582400074-0",
+      "ts": "2026-11-19T20:09:11.946Z",
+      "stream": "build",
+      "line": "#7 15.29   node@18.20.8  downloading  14.3s  30.3/44.2 MB · 2.2 MB/s"
+    },
+    {
+      "id": "1763582400075-0",
+      "ts": "2026-11-19T20:09:14.947Z",
+      "stream": "build",
+      "line": "#7 18.29 mise █████████░░░░░░░ 0/1 · 18.0s"
+    },
+    {
+      "id": "1763582400076-0",
+      "ts": "2026-11-19T20:09:14.947Z",
+      "stream": "build",
+      "line": "#7 18.29   node@18.20.8  downloading  17.3s  37.9/44.2 MB · 2.3 MB/s"
+    },
+    {
+      "id": "1763582400077-0",
+      "ts": "2026-11-19T20:09:17.946Z",
+      "stream": "build",
+      "line": "#7 21.29 mise ███████████░░░░░ 0/1 · 21.0s"
+    },
+    {
+      "id": "1763582400078-0",
+      "ts": "2026-11-19T20:09:17.946Z",
+      "stream": "build",
+      "line": "#7 21.29   node@18.20.8  downloading  20.3s  43.9/44.2 MB · 2.2 MB/s"
+    },
+    {
+      "id": "1763582400079-0",
+      "ts": "2026-11-19T20:09:20.314Z",
+      "stream": "build",
+      "line": "#7 23.66 mise node@18.20.8 v18.20.8"
+    },
+    {
+      "id": "1763582400080-0",
+      "ts": "2026-11-19T20:09:20.441Z",
+      "stream": "build",
+      "line": "#7 23.79 mise node@18.20.8 10.8.2"
+    },
+    {
+      "id": "1763582400081-0",
+      "ts": "2026-11-19T20:09:20.613Z",
+      "stream": "build",
+      "line": "#7 23.81 mise ✓ node@18.20.8  22.8s  node-v18.20.8-linux-arm64.tar.gz"
+    },
+    {
+      "id": "1763582400082-0",
+      "ts": "2026-11-19T20:09:20.613Z",
+      "stream": "build",
+      "line": "#7 23.81 mise ████████████████ 1/1 · installed 1 tool in 23.5s"
+    },
+    {
+      "id": "1763582400083-0",
+      "ts": "2026-11-19T20:09:20.636Z",
+      "stream": "build",
+      "line": "#7 DONE 24.0s"
+    },
+    {
+      "id": "1763582400084-0",
+      "ts": "2026-11-19T20:09:20.744Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400085-0",
+      "ts": "2026-11-19T20:09:20.744Z",
+      "stream": "build",
+      "line": "#8 mkdir -p /app/node_modules/.cache"
+    },
+    {
+      "id": "1763582400086-0",
+      "ts": "2026-11-19T20:09:20.744Z",
+      "stream": "build",
+      "line": "#8 DONE 0.1s"
+    },
+    {
+      "id": "1763582400087-0",
+      "ts": "2026-11-19T20:09:20.744Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400088-0",
+      "ts": "2026-11-19T20:09:20.744Z",
+      "stream": "build",
+      "line": "#9 copy package-lock.json"
+    },
+    {
+      "id": "1763582400089-0",
+      "ts": "2026-11-19T20:09:20.744Z",
+      "stream": "build",
+      "line": "#9 DONE 0.0s"
+    },
+    {
+      "id": "1763582400090-0",
+      "ts": "2026-11-19T20:09:20.744Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400091-0",
+      "ts": "2026-11-19T20:09:20.744Z",
+      "stream": "build",
+      "line": "#10 copy package.json"
+    },
+    {
+      "id": "1763582400092-0",
+      "ts": "2026-11-19T20:09:20.744Z",
+      "stream": "build",
+      "line": "#10 DONE 0.0s"
+    },
+    {
+      "id": "1763582400093-0",
+      "ts": "2026-11-19T20:09:20.864Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400094-0",
+      "ts": "2026-11-19T20:09:20.864Z",
+      "stream": "build",
+      "line": "#11 npm install"
+    },
+    {
+      "id": "1763582400095-0",
+      "ts": "2026-11-19T20:09:20.864Z",
+      "stream": "build",
+      "line": "#11 0.119 npm warn config production Use `--omit=dev` instead."
+    },
+    {
+      "id": "1763582400096-0",
+      "ts": "2026-11-19T20:09:21.034Z",
+      "stream": "build",
+      "line": "#11 0.289 npm warn EBADENGINE Unsupported engine {"
+    },
+    {
+      "id": "1763582400097-0",
+      "ts": "2026-11-19T20:09:21.034Z",
+      "stream": "build",
+      "line": "#11 0.289 npm warn EBADENGINE   package: 'next@16.4.6',"
+    },
+    {
+      "id": "1763582400098-0",
+      "ts": "2026-11-19T20:09:21.034Z",
+      "stream": "build",
+      "line": "#11 0.289 npm warn EBADENGINE   required: { node: '>=20.9.0' },"
+    },
+    {
+      "id": "1763582400099-0",
+      "ts": "2026-11-19T20:09:21.034Z",
+      "stream": "build",
+      "line": "#11 0.289 npm warn EBADENGINE   current: { node: 'v18.20.8', npm: '10.8.2' }"
+    },
+    {
+      "id": "1763582400100-0",
+      "ts": "2026-11-19T20:09:21.034Z",
+      "stream": "build",
+      "line": "#11 0.289 npm warn EBADENGINE }"
+    },
+    {
+      "id": "1763582400101-0",
+      "ts": "2026-11-19T20:09:21.164Z",
+      "stream": "build",
+      "line": "#11 ..."
+    },
+    {
+      "id": "1763582400102-0",
+      "ts": "2026-11-19T20:09:21.164Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400103-0",
+      "ts": "2026-11-19T20:09:21.164Z",
+      "stream": "build",
+      "line": "#12 copy /mise/shims"
+    },
+    {
+      "id": "1763582400104-0",
+      "ts": "2026-11-19T20:09:21.164Z",
+      "stream": "build",
+      "line": "#12 CACHED"
+    },
+    {
+      "id": "1763582400105-0",
+      "ts": "2026-11-19T20:09:21.315Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400106-0",
+      "ts": "2026-11-19T20:09:21.315Z",
+      "stream": "build",
+      "line": "#13 copy /mise/installs"
+    },
+    {
+      "id": "1763582400107-0",
+      "ts": "2026-11-19T20:09:22.008Z",
+      "stream": "build",
+      "line": "#13 ..."
+    },
+    {
+      "id": "1763582400108-0",
+      "ts": "2026-11-19T20:09:22.008Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400109-0",
+      "ts": "2026-11-19T20:09:22.008Z",
+      "stream": "build",
+      "line": "#14 install apt packages: libatomic1"
+    },
+    {
+      "id": "1763582400110-0",
+      "ts": "2026-11-19T20:09:22.008Z",
+      "stream": "build",
+      "line": "#14 CACHED"
+    },
+    {
+      "id": "1763582400111-0",
+      "ts": "2026-11-19T20:09:22.157Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400112-0",
+      "ts": "2026-11-19T20:09:22.157Z",
+      "stream": "build",
+      "line": "#11 npm install"
+    },
+    {
+      "id": "1763582400113-0",
+      "ts": "2026-11-19T20:09:23.318Z",
+      "stream": "build",
+      "line": "#11 ..."
+    },
+    {
+      "id": "1763582400114-0",
+      "ts": "2026-11-19T20:09:23.318Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400115-0",
+      "ts": "2026-11-19T20:09:23.318Z",
+      "stream": "build",
+      "line": "#13 copy /mise/installs"
+    },
+    {
+      "id": "1763582400116-0",
+      "ts": "2026-11-19T20:09:23.318Z",
+      "stream": "build",
+      "line": "#13 DONE 2.1s"
+    },
+    {
+      "id": "1763582400117-0",
+      "ts": "2026-11-19T20:09:23.469Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400118-0",
+      "ts": "2026-11-19T20:09:23.469Z",
+      "stream": "build",
+      "line": "#15 copy /usr/local/bin/mise"
+    },
+    {
+      "id": "1763582400119-0",
+      "ts": "2026-11-19T20:09:24.220Z",
+      "stream": "build",
+      "line": "#15 DONE 0.9s"
+    },
+    {
+      "id": "1763582400120-0",
+      "ts": "2026-11-19T20:09:24.220Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400121-0",
+      "ts": "2026-11-19T20:09:24.220Z",
+      "stream": "build",
+      "line": "#11 npm install"
+    },
+    {
+      "id": "1763582400122-0",
+      "ts": "2026-11-19T20:09:24.406Z",
+      "stream": "build",
+      "line": "#11 ..."
+    },
+    {
+      "id": "1763582400123-0",
+      "ts": "2026-11-19T20:09:24.406Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400124-0",
+      "ts": "2026-11-19T20:09:24.406Z",
+      "stream": "build",
+      "line": "#16 copy /etc/mise/config.toml"
+    },
+    {
+      "id": "1763582400125-0",
+      "ts": "2026-11-19T20:09:24.406Z",
+      "stream": "build",
+      "line": "#16 DONE 0.0s"
+    },
+    {
+      "id": "1763582400126-0",
+      "ts": "2026-11-19T20:09:24.406Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400127-0",
+      "ts": "2026-11-19T20:09:24.406Z",
+      "stream": "build",
+      "line": "#17 copy /root/.local/state/mise"
+    },
+    {
+      "id": "1763582400128-0",
+      "ts": "2026-11-19T20:09:24.406Z",
+      "stream": "build",
+      "line": "#17 DONE 0.0s"
+    },
+    {
+      "id": "1763582400129-0",
+      "ts": "2026-11-19T20:09:24.556Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400130-0",
+      "ts": "2026-11-19T20:09:24.556Z",
+      "stream": "build",
+      "line": "#11 npm install"
+    },
+    {
+      "id": "1763582400131-0",
+      "ts": "2026-11-19T20:10:04.209Z",
+      "stream": "build",
+      "line": "#11 43.46 "
+    },
+    {
+      "id": "1763582400132-0",
+      "ts": "2026-11-19T20:10:04.209Z",
+      "stream": "build",
+      "line": "#11 43.46 added 17 packages, and audited 18 packages in 43s"
+    },
+    {
+      "id": "1763582400133-0",
+      "ts": "2026-11-19T20:10:04.359Z",
+      "stream": "build",
+      "line": "#11 43.46 "
+    },
+    {
+      "id": "1763582400134-0",
+      "ts": "2026-11-19T20:10:04.359Z",
+      "stream": "build",
+      "line": "#11 43.46 found 0 vulnerabilities"
+    },
+    {
+      "id": "1763582400135-0",
+      "ts": "2026-11-19T20:10:04.583Z",
+      "stream": "build",
+      "line": "#11 DONE 43.8s"
+    },
+    {
+      "id": "1763582400136-0",
+      "ts": "2026-11-19T20:10:04.740Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400137-0",
+      "ts": "2026-11-19T20:10:04.740Z",
+      "stream": "build",
+      "line": "#18 copy / /app"
+    },
+    {
+      "id": "1763582400138-0",
+      "ts": "2026-11-19T20:10:04.740Z",
+      "stream": "build",
+      "line": "#18 DONE 0.0s"
+    },
+    {
+      "id": "1763582400139-0",
+      "ts": "2026-11-19T20:10:04.740Z",
+      "stream": "build",
+      "line": ""
+    },
+    {
+      "id": "1763582400140-0",
+      "ts": "2026-11-19T20:10:04.740Z",
+      "stream": "build",
+      "line": "#19 npm run build"
+    },
+    {
+      "id": "1763582400141-0",
+      "ts": "2026-11-19T20:10:04.740Z",
+      "stream": "build",
+      "line": "#19 0.110 npm warn config production Use `--omit=dev` instead."
+    },
+    {
+      "id": "1763582400142-0",
+      "ts": "2026-11-19T20:10:04.842Z",
+      "stream": "build",
+      "line": "#19 0.118 "
+    },
+    {
+      "id": "1763582400143-0",
+      "ts": "2026-11-19T20:10:04.842Z",
+      "stream": "build",
+      "line": "#19 0.118 > lift-broken-node@1.0.0 build"
+    },
+    {
+      "id": "1763582400144-0",
+      "ts": "2026-11-19T20:10:04.842Z",
+      "stream": "build",
+      "line": "#19 0.118 > next build"
+    },
+    {
+      "id": "1763582400145-0",
+      "ts": "2026-11-19T20:10:04.842Z",
+      "stream": "build",
+      "line": "#19 0.118 "
+    },
+    {
+      "id": "1763582400146-0",
+      "ts": "2026-11-19T20:10:04.842Z",
+      "stream": "build",
+      "line": "#19 0.171 You are using Node.js 18.20.8. For Next.js, Node.js version \">=20.9.0\" is required."
+    },
+    {
+      "id": "1763582400147-0",
+      "ts": "2026-11-19T20:10:04.842Z",
+      "stream": "build",
+      "line": "#19 ERROR: process \"npm run build\" did not complete successfully: exit code: 1"
+    },
+    {
+      "id": "1763582400148-0",
+      "ts": "2026-11-19T20:10:04.842Z",
+      "stream": "build",
+      "line": "------"
+    },
+    {
+      "id": "1763582400149-0",
+      "ts": "2026-11-19T20:10:04.842Z",
+      "stream": "build",
+      "line": " > npm run build:"
+    },
+    {
+      "id": "1763582400150-0",
+      "ts": "2026-11-19T20:10:04.842Z",
+      "stream": "build",
+      "line": "0.110 npm warn config production Use `--omit=dev` instead."
+    },
+    {
+      "id": "1763582400151-0",
+      "ts": "2026-11-19T20:10:04.842Z",
+      "stream": "build",
+      "line": "0.118 "
+    },
+    {
+      "id": "1763582400152-0",
+      "ts": "2026-11-19T20:10:04.842Z",
+      "stream": "build",
+      "line": "0.118 > lift-broken-node@1.0.0 build"
+    },
+    {
+      "id": "1763582400153-0",
+      "ts": "2026-11-19T20:10:04.842Z",
+      "stream": "build",
+      "line": "0.118 > next build"
+    },
+    {
+      "id": "1763582400154-0",
+      "ts": "2026-11-19T20:10:04.842Z",
+      "stream": "build",
+      "line": "0.118 "
+    },
+    {
+      "id": "1763582400155-0",
+      "ts": "2026-11-19T20:10:04.842Z",
+      "stream": "build",
+      "line": "0.171 You are using Node.js 18.20.8. For Next.js, Node.js version \">=20.9.0\" is required."
+    },
+    {
+      "id": "1763582400156-0",
+      "ts": "2026-11-19T20:10:04.842Z",
+      "stream": "build",
+      "line": "------"
+    },
+    {
+      "id": "1763582400157-0",
+      "ts": "2026-11-19T20:10:04.843Z",
+      "stream": "build",
+      "line": " ERRO failed to solve: failed to solve: process \"npm run build\" did not complete successfully: exit code: 1"
+    },
+    {
+      "id": "1763582400158-0",
+      "ts": "2026-11-19T20:10:04.868Z",
+      "stream": "build",
+      "line": "unrecognized image format"
+    },
+    {
+      "id": "1763582400159-0",
+      "ts": "2026-11-19T20:10:04.869Z",
+      "stream": "system",
+      "line": "Build failed after 1m 12s: railpack exited with code 1"
+    }
+  ],
+  "files": {
+    "package.json": "{\n  \"name\": \"lift-broken-node\",\n  \"version\": \"1.0.0\",\n  \"private\": true,\n  \"description\": \"A seeded failure for Lift's autofix demo: Next.js 16 pinned to Node 18.\",\n  \"scripts\": { \"dev\": \"next dev\", \"build\": \"next build\", \"start\": \"next start\" },\n  \"engines\": { \"node\": \"18.x\" },\n  \"dependencies\": { \"next\": \"16.4.6\", \"react\": \"19.3.1\", \"react-dom\": \"19.3.1\" }\n}\n"
+  }
+}
