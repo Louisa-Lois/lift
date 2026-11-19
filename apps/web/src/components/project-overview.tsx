@@ -3,7 +3,9 @@
 import { isLiftApiError } from "@lift/shared";
 import { FolderGit2Icon, PlusIcon } from "lucide-react";
 import Link from "next/link";
+import { Suspense } from "react";
 import { EmptyState } from "@/components/empty-state";
+import { ServicePanel } from "@/components/service-panel";
 import { ServiceRow } from "@/components/service-row";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -104,6 +106,10 @@ export function ProjectOverview({ projectId }: { projectId: string }) {
           </ul>
         </section>
       )}
+      {/* useSearchParams needs a Suspense boundary in the App Router. */}
+      <Suspense fallback={null}>
+        <ServicePanel services={services} canEdit={canDeploy} />
+      </Suspense>
     </div>
   );
 }

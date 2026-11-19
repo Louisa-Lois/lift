@@ -2,11 +2,11 @@ import { rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { type BuildJob, type DeploymentErrorCode, imageTagFor } from "@lift/shared";
 import { type InternalApi, StopDeployment } from "../internal-api";
-import type { LogSink } from "../log-sink";
+import { type LogSink, variableSecrets } from "../log-sink";
 import type { Logger } from "../logger";
 import type { RunResult } from "../process";
 import { type CloneInput, cloneCommit, tokenForms } from "./clone";
-import { type ImageBuildInput, imageExists, railpackBuild } from "./railpack";
+import { type ImageBuildInput, imageExists, railpackBuild, splitBuildVariables } from "./railpack";
 
 /** docs/prd/04-infrastructure.md: after 15 minutes the build is killed. */
 export const BUILD_TIMEOUT_MS = 15 * 60_000;
@@ -77,7 +77,10 @@ export async function processBuild(job: BuildJob, deps: BuildDeps): Promise<Buil
   try {
     await api.reportStatus(id, { status: "building", at: at() });
     const context = await api.buildContext(id);
-    const sink = deps.logSink(id, tokenForms(context.clone.token));
+    const sink = deps.logSink(id, [
+      ...tokenForms(context.clone.token),
+      ...variableSecrets(Object.values(context.buildVariables)),
+    ]);
     logs = sink;
     const repo = `${context.repo.owner}/${context.repo.name}`;
     const short = context.commitSha.slice(0, 7);
@@ -118,13 +121,19 @@ export async function processBuild(job: BuildJob, deps: BuildDeps): Promise<Buil
       );
     }
 
+    const variables = splitBuildVariables(context.buildVariables);
+    for (const key of variables.skipped) {
+      sink.system(
+        `Not passing ${key} to the build: the build tools use their own. The app gets it when it runs.`,
+      );
+    }
     sink.system("Building with Railpack");
     const imageTag = imageTagFor(context.serviceId, context.deploymentId);
     const timeoutMs = deps.timeoutMs ?? BUILD_TIMEOUT_MS;
     const built = await (deps.buildImage ?? railpackBuild)({
       dir: source,
       imageTag,
-      buildVariables: context.buildVariables,
+      buildVariables: variables.passed,
       buildkitHost: deps.buildkitHost,
       timeoutMs,
       onLine: (line) => sink.write("build", line),

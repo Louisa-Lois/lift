@@ -25,6 +25,16 @@ export function scrub(line: string, secrets: readonly string[]): string {
   return clean;
 }
 
+/**
+ * The variable values to scrub from a deployment's log, since a build or a crashing app may print
+ * them: values of 8 characters or more, except plain words like `production`, which are rarely
+ * secrets and would otherwise turn ordinary lines ("Creating an optimized production build") into
+ * stars.
+ */
+export function variableSecrets(values: Iterable<string>): string[] {
+  return [...values].filter((value) => value.length >= 8 && /[^A-Za-z]/.test(value));
+}
+
 export function capLine(line: string): string {
   if (Buffer.byteLength(line) <= MAX_LINE_BYTES) return line;
   const cut = Buffer.from(line).subarray(0, MAX_LINE_BYTES).toString("utf8").replace(/�$/, "");

@@ -32,7 +32,7 @@ export const internalDeploymentRoutes: FastifyPluginAsyncZod<{
   app.get(
     pattern(runtime),
     { schema: { hide: true, params: Params, response: { 200: runtime.response } } },
-    async (request) => runtimeEnv(app.db, appsDomain, request.params.deploymentId),
+    async (request) => runtimeEnv(app.db, secretBox, appsDomain, request.params.deploymentId),
   );
 
   app.post(

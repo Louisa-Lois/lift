@@ -43,7 +43,13 @@ The REST API every client and the worker go through. **Owner:** WS1 Back end & A
   - A token deploys with `trigger: cli`, a session with `manual`. Tokens for one project (`projectId`) get 400 for now.
   - The CLI's browser login (`/auth/cli…`) and `POST /auth/session` come after Nov 26.
 
-**Next:** the rest of the Nov 22 work: variables (BE-09), Postgres databases (BE-10) and rollback (BE-11).
+- **Variables (BE-09):**
+  - `GET /services/:id/variables` lists every variable, sorted by key, each value masked as `••••` and its last 4 characters. `?reveal=true` shows the values to editors (and to admin tokens).
+  - `PUT /services/:id/variables` sets keys and deletes those whose value is null, in one transaction. Values are encrypted with `ENCRYPTION_KEY`; PORT and `LIFT_*` keys come back as field errors. Every change emits `variables.changed` with the keys, never the values, and answers `requiresRedeploy: true`: changes wait for the next deployment.
+  - A value set by a user over one a database wrote becomes the user's.
+  - `build-context` hands the worker every stored variable for the build; `runtime-env` gives them to the container with the four system ones, sorted, and `envHash` over all of them. Both decrypt only for WORKER_TOKEN.
+
+**Next:** the rest of the Nov 22 work: Postgres databases (BE-10) and rollback (BE-11).
 
 | Command | What it does |
 | --- | --- |

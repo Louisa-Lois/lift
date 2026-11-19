@@ -7,6 +7,7 @@ Runs on the worker VM: consumes the build, deploy and ops queues, builds images 
   - It reports `building`, fetches the build context from the API, clones exactly the commit, builds `lift/{serviceId}:{deploymentId}` with Railpack through BuildKit, checks Docker has the image, and reports `deploying`.
   - On failure it reports `failed` with `clone_failed`, `build_failed`, or `build_timeout` after 15 minutes.
   - The clone token travels only in `GIT_CONFIG_*` environment variables: never in argv, a URL, a file or a log. Tools run with `PATH` and `HOME` only, never the worker's own secrets.
+  - The service's variables reach Railpack by name only (`--env KEY`), with each value in Railpack's environment, which it reads for a bare name. Keys the build tools read themselves (PATH, HOME, `DOCKER_*`, `BUILDKIT_*`, `LD_*`, proxies) stay out of the build, with a line in its log; the app still gets them when it runs.
   - Dockerfile builds fail with a clear message until INF-13.
 - **Deploy** (`lift-deploy`, 4 at a time, one per service):
   - It fetches the runtime environment and creates `lift-{slug}-{last 6 of the deployment ID}` with Traefik labels and hard limits (CPU, memory with no extra swap, 256 processes, no privilege escalation, no raw sockets). The container joins `lift-edge` and the project's network under its slug.
@@ -16,7 +17,7 @@ Runs on the worker VM: consumes the build, deploy and ops queues, builds images 
   - No request fails during a swap. Every deployment of a service joins one Traefik service (`svc-{serviceId}`), so old and new share a load balancer. Each router retries a request that couldn't connect, and Traefik's 2 s dial timeout means a request that reaches a container just removed fails over in about 2 s. `test:docker` polls through Traefik for a whole redeploy and expects only 200s.
   - The worker talks to Docker through its Engine API on the unix socket (`DOCKER_HOST` if set, else `/var/run/docker.sock`, else Docker Desktop's), so environment values travel in JSON, never in argv.
 - **Ops** (`lift-ops`): `remove_service` removes a deleted service's containers. The other ops fail loudly until INF-10.
-- **Logs:** every line goes to `logs:dep:{deploymentId}` before the report that ends the stage, scrubbed of the clone token and cut at 8 KB.
+- **Logs:** every line goes to `logs:dep:{deploymentId}` before the report that ends the stage, scrubbed of the clone token and cut at 8 KB. Variable values of 8 characters or more are scrubbed too, in build lines and in a crashing app's last lines, except plain words like `production`.
 - **409s:** a 409 from the API means the deployment moved on (canceled, or failed by the backstop), so the job stops quietly and removes anything it created.
 
 **Next:** INF-11 (hardening) before anyone outside the team can deploy; then INF-09 (runtime logs and metrics), INF-10 (databases) and INF-12 (reconciliation).

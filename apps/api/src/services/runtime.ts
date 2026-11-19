@@ -12,6 +12,7 @@ import { eq } from "drizzle-orm";
 import { problem } from "../lib/problem";
 import type { SecretBox } from "./crypto";
 import { githubTokenOf } from "./users";
+import { decryptedVariables } from "./variables";
 
 async function deploymentWithService(db: Db, deploymentId: string) {
   const [row] = await db
@@ -73,8 +74,10 @@ export async function buildContext(
     buildCommand: service.buildCommand,
     startCommand: service.startCommand,
     clone: { token: githubTokenOf(secretBox, owner), expiresAt: null },
-    // Users' build-time variables arrive with BE-09.
-    buildVariables: {},
+    // Every stored variable is there at build time too: Next.js inlines NEXT_PUBLIC_* while it builds.
+    buildVariables: Object.fromEntries(
+      (await decryptedVariables(db, secretBox, service.id)).map(({ key, value }) => [key, value]),
+    ),
   };
 }
 
@@ -86,11 +89,13 @@ export function envHashOf(variables: RuntimeEnvVariable[]): string {
 
 /**
  * `GET /internal/v1/deployments/:id/runtime-env`: the container's environment, while the
- * deployment is deploying or active (reconciliation recreates active containers). For now only
- * the system variables; users' variables arrive with BE-09.
+ * deployment is deploying or active (reconciliation recreates active containers): the service's
+ * stored variables, decrypted, as they are now (so a rollback runs with today's), plus the system
+ * ones, which are never stored: PORT, LIFT_SERVICE_ID, LIFT_DEPLOYMENT_ID and LIFT_PUBLIC_URL.
  */
 export async function runtimeEnv(
   db: Db,
+  secretBox: SecretBox | null,
   appsDomain: string,
   deploymentId: string,
 ): Promise<RuntimeEnv> {
@@ -107,10 +112,11 @@ export async function runtimeEnv(
     source: "system",
   });
   const variables = [
+    ...(await decryptedVariables(db, secretBox, service.id)),
     system("PORT", String(service.port)),
     system("LIFT_SERVICE_ID", service.id),
     system("LIFT_DEPLOYMENT_ID", deployment.id),
     system("LIFT_PUBLIC_URL", appUrl(appHostname(service.subdomain, appsDomain), appsDomain)),
-  ];
+  ].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   return { deploymentId: deployment.id, variables, envHash: envHashOf(variables) };
 }

@@ -1,7 +1,7 @@
 import { appUrl, type DeployJob, type DeploymentErrorCode } from "@lift/shared";
 import type { Docker } from "../docker";
 import { type InternalApi, StopDeployment } from "../internal-api";
-import type { LogSink } from "../log-sink";
+import { type LogSink, variableSecrets } from "../log-sink";
 import type { Logger } from "../logger";
 import { containerSpec, PIDS_LIMIT } from "./container-spec";
 import { containerName, EDGE_NETWORK, projectNetwork } from "./labels";
@@ -132,7 +132,8 @@ async function deploy(job: DeployJob, deps: DeployDeps): Promise<DeployOutcome> 
   const { api, docker, log } = deps;
   const id = job.deploymentId;
   const at = () => new Date().toISOString();
-  const logs = deps.logSink(id, []);
+  // Replaced once the runtime environment is known, to scrub its values (see below).
+  let logs = deps.logSink(id, []);
   const name = containerName(job.serviceSlug, id);
   let containerId: string | null = null;
   let live = false;
@@ -146,6 +147,13 @@ async function deploy(job: DeployJob, deps: DeployDeps): Promise<DeployOutcome> 
 
   try {
     const env = await api.runtimeEnv(id);
+    // A crashing app's last lines are copied into this log, and apps do print their settings.
+    logs = deps.logSink(
+      id,
+      variableSecrets(
+        env.variables.filter((variable) => variable.source !== "system").map((v) => v.value),
+      ),
+    );
     if (!(await docker.imageExists(job.imageTag))) {
       return await fail("image_missing", `Image ${job.imageTag} isn't on this machine`);
     }

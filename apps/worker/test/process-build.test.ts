@@ -135,6 +135,36 @@ async function gone(dir: string): Promise<boolean> {
 }
 
 describe("the build job", () => {
+  it("passes the service's variables to Railpack, except the tools' own, and scrubs their values", async () => {
+    const { deps, events, secrets } = setup({
+      context: {
+        buildVariables: {
+          API_SECRET: "s3cr3t-value-1234",
+          NEXT_PUBLIC_GREETING: "hi",
+          NODE_ENV: "production",
+          PATH: "/evil/bin",
+        },
+      },
+    });
+    let given: Record<string, string> = {};
+    const build = deps.buildImage;
+    deps.buildImage = async (input) => {
+      given = input.buildVariables;
+      return build ? build(input) : { code: 0, timedOut: false };
+    };
+    expect(await processBuild(job, deps)).toBe("deploying");
+    expect(given).toEqual({
+      API_SECRET: "s3cr3t-value-1234",
+      NEXT_PUBLIC_GREETING: "hi",
+      NODE_ENV: "production",
+    });
+    expect(systemLines(events)).toContain(
+      "Not passing PATH to the build: the build tools use their own. The app gets it when it runs.",
+    );
+    expect(secrets()).toContain("s3cr3t-value-1234");
+    expect(secrets()).not.toContain("production");
+  });
+
   it("clones, builds, then reports deploying with the image, every line flushed first", async () => {
     const { deps, events, reports, secrets } = setup();
     expect(await processBuild(job, deps)).toBe("deploying");
