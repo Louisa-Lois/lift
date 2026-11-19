@@ -41,7 +41,7 @@ When a date slips, Hakim drops extras first: ops chat, the MCP server, Redis, me
    ```bash
    pnpm install
    pnpm env:init      # creates .env with fresh development secrets
-   pnpm stack:up      # Postgres and Redis in Docker
+   pnpm stack:up      # Postgres, Redis, BuildKit and Traefik in Docker
    pnpm dev           # web, api, agent, collab and worker
    ```
 

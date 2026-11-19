@@ -1,9 +1,18 @@
-# Local development stack: `pnpm stack:up` starts it, `pnpm stack:down` stops it (data is kept in
-# named volumes; add -v to `docker compose down` to wipe it).
-# INF-06 adds BuildKit and a Traefik that serves deployed apps at http://{name}.apps.localhost.
-# Ports bind to 127.0.0.1 only. If 5432 or 6379 is taken on your machine, set LIFT_PG_PORT or
-# LIFT_REDIS_PORT in your shell and change DATABASE_URL or REDIS_URL in .env to match.
+# Local development stack (INF-06): `pnpm stack:up` starts it, `pnpm stack:down` stops it (data is
+# kept in named volumes; add -v to `docker compose down` to wipe it).
+# Postgres and Redis for the apps; BuildKit and a Traefik for the worker, which runs on your machine
+# with `pnpm dev` and serves deployed apps at http://{service}-{project}.apps.localhost, as the
+# worker VM does at https://…apps.{domain} (infra/compose/worker.yml).
+# Ports bind to 127.0.0.1 only. If one is taken on your machine, set LIFT_PG_PORT, LIFT_REDIS_PORT,
+# LIFT_BUILDKIT_PORT, LIFT_APPS_PORT or LIFT_TRAEFIK_PORT in your shell, and change the matching URL
+# in .env (DATABASE_URL, REDIS_URL, BUILDKIT_HOST). Apps are reachable without a port only on 80.
+# Before `pnpm stack:down`, run `pnpm --filter @lift/worker clean`: the network apps share
+# (lift-edge) can't be removed while deployed apps are still attached to it.
 name: lift-dev
+
+x-service: &service
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
 
 services:
   postgres:
@@ -37,6 +46,73 @@ services:
       retries: 20
     restart: unless-stopped
 
+  # Builds apps' images for the worker (INF-04): BUILDKIT_HOST=tcp://localhost:1234 in .env.
+  buildkit:
+    image: moby/buildkit:v0.34.2
+    privileged: true
+    command: ["--addr", "tcp://0.0.0.0:1234"]
+    ports:
+      - "127.0.0.1:${LIFT_BUILDKIT_PORT:-1234}:1234"
+    volumes:
+      - buildkit:/var/lib/buildkit
+    healthcheck:
+      test: ["CMD", "buildctl", "--addr", "tcp://127.0.0.1:1234", "debug", "workers"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # Read-only view of the Docker API for Traefik (GET on containers and networks only).
+  socket-proxy:
+    <<: *service
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    environment:
+      CONTAINERS: 1
+      NETWORKS: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [socket]
+
+  # Routes *.apps.localhost to the app containers the worker starts on lift-edge. Plain HTTP: there
+  # are no certificates locally. Dashboard at http://localhost:8080/dashboard/.
+  traefik:
+    <<: *service
+    image: traefik:v3.7.16
+    depends_on: [socket-proxy]
+    ports:
+      - "127.0.0.1:${LIFT_APPS_PORT:-80}:80"
+      - "127.0.0.1:${LIFT_TRAEFIK_PORT:-8080}:8080"
+    volumes:
+      - ../traefik/dev/traefik.yml:/etc/traefik/traefik.yml:ro
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    networks: [edge, socket]
+
+  # The worker checks a new app's health from here (`docker exec lift-probe curl …`), because a
+  # process on your Mac can't reach container IPs. It runs nothing else and holds no secrets.
+  probe:
+    <<: *service
+    image: curlimages/curl:8.23.0@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93
+    container_name: lift-probe
+    entrypoint: ["tail", "-f", "/dev/null"]
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    mem_limit: 32m
+    networks: [edge]
+
+networks:
+  # Shared by Traefik, the probe and every app container the worker starts (same name as on the
+  # worker VM, so the worker's code doesn't change between the two).
+  edge:
+    name: lift-edge
+  socket:
+    internal: true
+
 volumes:
   pgdata:
   redisdata:
+  buildkit:

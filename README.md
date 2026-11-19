@@ -11,7 +11,7 @@ You need Node.js 24 (`nvm use`), pnpm 10 (`npm install -g pnpm@10`) and Docker.
 ```bash
 pnpm install
 pnpm env:init      # creates .env with fresh development secrets
-pnpm stack:up      # Postgres and Redis in Docker
+pnpm stack:up      # Postgres, Redis, BuildKit and Traefik in Docker
 pnpm dev           # web, api, agent, collab and worker
 ```
 
