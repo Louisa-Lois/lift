@@ -7,8 +7,15 @@ The REST API every client and the worker go through. **Owner:** WS1 Back end & A
 - Every error is `application/problem+json` with a stable `code`; routes throw `problem(code, detail)` from `src/lib/problem.ts`.
 - Pino logs redact credential headers and drop query strings.
 - `GET /api/v1/health` answers ok only when Postgres and Redis answer within a second.
+- **Sign-in (BE-03):** GitHub OAuth, invite-only through `ALLOWED_GITHUB_LOGINS`, 14-day sliding sessions, and `GET /me`.
+- **Repos (BE-04):** `GET /github/repos` (search with `query`) and `GET /github/repos/:owner/:repo/branches`, read with the user's own GitHub token.
+- **Projects and services (BE-05):**
+  - CRUD, with slugs and a generated `{service}-{project}` subdomain, and a 4-character suffix on a clash.
+  - A non-member gets 404, and a role that's too low gets 403.
+  - Every change writes an `events` row and appends it to the project's Redis Stream.
+  - Deleting queues `remove_service` for the worker.
 
-**Next:** BE-03 (GitHub sign-in), BE-04 and BE-05 (repos, projects, services), BE-06 (deployments), BE-07 (logs).
+**Next:** BE-06 (deployments and the project events stream), BE-07 (deployment logs), BE-08 (push webhooks).
 
 | Command | What it does |
 | --- | --- |

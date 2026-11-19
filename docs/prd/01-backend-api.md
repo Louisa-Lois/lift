@@ -144,7 +144,7 @@ Worker-only internal routes are listed in `docs/contracts.md`. The agent service
 
 1. Check the user can read the repo with their token; otherwise fail with `github_error`.
 2. Insert the service with its generated `subdomain` and a `generated` domain row.
-3. Create a GitHub webhook for `push` events pointing at `/api/v1/webhooks/github?service={serviceId}`, with a random per-service secret.
+3. Create a GitHub webhook for `push` events pointing at `/api/v1/webhooks/github?service={serviceId}`, with a random per-service secret. (Built with BE-08, after INF-11: GitHub refuses hook URLs on localhost, and push deploys aren't on the first click path. A hook that fails never fails service creation.)
 4. If `deploy: true`, resolve the branch head and create a deployment with `trigger: manual`.
 
 ### Deployments

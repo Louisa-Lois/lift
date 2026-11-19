@@ -6,6 +6,7 @@
  * Sample data for mocks and tests is a separate entry point: `@lift/shared/fixtures`.
  */
 
+export * from "./apps";
 export * from "./client";
 export * from "./enums";
 export * from "./errors";

@@ -16,6 +16,7 @@
     "@fastify/swagger": "9.9.5",
     "@lift/db": "workspace:*",
     "@lift/shared": "workspace:*",
+    "bullmq": "catalog:",
     "drizzle-orm": "catalog:",
     "fastify": "catalog:",
     "fastify-plugin": "6.0.1",
