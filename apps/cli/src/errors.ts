@@ -19,6 +19,11 @@ export class UsageError extends CliError {
   }
 }
 
+export function formatCommanderError(error: { message: string }): UsageError {
+  const cleanMessage = error.message.replace(/^error:\s*/i, "").trim();
+  return new UsageError(cleanMessage, "Run `lift --help` to see available commands and options.");
+}
+
 export class NotSignedInError extends CliError {
   constructor(
     message = "Not signed in. Run `lift login`.",
@@ -70,8 +75,23 @@ export function toCliError(error: unknown): CliError {
   }
 
   if (error instanceof Error) {
-    return new CliError(error.message, EXIT_ERROR);
+    let suggestion = "Check your command arguments and try again, or run `lift --help`.";
+    const msg = error.message.toLowerCase();
+    if (
+      msg.includes("fetch failed") ||
+      msg.includes("econnrefused") ||
+      msg.includes("enotfound") ||
+      msg.includes("failed to fetch")
+    ) {
+      suggestion =
+        "Could not reach the Lift API. Check that the API server is running and reachable, or specify a different URL with --api-url.";
+    }
+    return new CliError(error.message, EXIT_ERROR, suggestion);
   }
 
-  return new CliError(String(error), EXIT_ERROR);
+  return new CliError(
+    String(error),
+    EXIT_ERROR,
+    "Check your command arguments and try again, or run `lift --help`.",
+  );
 }

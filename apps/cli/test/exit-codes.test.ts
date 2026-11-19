@@ -9,6 +9,7 @@ describe("exit codes and global error handling", () => {
       const { exitCode, stderr } = await runCli(["unknown-command"], { configDir });
       expect(exitCode).toBe(2);
       expect(stderr).toMatch(/unknown command/i);
+      expect(stderr).toContain("lift --help");
     } finally {
       cleanDir(configDir);
     }
@@ -20,6 +21,7 @@ describe("exit codes and global error handling", () => {
       const { exitCode, stderr } = await runCli(["--invalid-flag"], { configDir });
       expect(exitCode).toBe(2);
       expect(stderr).toMatch(/unknown option/i);
+      expect(stderr).toContain("lift --help");
     } finally {
       cleanDir(configDir);
     }

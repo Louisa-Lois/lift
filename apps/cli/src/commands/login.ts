@@ -1,7 +1,7 @@
-import { createLiftClient } from "@lift/shared";
+import { createLiftClient, LiftApiError, type User } from "@lift/shared";
 import { resolveApiUrl } from "../client";
 import { loadConfig, saveConfig } from "../config";
-import { NotSignedInError, UsageError } from "../errors";
+import { NotSignedInError, toCliError, UsageError } from "../errors";
 import { type OutputContext, printJson, printText } from "../output";
 
 export interface LoginOptions {
@@ -27,29 +27,33 @@ export async function loginCommand(options: LoginOptions, ctx?: OutputContext): 
     token,
   });
 
+  let user: User;
   try {
-    const user = await client.me();
-
-    saveConfig(
-      {
-        ...existingConfig,
-        apiUrl: resolvedUrl,
-        token,
-        user,
-      },
-      options.configDir,
-    );
-
-    if (ctx?.json) {
-      printJson(user, ctx);
-    } else {
-      const displayName = user.name ? `${user.name} (@${user.login})` : `@${user.login}`;
-      printText(`Signed in as ${displayName}.`, ctx);
+    user = await client.me();
+  } catch (err) {
+    if (err instanceof LiftApiError && (err.status === 401 || err.code === "unauthenticated")) {
+      throw new NotSignedInError(
+        "Invalid or expired token. Run `lift login --token <token>`.",
+        "Check your token in the dashboard settings and run `lift login --token <token>`.",
+      );
     }
-  } catch (_err) {
-    throw new NotSignedInError(
-      "Invalid or expired token. Run `lift login --token <token>`.",
-      "Check your token in the dashboard settings and run `lift login --token <token>`.",
-    );
+    throw toCliError(err);
+  }
+
+  saveConfig(
+    {
+      ...existingConfig,
+      apiUrl: resolvedUrl,
+      token,
+      user,
+    },
+    options.configDir,
+  );
+
+  if (ctx?.json) {
+    printJson(user, ctx);
+  } else {
+    const displayName = user.name ? `${user.name} (@${user.login})` : `@${user.login}`;
+    printText(`Signed in as ${displayName}.`, ctx);
   }
 }

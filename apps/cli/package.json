@@ -23,7 +23,7 @@
   "devDependencies": {
     "@lift/config": "workspace:*",
     "@types/node": "catalog:",
-    "msw": "3.0.7",
+    "msw": "catalog:",
     "tsup": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",

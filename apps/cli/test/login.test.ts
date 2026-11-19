@@ -82,4 +82,18 @@ describe("lift login", () => {
       cleanDir(configDir);
     }
   });
+
+  it("fails with exit code 1 on network or server errors rather than token error", async () => {
+    const configDir = createTempDir();
+    try {
+      const { exitCode, stderr } = await runCli(
+        ["login", "--token", "some_token", "--api-url", "http://127.0.0.1:59999"],
+        { configDir },
+      );
+      expect(exitCode).toBe(1);
+      expect(stderr).not.toContain("Invalid or expired token");
+    } finally {
+      cleanDir(configDir);
+    }
+  });
 });

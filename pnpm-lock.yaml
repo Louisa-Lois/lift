@@ -24,6 +24,9 @@ catalogs:
     ioredis:
       specifier: ^6.0.0
       version: 6.0.0
+    msw:
+      specifier: 3.0.7
+      version: 3.0.7
     postgres:
       specifier: ^3.4.9
       version: 3.4.9
@@ -89,7 +92,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: 'catalog:'
-        version: 5.1.0(@types/node@24.19.2)(jsdom@31.0.1)(msw@3.0.7(@types/node@24.19.2)(typescript@6.0.3)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.1.0(@types/node@24.19.2)(jsdom@31.0.1)(msw@3.0.7(@types/node@24.19.2)(typescript@6.0.3)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))(vite@8.3.8(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   apps/api:
     dependencies:
@@ -171,8 +174,8 @@ importers:
         specifier: 'catalog:'
         version: 24.19.2
       msw:
-        specifier: 3.0.7
-        version: 3.0.7(@types/node@24.19.2)(typescript@6.0.3)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        specifier: 'catalog:'
+        version: 3.0.7(@types/node@24.19.2)(typescript@6.0.3)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
       tsup:
         specifier: 'catalog:'
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.33)(tsx@4.23.15)(typescript@6.0.3)(yaml@2.9.1)
@@ -184,7 +187,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: 'catalog:'
-        version: 5.1.0(@types/node@24.19.2)(jsdom@31.0.1)(msw@3.0.7(@types/node@24.19.2)(typescript@6.0.3)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))(vite@8.3.8(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.1.0(@types/node@24.19.2)(jsdom@31.0.1)(msw@3.0.7(@types/node@24.19.2)(typescript@6.0.3)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   apps/collab:
     dependencies:
@@ -330,7 +333,7 @@ importers:
         specifier: 31.0.1
         version: 31.0.1
       msw:
-        specifier: 3.0.7
+        specifier: 'catalog:'
         version: 3.0.7(@types/node@24.19.2)(typescript@6.0.3)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
       shadcn:
         specifier: 4.23.0
@@ -8249,6 +8252,7 @@ snapshots:
     transitivePeerDependencies:
       - '@types/node'
       - supports-color
+    optional: true
 
   msw@3.0.7(@types/node@24.19.2)(typescript@6.0.3)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)):
     dependencies:

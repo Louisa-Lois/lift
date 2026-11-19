@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { CommanderError } from "commander";
 import { EXIT_SUCCESS, EXIT_USAGE } from "./constants";
-import { toCliError } from "./errors";
+import { formatCommanderError, toCliError } from "./errors";
 import { printError } from "./output";
 import { createProgram } from "./program";
 
@@ -15,6 +15,9 @@ try {
     if (rawError.code === "commander.helpDisplayed" || rawError.code === "commander.version") {
       process.exit(EXIT_SUCCESS);
     }
+    const usageError = formatCommanderError(rawError);
+    const isJson = process.argv.includes("--json");
+    printError(usageError, { json: isJson });
     process.exit(EXIT_USAGE);
   }
   const cliError = toCliError(rawError);

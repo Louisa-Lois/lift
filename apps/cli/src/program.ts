@@ -4,7 +4,7 @@ import { logoutCommand } from "./commands/logout";
 import { statusCommand } from "./commands/status";
 import { whoamiCommand } from "./commands/whoami";
 import { CLI_VERSION, EXIT_SUCCESS, EXIT_USAGE } from "./constants";
-import { toCliError } from "./errors";
+import { formatCommanderError, toCliError } from "./errors";
 import { type OutputContext, printError } from "./output";
 
 export { CLI_VERSION };
@@ -158,6 +158,9 @@ export async function runCli(
           stderr: stderrChunks.join(""),
         };
       }
+      const usageError = formatCommanderError(rawError);
+      const jsonMode = args.includes("--json");
+      printError(usageError, { ...ctx, json: jsonMode });
       return {
         exitCode: EXIT_USAGE,
         stdout: stdoutChunks.join(""),

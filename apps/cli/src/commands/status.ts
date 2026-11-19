@@ -44,14 +44,30 @@ export async function statusCommand(options: StatusOptions, ctx?: OutputContext)
     }
   }
 
-  // If projectId is a name or slug rather than an ID, try to resolve it from the list
+  // If projectId is a name or slug rather than an ID, resolve it by paginating through projects
   if (!projectId.startsWith("prj_")) {
-    const projectsPage = await client.projects.list({ limit: 50 });
-    const match = projectsPage.data.find(
-      (p) => p.slug === projectId || p.name.toLowerCase() === projectId?.toLowerCase(),
-    );
-    if (match) {
-      projectId = match.id;
+    let cursor: string | undefined;
+    let resolvedId: string | undefined;
+    do {
+      const projectsPage = await client.projects.list({ limit: 50, cursor });
+      const match = projectsPage.data.find(
+        (p) => p.slug === projectId || p.name.toLowerCase() === projectId?.toLowerCase(),
+      );
+      if (match) {
+        resolvedId = match.id;
+        break;
+      }
+      cursor = projectsPage.nextCursor ?? undefined;
+    } while (cursor);
+
+    if (resolvedId) {
+      projectId = resolvedId;
+    } else {
+      throw new CliError(
+        `Project '${projectId}' not found.`,
+        1,
+        "Run `lift status` without --project to view linked project services or check the project name on the dashboard.",
+      );
     }
   }
 
