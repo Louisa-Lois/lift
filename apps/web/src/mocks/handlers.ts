@@ -3,6 +3,7 @@ import {
   type ApiToken,
   appHostname,
   appUrl,
+  CreateDatabaseBody,
   CreateProjectBody,
   CreateServiceBody,
   CreateTokenBody,
@@ -30,7 +31,9 @@ const APPS_DOMAIN = "apps.localhost";
  * Each screen's task adds the handlers it needs; requests without one go to the real API.
  * Projects and services created with mocks on live in memory until the page reloads.
  */
-const projects: ProjectDetail[] = [fixtures.project];
+const projects: ProjectDetail[] = [
+  { ...fixtures.project, databases: [...fixtures.project.databases] },
+];
 /** Variables by service, kept in plaintext; answers mask them unless `?reveal=true`. */
 const variablesByService = new Map<string, Variable[]>([
   [fixtures.fixtureIds.services.web, [...fixtures.revealedVariables.web]],
@@ -312,6 +315,56 @@ export const handlers = [
     const next = [...stored.values()].sort((a, b) => (a.key < b.key ? -1 : 1));
     variablesByService.set(serviceId, next);
     return HttpResponse.json({ variables: next.map(masked), requiresRedeploy: true });
+  }),
+  // Databases are ready at once in mock mode; nothing provisions them.
+  http.post(api("/projects/:projectId/databases"), async ({ params, request }) => {
+    const project = projects.find((candidate) => candidate.id === params.projectId);
+    if (!project) return problem(404, "not_found", "Not found", `No project ${params.projectId}.`);
+    const parsed = CreateDatabaseBody.safeParse(await request.json());
+    if (!parsed.success) return invalid(issuesToFields(parsed.error.issues));
+    if (parsed.data.type !== "postgres") return invalid({ type: "Only postgres is available" });
+    if (project.databases.length > 0) {
+      return problem(409, "conflict", "Conflict", "This project already has a Postgres database.");
+    }
+    const created = {
+      id: newId("db"),
+      projectId: project.id,
+      type: "postgres" as const,
+      name: parsed.data.name ?? "postgres",
+      status: "ready" as const,
+      host: "lift-pg",
+      port: 5432,
+      envVar: "DATABASE_URL",
+      createdAt: new Date().toISOString(),
+    };
+    project.databases.push(created);
+    return HttpResponse.json(
+      { ...created, status: "provisioning", host: null, port: null },
+      { status: 202 },
+    );
+  }),
+  http.get(api("/databases/:databaseId/credentials"), ({ params }) => {
+    const found = projects
+      .flatMap((project) => project.databases)
+      .find((database) => database.id === params.databaseId);
+    if (!found) return problem(404, "not_found", "Not found", `No database ${params.databaseId}.`);
+    const password = "mock-password-not-real";
+    return HttpResponse.json({
+      url: `postgres://${found.id}:${password}@lift-pg:5432/${found.id}`,
+      host: "lift-pg",
+      port: 5432,
+      username: found.id,
+      password,
+      database: found.id,
+    });
+  }),
+  http.delete(api("/databases/:databaseId"), ({ params }) => {
+    for (const project of projects) {
+      const index = project.databases.findIndex((database) => database.id === params.databaseId);
+      const [removed] = index === -1 ? [] : project.databases.splice(index, 1);
+      if (removed) return HttpResponse.json({ ...removed, status: "deleting" }, { status: 202 });
+    }
+    return problem(404, "not_found", "Not found", `No database ${params.databaseId}.`);
   }),
   http.get(api("/tokens"), () => HttpResponse.json(fixtures.page(tokens))),
   http.post(api("/tokens"), async ({ request }) => {

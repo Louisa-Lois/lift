@@ -4,6 +4,7 @@ import { isLiftApiError } from "@lift/shared";
 import { FolderGit2Icon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
+import { DatabasesSection } from "@/components/databases-section";
 import { EmptyState } from "@/components/empty-state";
 import { ServicePanel } from "@/components/service-panel";
 import { ServiceRow } from "@/components/service-row";
@@ -53,7 +54,7 @@ export function ProjectOverview({ projectId }: { projectId: string }) {
     );
   }
 
-  const { name, role, services } = project.data;
+  const { name, role, services, databases } = project.data;
   const canDeploy = role !== "viewer";
   const newService = `/new?project=${encodeURIComponent(projectId)}`;
   return (
@@ -106,6 +107,9 @@ export function ProjectOverview({ projectId }: { projectId: string }) {
           </ul>
         </section>
       )}
+      {services.length > 0 || databases.length > 0 ? (
+        <DatabasesSection projectId={projectId} databases={databases} canEdit={canDeploy} />
+      ) : null}
       {/* useSearchParams needs a Suspense boundary in the App Router. */}
       <Suspense fallback={null}>
         <ServicePanel services={services} canEdit={canDeploy} />
