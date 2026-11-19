@@ -12,18 +12,20 @@ import {
   isLiftApiError,
   newId,
   type ProjectRole,
+  rollbackTarget,
+  type Service,
 } from "@lift/shared";
 import { and, asc, desc, eq, inArray, isNull, max } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 import type { Redis } from "ioredis";
-import { dropQueuedBuild, enqueueBuild, enqueueDeploy } from "../jobs/enqueue";
+import { dropQueuedBuild, enqueueBuild, enqueueDeploy, enqueueOp } from "../jobs/enqueue";
 import { problem } from "../lib/problem";
 import type { Queues } from "../plugins/queues";
 import { accessProject, type ProjectRow } from "./access";
 import { canTransition } from "./deployment-state";
 import { type DbOrTx, type EventRow, publishEvents, recordEvent } from "./events";
 import type { Github, GithubCommit } from "./github";
-import { finishLogs } from "./logs";
+import { appendSystemLine, finishLogs } from "./logs";
 import type { ServiceRow } from "./services";
 
 export type DeploymentRow = typeof schema.deployments.$inferSelect;
@@ -294,6 +296,30 @@ export async function startDeployment(
   return row;
 }
 
+/**
+ * The deploy job for an image, from the service's settings and domains as they are now: a
+ * finished build's, or a rollback's, which runs an old image with today's settings.
+ */
+async function deployJobFor(
+  tx: DbOrTx,
+  service: ServiceRow,
+  deploymentId: string,
+  imageTag: string,
+): Promise<DeployJob> {
+  return {
+    deploymentId,
+    serviceId: service.id,
+    serviceSlug: service.slug,
+    projectId: service.projectId,
+    imageTag,
+    port: service.port,
+    healthcheckPath: service.healthcheckPath,
+    cpu: service.cpu,
+    memoryMb: service.memoryMb,
+    hostnames: await hostnamesOf(tx, service.id),
+  };
+}
+
 /** Hostnames a deployment answers on: the service's active domains. */
 async function hostnamesOf(tx: DbOrTx, serviceId: string): Promise<string[]> {
   const rows = await tx
@@ -347,18 +373,7 @@ export async function applyReport(
           ...step,
           set: { imageTag: report.imageTag },
         });
-        const deployJob: DeployJob = {
-          deploymentId: row.id,
-          serviceId: service.id,
-          serviceSlug: service.slug,
-          projectId: service.projectId,
-          imageTag: report.imageTag,
-          port: service.port,
-          healthcheckPath: service.healthcheckPath,
-          cpu: service.cpu,
-          memoryMb: service.memoryMb,
-          hostnames: await hostnamesOf(tx, service.id),
-        };
+        const deployJob = await deployJobFor(tx, service, row.id, report.imageTag);
         return { row: change.row, events: [change.event], deployJob };
       }
       case "active": {
@@ -499,4 +514,189 @@ export async function deploymentDetail(db: Db, row: DeploymentRow): Promise<Depl
       at: step.at.toISOString(),
     })),
   };
+}
+
+/**
+ * `POST /deployments/:id/rollback` (docs/prd/01-backend-api.md, "Deployments"): a new deployment
+ * that starts at `deploying` with the target's image, commit and `rollback_of`, and goes straight
+ * to the deploy job: no build. It runs with today's variables and settings. Older queued
+ * deployments are canceled (newest wins); a build already running is left to finish. The target
+ * must pass the shared rollback rule, so its image is one Lift keeps.
+ */
+export async function rollbackDeployment(
+  deps: DeploymentDeps,
+  input: { service: ServiceRow; target: DeploymentRow; actor: Actor },
+): Promise<DeploymentRow> {
+  const { service, target, actor } = input;
+  const created = await deps.db.transaction(async (tx) => {
+    await tx
+      .select({ id: schema.services.id })
+      .from(schema.services)
+      .where(eq(schema.services.id, service.id))
+      .for("update");
+    const all = await tx
+      .select({ id: d.id, status: d.status, imageTag: d.imageTag, createdAt: d.createdAt })
+      .from(d)
+      .where(eq(d.serviceId, service.id));
+    const images = all.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
+    const [current] = images.filter((row) => row.id === target.id);
+    const check = rollbackTarget(
+      current ?? { ...target, createdAt: target.createdAt.toISOString() },
+      images,
+    );
+    if (!check.ok || !target.imageTag) {
+      throw problem("conflict", check.ok ? "This deployment has no image." : check.reason);
+    }
+    const now = new Date();
+    const events: EventRow[] = [];
+    const canceled: DeploymentRow[] = [];
+    const queued = await tx
+      .select()
+      .from(d)
+      .where(and(eq(d.serviceId, service.id), eq(d.status, "queued")));
+    for (const old of queued) {
+      const change = await changeStatus(tx, old, "canceled", {
+        at: now,
+        message: "Replaced by a rollback",
+        actor,
+        set: { finishedAt: now },
+      });
+      events.push(change.event);
+      canceled.push(change.row);
+    }
+    const [row] = await tx
+      .insert(d)
+      .values({
+        id: newId("dep"),
+        serviceId: service.id,
+        projectId: service.projectId,
+        status: "deploying",
+        trigger: "rollback",
+        commitSha: target.commitSha,
+        commitMessage: target.commitMessage,
+        commitAuthor: target.commitAuthor,
+        imageTag: target.imageTag,
+        rollbackOf: target.id,
+        createdByUserId: actor.type === "user" ? actor.id : null,
+        queuedAt: now,
+        startedAt: now,
+      })
+      .returning();
+    if (!row) throw new Error("insert returned no deployment");
+    await tx.insert(timeline).values({
+      id: newId("dpe"),
+      deploymentId: row.id,
+      status: "deploying",
+      message: `Rolling back to ${target.commitSha.slice(0, 7)} (${target.id})`,
+      at: now,
+    });
+    events.push(
+      await recordEvent(tx, {
+        projectId: row.projectId,
+        actorType: actor.type,
+        actorId: actor.id,
+        type: "deployment.created",
+        data: toDeployment(row),
+      }),
+    );
+    const job = await deployJobFor(tx, service, row.id, target.imageTag);
+    return { row, events, canceled, job };
+  });
+  const { row, events, canceled, job } = created;
+  await publishEvents(deps.redis, events, deps.log);
+  for (const old of canceled) {
+    await dropQueuedBuild(deps.queues, old.id);
+    await finishLogs(deps, old.id, "canceled");
+  }
+  await appendSystemLine(
+    deps,
+    row.id,
+    `Rolling back to ${target.commitSha.slice(0, 7)} (${target.id}): its image runs with today's variables and settings. No build runs.`,
+  );
+  try {
+    await enqueueDeploy(deps.queues, job);
+  } catch (error) {
+    deps.log.error({ err: error, deploymentId: row.id }, "couldn't queue a rollback");
+    await failDeployment(deps, row.id, {
+      code: "upstream_unavailable",
+      message: "Lift couldn't queue the rollback. Try again.",
+    });
+    throw problem("upstream_unavailable", "Lift couldn't queue the rollback. Try again.", {
+      cause: error,
+    });
+  }
+  return row;
+}
+
+/**
+ * `POST /deployments/:id/cancel`: only while it's queued or building. A queued build job is
+ * dropped; a running build gets a `stop` op, and its next report gets 409 anyway. The log ends.
+ */
+export async function cancelDeployment(
+  deps: DeploymentDeps,
+  input: { deployment: DeploymentRow; actor: Actor; by: string },
+): Promise<DeploymentRow> {
+  const result = await deps.db.transaction(async (tx) => {
+    const [row] = await tx.select().from(d).where(eq(d.id, input.deployment.id)).for("update");
+    if (!row) throw problem("not_found", `No deployment ${input.deployment.id}.`);
+    if (row.status !== "queued" && row.status !== "building") {
+      throw problem(
+        "conflict",
+        `This deployment is ${row.status}; only a queued or building one can be canceled.`,
+      );
+    }
+    const now = new Date();
+    const change = await changeStatus(tx, row, "canceled", {
+      at: now,
+      message: `Canceled by ${input.by}`,
+      actor: input.actor,
+      set: { finishedAt: now },
+    });
+    return { change, was: row.status };
+  });
+  const { change, was } = result;
+  await publishEvents(deps.redis, [change.event], deps.log);
+  if (was === "queued") {
+    await dropQueuedBuild(deps.queues, change.row.id);
+  } else {
+    await enqueueOp(deps.queues, {
+      op: "stop",
+      deploymentId: change.row.id,
+      serviceId: change.row.serviceId,
+      projectId: change.row.projectId,
+    });
+  }
+  await finishLogs(deps, change.row.id, "canceled");
+  return change.row;
+}
+
+/**
+ * `POST /services/:id/restart`: the worker restarts the active deployment's container, with the
+ * same image and variables. 409 when nothing is running.
+ */
+export async function restartService(
+  deps: DeploymentDeps,
+  input: { service: ServiceRow; view: Service; actor: Actor },
+): Promise<void> {
+  const { service } = input;
+  const [active] = await deps.db
+    .select()
+    .from(d)
+    .where(and(eq(d.serviceId, service.id), eq(d.status, "active")))
+    .limit(1);
+  if (!active) throw problem("conflict", `${service.name} has nothing running to restart.`);
+  await enqueueOp(deps.queues, {
+    op: "restart",
+    deploymentId: active.id,
+    serviceId: service.id,
+    projectId: service.projectId,
+  });
+  const event = await recordEvent(deps.db, {
+    projectId: service.projectId,
+    actorType: input.actor.type,
+    actorId: input.actor.id,
+    type: "service.restarted",
+    data: input.view,
+  });
+  await publishEvents(deps.redis, [event], deps.log);
 }

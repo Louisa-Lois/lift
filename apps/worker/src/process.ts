@@ -4,6 +4,8 @@ export interface RunResult {
   /** The exit code; null when a signal ended it. */
   code: number | null;
   timedOut: boolean;
+  /** Ended because the caller's signal aborted it, e.g. a canceled build. */
+  aborted?: boolean;
 }
 
 export interface RunOptions {
@@ -14,6 +16,8 @@ export interface RunOptions {
   timeoutMs?: number;
   /** Every line of stdout and stderr, without its line break. */
   onLine?: (line: string) => void;
+  /** Aborting it stops the program like a timeout does: SIGTERM, then SIGKILL 10 seconds later. */
+  signal?: AbortSignal;
 }
 
 const KILL_GRACE_MS = 10_000;
@@ -45,15 +49,26 @@ export function run(
       stdio: ["ignore", "pipe", "pipe"],
     });
     let timedOut = false;
+    let aborted = false;
     let killer: NodeJS.Timeout | undefined;
+    const stop = () => {
+      if (killer) return;
+      child.kill("SIGTERM");
+      killer = setTimeout(() => child.kill("SIGKILL"), KILL_GRACE_MS);
+    };
     const timer =
       options.timeoutMs === undefined
         ? undefined
         : setTimeout(() => {
             timedOut = true;
-            child.kill("SIGTERM");
-            killer = setTimeout(() => child.kill("SIGKILL"), KILL_GRACE_MS);
+            stop();
           }, options.timeoutMs);
+    const onAbort = () => {
+      aborted = true;
+      stop();
+    };
+    if (options.signal?.aborted) onAbort();
+    else options.signal?.addEventListener("abort", onAbort, { once: true });
 
     for (const output of [child.stdout, child.stderr]) {
       let rest = "";
@@ -72,12 +87,14 @@ export function run(
     child.on("error", (error) => {
       clearTimeout(timer);
       clearTimeout(killer);
+      options.signal?.removeEventListener("abort", onAbort);
       reject(error);
     });
     child.on("close", (code) => {
       clearTimeout(timer);
       clearTimeout(killer);
-      resolve({ code, timedOut });
+      options.signal?.removeEventListener("abort", onAbort);
+      resolve({ code, timedOut, ...(aborted ? { aborted } : {}) });
     });
   });
 }

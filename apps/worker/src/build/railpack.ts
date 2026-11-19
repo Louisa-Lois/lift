@@ -43,6 +43,8 @@ export interface ImageBuildInput {
   buildkitHost: string;
   timeoutMs: number;
   onLine: (line: string) => void;
+  /** Stops Railpack, and with it the BuildKit solve, when the deployment is canceled. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -56,6 +58,7 @@ export function railpackBuild(input: ImageBuildInput): Promise<RunResult> {
     env: childEnv({ ...passed, BUILDKIT_HOST: input.buildkitHost }),
     timeoutMs: input.timeoutMs,
     onLine: input.onLine,
+    signal: input.signal,
   });
 }
 

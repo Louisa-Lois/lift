@@ -24,6 +24,8 @@ export interface ConfirmDialogProps {
   /** What happens if you go ahead, in plain words. */
   description: ReactNode;
   confirmLabel: string;
+  /** The button that closes the dialog, "Cancel" unless that would read oddly. */
+  dismissLabel?: string;
   /** Shown on the button while `onConfirm` runs, like "Revoking…". */
   pendingLabel?: string;
   /** For actions that delete something or can't be undone. */
@@ -45,6 +47,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
+  dismissLabel = "Cancel",
   pendingLabel,
   destructive = false,
   confirmPhrase,
@@ -105,7 +108,7 @@ export function ConfirmDialog({
           </div>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>{dismissLabel}</AlertDialogCancel>
           <AlertDialogAction
             variant={destructive ? "destructive" : "default"}
             disabled={!ready || pending}

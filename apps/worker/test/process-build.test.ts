@@ -10,6 +10,7 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { tokenForms } from "../src/build/clone";
 import { type BuildDeps, formatDuration, processBuild } from "../src/build/process-build";
+import { createRunningBuilds } from "../src/build/running";
 import { type InternalApi, StopDeployment } from "../src/internal-api";
 import type { LogSink } from "../src/log-sink";
 import { createLogger } from "../src/logger";
@@ -141,6 +142,25 @@ async function gone(dir: string): Promise<boolean> {
 }
 
 describe("the build job", () => {
+  it("stops quietly when its deployment is canceled mid-build, and cleans up", async () => {
+    const { deps, reports } = setup();
+    const builds = createRunningBuilds();
+    deps.builds = builds;
+    deps.buildImage = (input) =>
+      new Promise((resolve) => {
+        input.signal?.addEventListener("abort", () =>
+          resolve({ code: null, timedOut: false, aborted: true }),
+        );
+        // The ops worker gets `stop` while Railpack runs.
+        setTimeout(() => builds.stop(job.deploymentId), 20);
+      });
+    expect(await processBuild(job, deps)).toBe("stopped");
+    // The API already ended it: nothing after `building` is reported.
+    expect(reports.map((report) => report.status)).toEqual(["building"]);
+    expect(await gone(path.join(buildDir, job.deploymentId))).toBe(true);
+    expect(builds.stop(job.deploymentId)).toBe(false);
+  });
+
   it("passes the service's variables to Railpack, except the tools' own, and scrubs their values", async () => {
     const { deps, events, secrets } = setup({
       context: {

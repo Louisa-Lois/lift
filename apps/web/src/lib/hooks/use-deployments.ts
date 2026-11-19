@@ -4,11 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 
-/** A service's recent deployments, newest first. */
+/** A service's recent deployments, newest first; waits while `serviceId` is still unknown (""). */
 export function useDeployments(serviceId: string, limit = 5) {
   return useQuery({
     queryKey: queryKeys.deployments(serviceId),
     queryFn: () => api.deployments.list(serviceId, { limit }),
+    enabled: serviceId !== "",
   });
 }
 

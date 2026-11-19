@@ -1,5 +1,6 @@
 import { type OpsJob, postgresNamesFor } from "@lift/shared";
 import type { Sql } from "postgres";
+import type { RunningBuilds } from "../build/running";
 import { projectNetwork } from "../deploy/labels";
 import type { Docker } from "../docker";
 import { type InternalApi, StopDeployment } from "../internal-api";
@@ -9,9 +10,18 @@ import { deprovisionPostgres, provisionPostgres } from "./postgres";
 /** The shared Postgres for users' databases, as apps on a project network reach it. */
 export const LIFT_PG = { container: "lift-pg", port: 5432 } as const;
 
+/** How long a container gets to stop before Docker kills it, as when a deploy replaces it. */
+const STOP_SECONDS = 10;
+/** How long a restarted container has to be running again. */
+const RESTART_WAIT_MS = 60_000;
+
 export interface OpsDeps {
   docker: Docker;
   log: Logger;
+  /** The builds running in this process, which `stop` aborts. */
+  builds?: RunningBuilds;
+  /** Between checks that a restarted container runs; tests shorten it. */
+  pollMs?: number;
   api?: InternalApi;
   /** lift-pg's superuser connection (LIFT_PG_URL); null on a worker without one. */
   pg?: Sql | null;
@@ -32,10 +42,13 @@ function databaseDeps(deps: OpsDeps): { api: InternalApi; pg: Sql | null } {
 }
 
 /**
- * `lift-ops` jobs. `remove_service` removes every container of a deleted service.
- * `provision_db` and `deprovision_db` create and drop a project's Postgres database on lift-pg
- * (INF-10). `stop` and `restart` arrive with BE-11 and fail loudly until then, so BullMQ keeps
- * them (a week) instead of dropping them.
+ * `lift-ops` jobs (docs/contracts.md, "Worker jobs"):
+ * - `stop`: a canceled deployment. Its build is aborted if it runs here; otherwise any container
+ *   of it is stopped and removed.
+ * - `restart`: the deployment's container restarts with the same image and variables.
+ * - `remove_service`: every container of a deleted service is removed.
+ * - `provision_db` and `deprovision_db` create and drop a project's Postgres database on lift-pg
+ *   (INF-10).
  */
 export async function processOp(job: OpsJob, deps: OpsDeps): Promise<string> {
   const { log } = deps;
@@ -112,7 +125,34 @@ export async function processOp(job: OpsJob, deps: OpsDeps): Promise<string> {
       }
     }
 
-    default:
-      throw new Error(`The worker can't run "${job.op}" yet (INF-10)`);
+    case "stop": {
+      if (deps.builds?.stop(job.deploymentId)) {
+        log.info({ deploymentId: job.deploymentId }, "stopping a canceled build");
+        return "stopped the build";
+      }
+      const containers = await deps.docker.listContainers([`lift.deployment=${job.deploymentId}`]);
+      for (const container of containers) {
+        await deps.docker.stopContainer(container.Id, STOP_SECONDS);
+        await deps.docker.removeContainer(container.Id);
+      }
+      return `removed ${containers.length} container(s)`;
+    }
+
+    case "restart": {
+      const [container] = await deps.docker.listContainers([`lift.deployment=${job.deploymentId}`]);
+      if (!container) throw new Error(`no container runs deployment ${job.deploymentId}`);
+      await deps.docker.restartContainer(container.Id, STOP_SECONDS);
+      const deadline = Date.now() + RESTART_WAIT_MS;
+      for (;;) {
+        const details = await deps.docker.inspectContainer(container.Id);
+        if (details?.State.Running) break;
+        if (Date.now() >= deadline) {
+          throw new Error(`deployment ${job.deploymentId}'s container didn't start again`);
+        }
+        await new Promise((resolve) => setTimeout(resolve, deps.pollMs ?? 1_000));
+      }
+      log.info({ deploymentId: job.deploymentId }, "restarted a container");
+      return "restarted";
+    }
   }
 }

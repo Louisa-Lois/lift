@@ -74,6 +74,9 @@ export function fakeDocker(setup: FakeDockerSetup = {}) {
     setRestartPolicy: async (id: string, name: "no" | "unless-stopped") => {
       calls.push(`restart-policy:${id}:${name}`);
     },
+    restartContainer: async (id: string) => {
+      calls.push(`restart:${id}`);
+    },
     startContainer: async (id: string) => {
       calls.push(`start:${id}`);
     },

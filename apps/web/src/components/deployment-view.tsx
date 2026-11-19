@@ -5,11 +5,17 @@ import {
   type DeploymentStatus,
   type DeploymentTrigger,
   isLiftApiError,
+  rollbackTarget,
 } from "@lift/shared";
 import { useQueryClient } from "@tanstack/react-query";
-import { ExternalLinkIcon, GitCommitHorizontalIcon } from "lucide-react";
+import { ExternalLinkIcon, GitCommitHorizontalIcon, RotateCcwIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect } from "react";
+import {
+  CancelDeploymentButton,
+  RedeployButton,
+  RollbackDialog,
+} from "@/components/deployment-actions";
 import { EmptyState } from "@/components/empty-state";
 import { LogViewer } from "@/components/log-viewer";
 import { StatusBadge } from "@/components/status-badge";
@@ -17,7 +23,7 @@ import { Timeline } from "@/components/timeline";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDuration, timeAgo } from "@/lib/format";
-import { useDeployment } from "@/lib/hooks/use-deployments";
+import { useDeployment, useDeployments } from "@/lib/hooks/use-deployments";
 import { useLogStream } from "@/lib/hooks/use-log-stream";
 import { useNow } from "@/lib/hooks/use-now";
 import { useProjectEvents } from "@/lib/hooks/use-project-events";
@@ -63,6 +69,9 @@ export function DeploymentView({
   const project = useProject(projectId);
   const deployment = useDeployment(deploymentId);
   const service = useService(deployment.data?.serviceId ?? null);
+  // The service's recent deployments (the list's cache), for the rollback rule and to know if a
+  // build is running. The API checks the rule against all of them.
+  const siblings = useDeployments(deployment.data?.serviceId ?? "");
   const logs = useLogStream(deploymentId);
   const running = deployment.data ? IN_PROGRESS.has(deployment.data.status) : false;
   const now = useNow(running);
@@ -102,6 +111,13 @@ export function DeploymentView({
 
   const d = deployment.data;
   const repo = service.data?.repo;
+  const canEdit = project.data !== undefined && project.data.role !== "viewer";
+  const others = siblings.data?.data ?? [];
+  // The rule needs the deployment among its siblings; on page 1 it always is unless it's old.
+  const rollback = others.some((other) => other.id === d.id) ? rollbackTarget(d, others) : null;
+  const buildInProgress = others.some(
+    (other) => other.status === "queued" || other.status === "building",
+  );
   const sha = d.commitSha.slice(0, 7);
   const started = Date.parse(d.startedAt ?? d.queuedAt);
   const elapsed = formatDuration((d.finishedAt ? Date.parse(d.finishedAt) : now) - started);
@@ -147,14 +163,33 @@ export function DeploymentView({
             </span>
           </p>
         </div>
-        {d.status === "active" && service.data ? (
-          <Button asChild>
-            <a href={service.data.url} target="_blank" rel="noreferrer">
-              Visit
-              <ExternalLinkIcon aria-hidden="true" />
-            </a>
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {canEdit && (d.status === "queued" || d.status === "building") ? (
+            <CancelDeploymentButton deployment={d} />
+          ) : null}
+          {canEdit && rollback?.ok && service.data ? (
+            <RollbackDialog
+              deployment={d}
+              serviceName={service.data.name}
+              buildInProgress={buildInProgress}
+              trigger={
+                <Button variant="outline">
+                  <RotateCcwIcon aria-hidden="true" />
+                  Rollback
+                </Button>
+              }
+            />
+          ) : null}
+          {canEdit && !running ? <RedeployButton deployment={d} /> : null}
+          {d.status === "active" && service.data ? (
+            <Button asChild>
+              <a href={service.data.url} target="_blank" rel="noreferrer">
+                Visit
+                <ExternalLinkIcon aria-hidden="true" />
+              </a>
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {d.status === "failed" && d.errorCode ? (

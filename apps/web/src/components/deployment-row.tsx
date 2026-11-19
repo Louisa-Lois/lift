@@ -1,5 +1,6 @@
 import type { Deployment, DeploymentTrigger, RepoRef } from "@lift/shared";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { StatusBadge } from "@/components/status-badge";
 import { formatDuration, timeAgo } from "@/lib/format";
 
@@ -23,7 +24,16 @@ function took(deployment: Deployment): string {
  * One deployment in a list: status, short SHA linking to the commit on GitHub, the commit
  * message (linking to the deployment page), trigger and author, age and duration.
  */
-export function DeploymentRow({ deployment, repo }: { deployment: Deployment; repo: RepoRef }) {
+export function DeploymentRow({
+  deployment,
+  repo,
+  menu,
+}: {
+  deployment: Deployment;
+  repo: RepoRef;
+  /** The row's menu (View logs · Rollback to this · Copy ID), where the list offers one. */
+  menu?: ReactNode;
+}) {
   const sha = deployment.commitSha;
   return (
     <li className="flex items-center gap-3 px-4 py-2.5 text-sm">
@@ -52,6 +62,7 @@ export function DeploymentRow({ deployment, repo }: { deployment: Deployment; re
       <span className="hidden w-14 text-right font-mono text-muted-foreground text-xs md:inline">
         {took(deployment)}
       </span>
+      {menu}
     </li>
   );
 }

@@ -425,6 +425,90 @@ export const handlers = [
       .map(withoutTimeline);
     return HttpResponse.json(fixtures.page(list.slice(0, limit)));
   }),
+  // A rollback goes live at once in mock mode: there's no image to run.
+  http.post(api("/deployments/:deploymentId/rollback"), ({ params }) => {
+    const target = deployments.get(String(params.deploymentId));
+    const service = target && findService(target.serviceId);
+    if (!target || !service) return problem(404, "not_found", "Not found", "No such deployment.");
+    if (target.status !== "superseded" || !target.imageTag) {
+      return problem(
+        409,
+        "conflict",
+        "Conflict",
+        "Only a deployment that was live can be rolled back to.",
+      );
+    }
+    const now = new Date().toISOString();
+    for (const other of deployments.values()) {
+      if (other.serviceId === service.id && other.status === "active") other.status = "superseded";
+    }
+    const id = newId(ID_PREFIXES.deployment);
+    const detail: DeploymentDetail = {
+      ...target,
+      id,
+      status: "active",
+      trigger: "rollback",
+      rollbackOf: target.id,
+      createdByUserId: fixtures.me.id,
+      queuedAt: now,
+      startedAt: now,
+      finishedAt: now,
+      createdAt: now,
+      timeline: [
+        {
+          id: newId(ID_PREFIXES.deploymentEvent),
+          status: "deploying",
+          message: `Rolling back to ${target.commitSha.slice(0, 7)}`,
+          at: now,
+        },
+        { id: newId(ID_PREFIXES.deploymentEvent), status: "active", message: null, at: now },
+      ],
+    };
+    deployments.set(id, detail);
+    service.latestDeployment = {
+      id,
+      status: "active",
+      commitSha: detail.commitSha,
+      createdAt: now,
+    };
+    service.activeDeploymentId = id;
+    return HttpResponse.json(withoutTimeline(detail), { status: 202 });
+  }),
+  http.post(api("/deployments/:deploymentId/cancel"), ({ params }) => {
+    const deployment = deployments.get(String(params.deploymentId));
+    if (!deployment) return problem(404, "not_found", "Not found", "No such deployment.");
+    if (deployment.status !== "queued" && deployment.status !== "building") {
+      return problem(
+        409,
+        "conflict",
+        "Conflict",
+        `This deployment is ${deployment.status}; only a queued or building one can be canceled.`,
+      );
+    }
+    const now = new Date().toISOString();
+    deployment.status = "canceled";
+    deployment.finishedAt = now;
+    deployment.timeline.push({
+      id: newId(ID_PREFIXES.deploymentEvent),
+      status: "canceled",
+      message: `Canceled by ${fixtures.me.login}`,
+      at: now,
+    });
+    return HttpResponse.json(withoutTimeline(deployment));
+  }),
+  http.post(api("/services/:serviceId/restart"), ({ params }) => {
+    const service = findService(String(params.serviceId));
+    if (!service) return problem(404, "not_found", "Not found", "No service with that ID.");
+    if (!service.activeDeploymentId) {
+      return problem(
+        409,
+        "conflict",
+        "Conflict",
+        `${service.name} has nothing running to restart.`,
+      );
+    }
+    return HttpResponse.json(service, { status: 202 });
+  }),
   http.post(api("/services/:serviceId/deployments"), ({ params }) => {
     const service = findService(String(params.serviceId));
     if (!service) return problem(404, "not_found", "Not found", "No service with that ID.");

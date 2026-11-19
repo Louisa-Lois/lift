@@ -225,6 +225,17 @@ export function createDocker(socketPath: string = dockerSocketPath()) {
       });
     },
 
+    /** `docker restart`: stops it (SIGTERM, then SIGKILL after `seconds`) and starts it again. */
+    async restartContainer(id: string, seconds: number): Promise<void> {
+      await call(
+        "POST",
+        `/containers/${encodeURIComponent(id)}/restart?t=${seconds}`,
+        [204],
+        undefined,
+        (seconds + 30) * 1000,
+      );
+    },
+
     async startContainer(id: string): Promise<void> {
       await call("POST", `/containers/${id}/start`, [204, 304]);
     },

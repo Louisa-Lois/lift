@@ -3,6 +3,7 @@
 import type { Service } from "@lift/shared";
 import { ExternalLinkIcon } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { RestartServiceButton } from "@/components/deployment-actions";
 import { ServiceDeployments } from "@/components/service-deployments";
 import { StatusBadge } from "@/components/status-badge";
 import {
@@ -60,6 +61,9 @@ export function ServicePanel({ services, canEdit }: { services: Service[]; canEd
                 {service.latestDeployment ? (
                   <StatusBadge status={service.latestDeployment.status} />
                 ) : null}
+                {canEdit && service.activeDeploymentId ? (
+                  <RestartServiceButton serviceId={service.id} serviceName={service.name} />
+                ) : null}
               </div>
               <SheetDescription asChild>
                 {service.activeDeploymentId ? (
@@ -87,7 +91,7 @@ export function ServicePanel({ services, canEdit }: { services: Service[]; canEd
                 <TabsTrigger value="variables">Variables</TabsTrigger>
               </TabsList>
               <TabsContent value="deployments" className="mt-3 rounded-lg border">
-                <ServiceDeployments service={service} />
+                <ServiceDeployments service={service} canEdit={canEdit} />
               </TabsContent>
               <TabsContent value="variables" className="mt-3">
                 <VariablesTab
