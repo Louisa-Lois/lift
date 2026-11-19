@@ -54,6 +54,10 @@ export function applyProjectEvent(queryClient: QueryClient, event: ProjectEvent)
       void queryClient.invalidateQueries({ queryKey: project });
       void queryClient.invalidateQueries({ queryKey: queryKeys.projects });
       return;
+    case "variables.changed":
+      // Values never travel in events: refetch the (masked) list.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.variables(event.data.serviceId) });
+      return;
     default:
       void queryClient.invalidateQueries({ queryKey: project });
   }

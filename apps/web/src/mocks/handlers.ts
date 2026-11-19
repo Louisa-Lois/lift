@@ -10,11 +10,14 @@ import {
   type DeploymentDetail,
   ID_PREFIXES,
   type LogEntry,
+  maskVariableValue,
   newId,
   PROBLEM_CONTENT_TYPE,
   type ProjectDetail,
   type ProjectListItem,
   type Service,
+  UpsertVariablesBody,
+  type Variable,
 } from "@lift/shared";
 import * as fixtures from "@lift/shared/fixtures";
 import { HttpResponse, http } from "msw";
@@ -28,6 +31,16 @@ const APPS_DOMAIN = "apps.localhost";
  * Projects and services created with mocks on live in memory until the page reloads.
  */
 const projects: ProjectDetail[] = [fixtures.project];
+/** Variables by service, kept in plaintext; answers mask them unless `?reveal=true`. */
+const variablesByService = new Map<string, Variable[]>([
+  [fixtures.fixtureIds.services.web, [...fixtures.revealedVariables.web]],
+  [fixtures.fixtureIds.services.api, [...fixtures.revealedVariables.api]],
+]);
+const masked = (variable: Variable): Variable => ({
+  ...variable,
+  value: maskVariableValue(variable.value),
+});
+
 /** Personal tokens; a created one is listed without its plaintext, as the API does. */
 const tokens: ApiToken[] = [...fixtures.apiTokens];
 
@@ -266,6 +279,40 @@ export const handlers = [
     return HttpResponse.json(service, { status: 201 });
   }),
 
+  http.get(api("/services/:serviceId/variables"), ({ params, request }) => {
+    const reveal = new URL(request.url).searchParams.get("reveal") === "true";
+    const stored = variablesByService.get(String(params.serviceId)) ?? [];
+    return HttpResponse.json(fixtures.page(reveal ? stored : stored.map(masked)));
+  }),
+  http.put(api("/services/:serviceId/variables"), async ({ params, request }) => {
+    const parsed = UpsertVariablesBody.safeParse(await request.json());
+    if (!parsed.success) return invalid(issuesToFields(parsed.error.issues));
+    const serviceId = String(params.serviceId);
+    const now = new Date().toISOString();
+    const stored = new Map(
+      (variablesByService.get(serviceId) ?? []).map((variable) => [variable.key, variable]),
+    );
+    for (const [key, value] of Object.entries(parsed.data.variables)) {
+      if (value === null) {
+        stored.delete(key);
+        continue;
+      }
+      const before = stored.get(key);
+      stored.set(key, {
+        id: before?.id ?? newId("var"),
+        serviceId,
+        key,
+        value,
+        source: "user",
+        databaseId: null,
+        updatedAt: now,
+        createdAt: before?.createdAt ?? now,
+      });
+    }
+    const next = [...stored.values()].sort((a, b) => (a.key < b.key ? -1 : 1));
+    variablesByService.set(serviceId, next);
+    return HttpResponse.json({ variables: next.map(masked), requiresRedeploy: true });
+  }),
   http.get(api("/tokens"), () => HttpResponse.json(fixtures.page(tokens))),
   http.post(api("/tokens"), async ({ request }) => {
     const parsed = CreateTokenBody.safeParse(await request.json());

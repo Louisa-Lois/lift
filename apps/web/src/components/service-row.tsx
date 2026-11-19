@@ -1,15 +1,20 @@
 "use client";
 
 import type { Service } from "@lift/shared";
-import { ExternalLinkIcon, GitBranchIcon, RocketIcon } from "lucide-react";
+import { BracesIcon, ExternalLinkIcon, GitBranchIcon, RocketIcon } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { DeploymentRow } from "@/components/deployment-row";
+import { ServiceDeployments } from "@/components/service-deployments";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useDeploy, useDeployments } from "@/lib/hooks/use-deployments";
+import { useDeploy } from "@/lib/hooks/use-deployments";
 import { showProblem } from "@/lib/problems";
+
+/** The service panel over the project page, on one of its tabs (`?service=&tab=`). */
+function panelHref(service: Service, tab: "deployments" | "variables"): string {
+  return `/p/${service.projectId}?service=${service.id}&tab=${tab}`;
+}
 
 /** A branch's page on GitHub; a branch name can hold slashes, so encode each part. */
 function branchUrl({ owner, name, branch }: Service["repo"]): string {
@@ -24,7 +29,6 @@ function branchUrl({ owner, name, branch }: Service["repo"]): string {
 export function ServiceRow({ service, canDeploy }: { service: Service; canDeploy: boolean }) {
   const router = useRouter();
   const deploy = useDeploy();
-  const deployments = useDeployments(service.id);
   const latest = service.latestDeployment;
   const host = new URL(service.url).host;
 
@@ -42,7 +46,13 @@ export function ServiceRow({ service, canDeploy }: { service: Service; canDeploy
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex items-center gap-2">
-            <span className="truncate font-medium">{service.name}</span>
+            <Link
+              href={panelHref(service, "deployments")}
+              scroll={false}
+              className="truncate font-medium hover:underline"
+            >
+              {service.name}
+            </Link>
             {latest ? (
               <StatusBadge status={latest.status} />
             ) : (
@@ -81,6 +91,12 @@ export function ServiceRow({ service, canDeploy }: { service: Service; canDeploy
             {host}
           </span>
         )}
+        <Button asChild variant="ghost" size="sm">
+          <Link href={panelHref(service, "variables")} scroll={false}>
+            <BracesIcon aria-hidden="true" />
+            Variables
+          </Link>
+        </Button>
         {canDeploy ? (
           <Button variant="outline" size="sm" onClick={deployNow} disabled={deploy.isPending}>
             <RocketIcon aria-hidden="true" />
@@ -89,19 +105,7 @@ export function ServiceRow({ service, canDeploy }: { service: Service; canDeploy
         ) : null}
       </div>
       <div className="border-t bg-muted/20">
-        {deployments.isPending ? (
-          <div role="status" aria-label="Loading deployments" className="px-4 py-3">
-            <Skeleton className="h-4 w-2/3" />
-          </div>
-        ) : (deployments.data?.data.length ?? 0) === 0 ? (
-          <p className="px-4 py-3 text-muted-foreground text-xs">No deployments yet.</p>
-        ) : (
-          <ul aria-label={`Deployments of ${service.name}`} className="divide-y">
-            {deployments.data?.data.map((deployment) => (
-              <DeploymentRow key={deployment.id} deployment={deployment} repo={service.repo} />
-            ))}
-          </ul>
-        )}
+        <ServiceDeployments service={service} />
       </div>
     </li>
   );

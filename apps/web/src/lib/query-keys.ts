@@ -7,6 +7,8 @@ export const queryKeys = {
   deployments: (serviceId: string) => ["deployments", serviceId] as const,
   deployment: (deploymentId: string) => ["deployment", deploymentId] as const,
   variables: (serviceId: string) => ["variables", serviceId] as const,
+  /** Under `variables`, so invalidating a service's variables refetches these too. */
+  revealedVariables: (serviceId: string) => ["variables", serviceId, "revealed"] as const,
   databases: (projectId: string) => ["databases", projectId] as const,
   usage: (projectId: string) => ["usage", projectId] as const,
   tokens: ["tokens"] as const,
