@@ -32,7 +32,10 @@ export const GITHUB_FILE_MAX_BYTES = 1024 * 1024;
 export const GithubRefQuery = z.object({ ref: z.string().min(1).max(255).optional() });
 export type GithubRefQuery = z.infer<typeof GithubRefQuery>;
 
-/** `GET /github/repos/:owner/:repo/tree?ref=`: file paths and sizes, at most 5,000. */
+/**
+ * `GET /github/repos/:owner/:repo/tree?ref=`: file paths and sizes, at most 5,000. `sha` is the
+ * commit the ref resolved to, so later reads can pass it as their `ref`.
+ */
 export const GithubTree = z.object({
   sha: GitSha,
   truncated: z.boolean(),
