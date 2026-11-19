@@ -1,7 +1,7 @@
 "use client";
 
 import type { CreateServiceBody } from "@lift/shared";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 
@@ -15,5 +15,14 @@ export function useCreateService() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.project(service.projectId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.projects });
     },
+  });
+}
+
+/** One service, with its URL and latest deployment. Waits while `serviceId` is null. */
+export function useService(serviceId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.service(serviceId ?? ""),
+    queryFn: () => api.services.get(serviceId ?? ""),
+    enabled: serviceId !== null,
   });
 }

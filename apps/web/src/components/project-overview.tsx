@@ -7,13 +7,15 @@ import { EmptyState } from "@/components/empty-state";
 import { ServiceRow } from "@/components/service-row";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useProjectEvents } from "@/lib/hooks/use-project-events";
 import { useProject } from "@/lib/hooks/use-projects";
 
 /**
- * /p/[projectId] until FE-06 brings the canvas: the project's services as a list, and the way to
- * deploy one from GitHub.
+ * /p/[projectId] until FE-06 brings the canvas: the project's services with their recent
+ * deployments, kept live by the project's event stream, and the way to deploy one from GitHub.
  */
 export function ProjectOverview({ projectId }: { projectId: string }) {
+  useProjectEvents(projectId);
   const project = useProject(projectId);
 
   if (project.isPending) {
@@ -95,9 +97,9 @@ export function ProjectOverview({ projectId }: { projectId: string }) {
           <h2 id="services-heading" className="font-medium text-muted-foreground text-sm">
             Services
           </h2>
-          <ul className="divide-y rounded-lg border">
+          <ul className="flex flex-col gap-4">
             {services.map((service) => (
-              <ServiceRow key={service.id} service={service} />
+              <ServiceRow key={service.id} service={service} canDeploy={canDeploy} />
             ))}
           </ul>
         </section>
