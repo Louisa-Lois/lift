@@ -32,6 +32,8 @@ export interface CloneInput {
   remoteUrl?: string;
   onLine: (line: string) => void;
   timeoutMs: number;
+  /** Stops git when the deployment is canceled. */
+  signal?: AbortSignal;
 }
 
 /** The git commands of a clone, as [args, environment] pairs; tests check no argv holds the token. */
@@ -64,6 +66,7 @@ export async function cloneCommit(input: CloneInput): Promise<RunResult> {
       env,
       timeoutMs: input.timeoutMs,
       onLine: input.onLine,
+      signal: input.signal,
     });
     if (result.code !== 0 || result.timedOut) return result;
   }

@@ -7,6 +7,7 @@ import type { Logger } from "../logger";
 import type { RunResult } from "../process";
 import { type CloneInput, cloneCommit, tokenForms } from "./clone";
 import { type ImageBuildInput, imageExists, railpackBuild, splitBuildVariables } from "./railpack";
+import type { RunningBuilds } from "./running";
 
 /** docs/prd/04-infrastructure.md: after 15 minutes the build is killed. */
 export const BUILD_TIMEOUT_MS = 15 * 60_000;
@@ -19,6 +20,8 @@ export interface BuildDeps {
   buildDir: string;
   buildkitHost: string;
   log: Logger;
+  /** Where a `stop` op finds this build to abort it (a canceled deployment). */
+  builds?: RunningBuilds;
   timeoutMs?: number;
   // Seams for tests; by default these run git, Railpack and Docker.
   clone?: (input: CloneInput) => Promise<RunResult>;
@@ -67,6 +70,13 @@ export async function processBuild(job: BuildJob, deps: BuildDeps): Promise<Buil
   const dir = path.join(deps.buildDir, id);
   let logs: LogSink | null = null;
 
+  const signal = deps.builds?.start(id);
+  /** Canceled: the API already ended the deployment and its log, so nothing is reported. */
+  const stopped = (): BuildOutcome => {
+    log.info({ deploymentId: id }, "the build was stopped: its deployment was canceled");
+    return "stopped";
+  };
+
   const fail = async (errorCode: DeploymentErrorCode, line: string): Promise<BuildOutcome> => {
     logs?.system(line);
     await logs?.flush();
@@ -95,7 +105,9 @@ export async function processBuild(job: BuildJob, deps: BuildDeps): Promise<Buil
       token: context.clone.token,
       onLine: (line) => sink.write("build", line),
       timeoutMs: CLONE_TIMEOUT_MS,
+      signal,
     });
+    if (cloned.aborted) return stopped();
     if (cloned.code !== 0 || cloned.timedOut) {
       return await fail(
         "clone_failed",
@@ -137,7 +149,9 @@ export async function processBuild(job: BuildJob, deps: BuildDeps): Promise<Buil
       buildkitHost: deps.buildkitHost,
       timeoutMs,
       onLine: (line) => sink.write("build", line),
+      signal,
     });
+    if (built.aborted) return stopped();
     const elapsed = formatDuration(Date.now() - started);
     if (built.timedOut) {
       return await fail(
@@ -175,6 +189,7 @@ export async function processBuild(job: BuildJob, deps: BuildDeps): Promise<Buil
     }
     throw error;
   } finally {
+    deps.builds?.finish(id);
     await rm(dir, { recursive: true, force: true });
   }
 }

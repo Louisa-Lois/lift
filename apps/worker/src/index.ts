@@ -4,6 +4,7 @@ import { type Job, Worker } from "bullmq";
 import { Redis } from "ioredis";
 import postgres from "postgres";
 import { processBuild } from "./build/process-build";
+import { createRunningBuilds } from "./build/running";
 import { processDeploy } from "./deploy/process-deploy";
 import { createDocker } from "./docker";
 import { missingTools } from "./doctor";
@@ -72,6 +73,8 @@ async function start(env: Env): Promise<void> {
   if (!pg)
     log.warn("LIFT_PG_URL isn't set, so the worker can't create databases (see .env.example)");
 
+  // Shared by the build and ops workers, so a `stop` op can abort a canceled build.
+  const builds = createRunningBuilds();
   const logSink = (deploymentId: string, secrets: string[]) =>
     createLogSink(logRedis, deploymentId, { secrets, log });
   const options = (concurrency: number) => ({ connection: queueRedis, concurrency });
@@ -86,6 +89,7 @@ async function start(env: Env): Promise<void> {
           buildDir: env.BUILD_DIR,
           buildkitHost: env.BUILDKIT_HOST,
           log,
+          builds,
         }),
       options(env.BUILD_CONCURRENCY),
     ),
@@ -104,7 +108,7 @@ async function start(env: Env): Promise<void> {
     ),
     new Worker(
       QUEUE_NAMES.ops,
-      (job: Job) => processOp(OpsJob.parse(job.data), { docker, log, api, pg }),
+      (job: Job) => processOp(OpsJob.parse(job.data), { docker, log, api, pg, builds }),
       options(4),
     ),
   ];

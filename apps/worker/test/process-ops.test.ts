@@ -1,6 +1,7 @@
 import type { DatabaseStatusReport, ProvisionContext } from "@lift/shared";
 import type { Sql } from "postgres";
 import { describe, expect, it } from "vitest";
+import { createRunningBuilds } from "../src/build/running";
 import { type InternalApi, StopDeployment } from "../src/internal-api";
 import { createLogger } from "../src/logger";
 import { processOp } from "../src/ops/process-ops";
@@ -30,19 +31,67 @@ describe("ops jobs", () => {
     expect(calls).toEqual(["remove:a", "remove:b"]);
   });
 
-  it("refuses the ops that arrive with INF-10, so BullMQ keeps them", async () => {
+  const deploymentOp = {
+    deploymentId: "dep_aaaaaaaaaaaaaaaaaaaaaaaa",
+    serviceId: SERVICE,
+    projectId: PROJECT,
+  };
+
+  it("stop aborts the deployment's build when it runs here", async () => {
+    const { docker, calls } = fakeDocker();
+    const builds = createRunningBuilds();
+    const signal = builds.start(deploymentOp.deploymentId);
+    expect(await processOp({ op: "stop", ...deploymentOp }, { docker, log, builds })).toBe(
+      "stopped the build",
+    );
+    expect(signal.aborted).toBe(true);
+    expect(calls).toEqual([]);
+  });
+
+  it("stop removes the deployment's containers when no build runs", async () => {
+    const { docker, calls } = fakeDocker({
+      existing: [
+        {
+          id: "a",
+          name: "lift-web-aaaaaa",
+          labels: { "lift.deployment": deploymentOp.deploymentId },
+        },
+        {
+          id: "b",
+          name: "lift-web-bbbbbb",
+          labels: { "lift.deployment": "dep_other00000000000000000" },
+        },
+      ],
+    });
+    const outcome = await processOp(
+      { op: "stop", ...deploymentOp },
+      { docker, log, builds: createRunningBuilds() },
+    );
+    expect(outcome).toBe("removed 1 container(s)");
+    expect(calls).toEqual(["stop:a", "remove:a"]);
+  });
+
+  it("restart restarts the deployment's container and waits for it to run", async () => {
+    const { docker, calls } = fakeDocker({
+      existing: [
+        {
+          id: "a",
+          name: "lift-web-aaaaaa",
+          labels: { "lift.deployment": deploymentOp.deploymentId },
+        },
+      ],
+    });
+    expect(await processOp({ op: "restart", ...deploymentOp }, { docker, log, pollMs: 1 })).toBe(
+      "restarted",
+    );
+    expect(calls).toEqual(["restart:a"]);
+  });
+
+  it("restart fails loudly when the deployment has no container", async () => {
     const { docker } = fakeDocker();
     await expect(
-      processOp(
-        {
-          op: "restart",
-          deploymentId: "dep_aaaaaaaaaaaaaaaaaaaaaaaa",
-          serviceId: SERVICE,
-          projectId: PROJECT,
-        },
-        { docker, log },
-      ),
-    ).rejects.toThrow(/INF-10/);
+      processOp({ op: "restart", ...deploymentOp }, { docker, log, pollMs: 1 }),
+    ).rejects.toThrow(/no container runs deployment/);
   });
 });
 

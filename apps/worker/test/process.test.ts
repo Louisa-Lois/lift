@@ -29,6 +29,18 @@ describe("running a tool", () => {
     expect(Date.now() - started).toBeLessThan(5_000);
   });
 
+  it("stops a tool when its signal aborts, as for a canceled build", async () => {
+    const controller = new AbortController();
+    const started = Date.now();
+    const result = run(node, ["-e", "setTimeout(() => {}, 30000)"], {
+      env: childEnv(),
+      signal: controller.signal,
+    });
+    setTimeout(() => controller.abort(), 100);
+    expect(await result).toEqual({ code: null, timedOut: false, aborted: true });
+    expect(Date.now() - started).toBeLessThan(5_000);
+  });
+
   it("gives tools PATH and HOME, never the worker's secrets", () => {
     const saved = { ...process.env };
     process.env.WORKER_TOKEN = "w".repeat(32);
