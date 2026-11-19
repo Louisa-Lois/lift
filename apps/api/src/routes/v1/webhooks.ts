@@ -32,6 +32,8 @@ export const webhookRoutes: FastifyPluginAsyncZod<{ secretBox: SecretBox | null 
   app.post(
     "/webhooks/github",
     {
+      // Public, but every delivery must carry this service's signature.
+      config: { public: true },
       bodyLimit: BODY_LIMIT,
       schema: {
         summary: "GitHub push events for a service (signature-checked)",

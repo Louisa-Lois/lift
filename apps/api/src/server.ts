@@ -13,6 +13,7 @@ import { registerErrorHandling } from "./plugins/errors";
 import { registerOpenApi } from "./plugins/openapi";
 import { registerQueues } from "./plugins/queues";
 import { registerRedis } from "./plugins/redis";
+import { routeGuard } from "./plugins/scopes";
 import { internalDeploymentRoutes } from "./routes/internal/deployments";
 import { authRoutes } from "./routes/v1/auth";
 import { deploymentRoutes } from "./routes/v1/deployments";
@@ -23,6 +24,7 @@ import { logRoutes } from "./routes/v1/logs";
 import { meRoutes } from "./routes/v1/me";
 import { projectRoutes } from "./routes/v1/projects";
 import { serviceRoutes } from "./routes/v1/services";
+import { tokenRoutes } from "./routes/v1/tokens";
 import { webhookRoutes } from "./routes/v1/webhooks";
 import { createSecretBox } from "./services/crypto";
 import { createGithub } from "./services/github";
@@ -63,10 +65,13 @@ export function buildServer(env: Env, options: ServerOptions = {}) {
   registerQueues(app, env.REDIS_URL, options.queuePrefix);
   registerOpenApi(app);
   app.register(authPlugin, { env });
+  // Every /api/v1 route needs a session or a token unless it is marked public.
+  app.register(routeGuard);
 
   app.register(healthRoutes, { prefix: API_BASE_PATH });
   app.register(authRoutes, { prefix: API_BASE_PATH, env, github, secretBox });
   app.register(meRoutes, { prefix: API_BASE_PATH });
+  app.register(tokenRoutes, { prefix: API_BASE_PATH });
   app.register(githubRoutes, { prefix: API_BASE_PATH, github, secretBox });
   const publicUrl = env.PUBLIC_URL;
   app.register(projectRoutes, {

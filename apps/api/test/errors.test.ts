@@ -7,14 +7,17 @@ import { testEnv } from "./helpers/env";
 const app = buildServer(testEnv());
 
 beforeAll(async () => {
-  // Routes that exist only in this test, to drive each kind of error.
-  app.post(`${API_BASE_PATH}/test/services`, { schema: { body: CreateServiceBody } }, async () => ({
-    ok: true,
-  }));
-  app.get(`${API_BASE_PATH}/test/conflict`, async () => {
+  // Routes that exist only in this test, to drive each kind of error. They're public, so the
+  // route guard (plugins/scopes.ts) lets them through without a session.
+  app.post(
+    `${API_BASE_PATH}/test/services`,
+    { config: { public: true }, schema: { body: CreateServiceBody } },
+    async () => ({ ok: true }),
+  );
+  app.get(`${API_BASE_PATH}/test/conflict`, { config: { public: true } }, async () => {
     throw problem("conflict", "The deployment was canceled.");
   });
-  app.get(`${API_BASE_PATH}/test/crash`, async () => {
+  app.get(`${API_BASE_PATH}/test/crash`, { config: { public: true } }, async () => {
     throw new Error("database password is hunter2");
   });
   await app.ready();

@@ -14,7 +14,7 @@ import { z } from "zod";
 import { enqueueOp } from "../../jobs/enqueue";
 import { numberCursor } from "../../lib/pagination";
 import { problem } from "../../lib/problem";
-import { requireUser } from "../../plugins/auth";
+import { requireUser, triggerFor } from "../../plugins/auth";
 import { accessProject } from "../../services/access";
 import type { SecretBox } from "../../services/crypto";
 import { resolveCommit, startDeployment } from "../../services/deployments";
@@ -215,7 +215,12 @@ export const projectRoutes: FastifyPluginAsyncZod<ProjectRoutesOptions> = async 
           const commit = await resolveCommit(github, token, row);
           await startDeployment(
             { db: app.db, redis: app.redis, queues: app.queues, log: request.log },
-            { service: row, trigger: "manual", commit, actor: { type: "user", id: user.id } },
+            {
+              service: row,
+              trigger: triggerFor(request),
+              commit,
+              actor: { type: "user", id: user.id },
+            },
           );
         } catch (error) {
           // The service exists either way; an error answer now would only invite a duplicate.

@@ -21,5 +21,9 @@ export function registerOpenApi(app: FastifyInstance): void {
     },
     transform: jsonSchemaTransform,
   });
-  app.get(`${API_BASE_PATH}/openapi.json`, { schema: { hide: true } }, async () => app.swagger());
+  app.get(
+    `${API_BASE_PATH}/openapi.json`,
+    { schema: { hide: true }, config: { public: true } },
+    async () => app.swagger(),
+  );
 }
