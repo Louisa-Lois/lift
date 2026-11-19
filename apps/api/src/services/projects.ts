@@ -11,6 +11,7 @@ import {
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { uniqueViolation } from "../lib/db-errors";
 import type { ProjectRow } from "./access";
+import { type DatabaseRow, projectDatabases, toDatabase } from "./databases";
 import { type EventRow, recordEvent } from "./events";
 import { projectServices, type ServiceRow, serviceViews } from "./services";
 import { slugify, withSuffix } from "./slugs";
@@ -29,7 +30,7 @@ export function toProject(row: ProjectRow, role: ProjectRole): Project {
   return { ...toProjectBase(row), role };
 }
 
-/** `GET /projects/:id`: the project with its services. Databases arrive with BE-10. */
+/** `GET /projects/:id`: the project with its services and databases. */
 export async function projectDetail(
   db: Db,
   project: ProjectRow,
@@ -37,7 +38,8 @@ export async function projectDetail(
   appsDomain: string,
 ): Promise<ProjectDetail> {
   const services = await serviceViews(db, await projectServices(db, project.id), appsDomain);
-  return { ...toProject(project, role), services, databases: [] };
+  const databases = (await projectDatabases(db, project.id)).map(toDatabase);
+  return { ...toProject(project, role), services, databases };
 }
 
 /**
@@ -170,13 +172,13 @@ export async function renameProjectRows(
 }
 
 /**
- * Soft-deletes the project and its services and records `project.deleted`. The caller queues
- * `remove_service` for each returned service.
+ * Soft-deletes the project, its services and its databases, and records `project.deleted`. The
+ * caller queues `remove_service` for each returned service and `deprovision_db` for each database.
  */
 export async function deleteProjectRows(
   db: Db,
   input: { project: ProjectRow; actorId: string },
-): Promise<{ services: ServiceRow[]; event: EventRow }> {
+): Promise<{ services: ServiceRow[]; databases: DatabaseRow[]; event: EventRow }> {
   return db.transaction(async (tx) => {
     const now = new Date();
     const [row] = await tx
@@ -190,6 +192,11 @@ export async function deleteProjectRows(
       .set({ deletedAt: now })
       .where(and(eq(schema.services.projectId, row.id), isNull(schema.services.deletedAt)))
       .returning();
+    const databases = await tx
+      .update(schema.databases)
+      .set({ status: "deleting", deletedAt: now })
+      .where(and(eq(schema.databases.projectId, row.id), isNull(schema.databases.deletedAt)))
+      .returning();
     const event = await recordEvent(tx, {
       projectId: row.id,
       actorType: "user",
@@ -197,6 +204,6 @@ export async function deleteProjectRows(
       type: "project.deleted",
       data: toProjectBase(row),
     });
-    return { services, event };
+    return { services, databases, event };
   });
 }

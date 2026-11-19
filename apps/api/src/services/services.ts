@@ -15,6 +15,8 @@ import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { uniqueViolation } from "../lib/db-errors";
 import { problem } from "../lib/problem";
 import { accessProject, type ProjectRow } from "./access";
+import type { SecretBox } from "./crypto";
+import { addDatabaseVariables } from "./databases";
 import { type EventRow, recordEvent } from "./events";
 import { slugify, subdomainFor, subdomainWithSuffix, withSuffix } from "./slugs";
 
@@ -156,7 +158,14 @@ const MAX_ATTEMPTS = 5;
  */
 export async function createServiceRows(
   db: Db,
-  input: { project: ProjectRow; actorId: string; body: CreateServiceBody; appsDomain: string },
+  input: {
+    project: ProjectRow;
+    actorId: string;
+    body: CreateServiceBody;
+    appsDomain: string;
+    /** Writes the project's ready databases' connection strings into the new service. */
+    secretBox?: SecretBox | null;
+  },
 ): Promise<{ row: ServiceRow; event: EventRow }> {
   const { project, body, appsDomain } = input;
   let slug = slugify(body.name);
@@ -194,6 +203,13 @@ export async function createServiceRows(
           status: "active",
           verifiedAt: new Date(),
         });
+        if (input.secretBox) {
+          await addDatabaseVariables(tx, {
+            projectId: project.id,
+            serviceId: row.id,
+            secretBox: input.secretBox,
+          });
+        }
         const event = await recordEvent(tx, {
           projectId: row.projectId,
           actorType: "user",
