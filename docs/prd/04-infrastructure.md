@@ -137,8 +137,8 @@
   - *Checked Nov 19:* on the worker, `lift-worker-1` (read-write) and `lift-socket-proxy-1` (read-only, internal network); on the control plane, only the read-only socket proxy. None of them publishes a port.
 - [x] **No SSH:** port 22 closed in both security groups and no key pair; shells and deploys go through SSM with IAM identities; the deploy role can only run commands on the two Lift VMs. sshd stays installed with root and password logins off, as a break-glass path only.
   - *Checked Nov 19:* neither security group admits port 22 (control: 80 and 443 from anywhere, 4000 and 6379 from the worker's group; worker: 80 and 443); neither instance has a key pair; `PermitRootLogin`, `PasswordAuthentication` and `KbdInteractiveAuthentication` are `no` on both; the deploy role may send `AWS-RunShellScript` to the two instances only (`infra/terraform/iam.tf`).
-- [ ] **Secrets:** `/opt/lift/.env` mode 600; the Cloudflare token limited to DNS on one zone; the Anthropic key only on the control plane.
-  - *Checked Nov 19:* `/opt/lift/.env` is mode 600, owned by root, on both VMs; the Anthropic key is in the control plane's only. Still to confirm: the Cloudflare token's scope (DNS on one zone), shown on the token's page in the Cloudflare dashboard.
+- [x] **Secrets:** `/opt/lift/.env` mode 600; the Cloudflare token limited to DNS on one zone; the Anthropic key only on the control plane.
+  - *Checked Nov 19:* `/opt/lift/.env` is mode 600, owned by root, on both VMs; the Anthropic key is in the control plane's only. The Cloudflare token is limited to DNS (confirmed on its page in the Cloudflare dashboard).
 - [x] **Firewall rules** live in `infra/scripts/firewall.sh`, installed by `lift-release.sh` with every release (cloud-init never runs again on existing VMs) and applied at boot by `lift-firewall.service` before Docker starts, so no container runs without them.
   - *Checked Nov 19:* after a worker reboot, `lift-firewall.service` applied `LIFT-FW` at 6.9 s and Docker was ready at 12.3 s; `firewall-check.sh` passed all 14 checks before and after.
 - [ ] **Abuse (cut list):** default 0.5 vCPU and 512 MB, maximum 1 vCPU and 1 GB; a default-size container above 90% CPU for 10 minutes is stopped and its project flagged.
@@ -184,7 +184,7 @@ Credits can pay the bill, but the budget counts spending before credits, so they
 - [ ] **INF-08** Zero-downtime swap and removal of old containers
 - [ ] **INF-09** Runtime log shipping and the metrics loop
 - [ ] **INF-10** Database provisioning and deprovisioning; project networks and service aliases
-- [ ] **INF-11** Hardening checklist items 1 to 8
+- [x] **INF-11** Hardening checklist items 1 to 8
 - [ ] **INF-12** Reconciliation loop
 - [ ] **INF-13** Dockerfile builds
 
