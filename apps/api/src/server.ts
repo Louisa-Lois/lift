@@ -25,6 +25,7 @@ import { meRoutes } from "./routes/v1/me";
 import { projectRoutes } from "./routes/v1/projects";
 import { serviceRoutes } from "./routes/v1/services";
 import { tokenRoutes } from "./routes/v1/tokens";
+import { variableRoutes } from "./routes/v1/variables";
 import { webhookRoutes } from "./routes/v1/webhooks";
 import { createSecretBox } from "./services/crypto";
 import { createGithub } from "./services/github";
@@ -89,6 +90,7 @@ export function buildServer(env: Env, options: ServerOptions = {}) {
     publicUrl,
   });
   app.register(deploymentRoutes, { prefix: API_BASE_PATH, github, secretBox, publicUrl });
+  app.register(variableRoutes, { prefix: API_BASE_PATH, secretBox });
   app.register(webhookRoutes, { prefix: API_BASE_PATH, secretBox });
   const heartbeatMs = options.sseHeartbeatMs ?? SSE_HEARTBEAT_MS;
   app.register(eventRoutes, { prefix: API_BASE_PATH, heartbeatMs });

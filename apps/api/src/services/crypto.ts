@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { problem } from "../lib/problem";
 
 const IV_BYTES = 12;
 const TAG_BYTES = 16;
@@ -34,4 +35,15 @@ export function createSecretBox(keyBase64: string): SecretBox {
       ]).toString("utf8");
     },
   };
+}
+
+/** The secret box, or 503 on a server without ENCRYPTION_KEY (development only; production needs it). */
+export function requireSecretBox(secretBox: SecretBox | null): SecretBox {
+  if (!secretBox) {
+    throw problem(
+      "upstream_unavailable",
+      "This server has no ENCRYPTION_KEY, so it can't store or read secrets.",
+    );
+  }
+  return secretBox;
 }
