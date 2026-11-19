@@ -1,4 +1,5 @@
 import {
+  AddMemberBody,
   API_BASE_PATH,
   type ApiToken,
   appHostname,
@@ -18,7 +19,9 @@ import {
   PROBLEM_CONTENT_TYPE,
   type ProjectDetail,
   type ProjectListItem,
+  type ProjectMember,
   type Service,
+  UpdateMemberBody,
   UpdateServiceBody,
   UpsertVariablesBody,
   type Variable,
@@ -37,6 +40,11 @@ const APPS_DOMAIN = "apps.localhost";
 const projects: ProjectDetail[] = [
   { ...fixtures.project, databases: [...fixtures.project.databases] },
 ];
+/** The demo project's members; anyone added with mocks on lives in memory too. */
+const membersByProject = new Map<string, ProjectMember[]>([
+  [fixtures.project.id, [...fixtures.members]],
+]);
+
 /** Plans asked for with mocks on: every repo gets the express-postgres plan, under its own name. */
 const plans = new Map<string, OnboardingPlan>([
   [fixtures.onboardingPlan.id, fixtures.onboardingPlan],
@@ -565,6 +573,63 @@ export const handlers = [
       }
       send(`event: end\ndata: ${JSON.stringify({ status })}\n\n`);
     });
+  }),
+  // BE-15: members. Only logins of the fixture users "have signed in to Lift".
+  http.get(api("/projects/:projectId/members"), ({ params }) =>
+    HttpResponse.json(fixtures.page(membersByProject.get(String(params.projectId)) ?? [])),
+  ),
+  http.post(api("/projects/:projectId/members"), async ({ params, request }) => {
+    const body = AddMemberBody.parse(await request.json());
+    const list = membersByProject.get(String(params.projectId)) ?? [];
+    const user = Object.values(fixtures.users).find(
+      (candidate) => candidate.login.toLowerCase() === body.login.toLowerCase(),
+    );
+    if (!user) {
+      return HttpResponse.json(
+        {
+          type: "about:blank",
+          title: "Not found",
+          status: 404,
+          code: "not_found",
+          detail: `${body.login} hasn't signed in to Lift yet. Ask them to sign in once, then add them.`,
+          fields: { login: "Hasn't signed in to Lift yet" },
+        },
+        { status: 404, headers: { "content-type": PROBLEM_CONTENT_TYPE } },
+      );
+    }
+    if (list.some((member) => member.userId === user.id)) {
+      return problem(
+        409,
+        "conflict",
+        "Conflict",
+        `${user.login} is already a member of this project.`,
+      );
+    }
+    const member: ProjectMember = {
+      projectId: String(params.projectId),
+      userId: user.id,
+      role: body.role,
+      user: { id: user.id, login: user.login, name: user.name, avatarUrl: user.avatarUrl },
+      createdAt: new Date().toISOString(),
+    };
+    membersByProject.set(String(params.projectId), [...list, member]);
+    return HttpResponse.json(member, { status: 201 });
+  }),
+  http.patch(api("/projects/:projectId/members/:userId"), async ({ params, request }) => {
+    const { role } = UpdateMemberBody.parse(await request.json());
+    const list = membersByProject.get(String(params.projectId)) ?? [];
+    const member = list.find((candidate) => candidate.userId === params.userId);
+    if (!member) return problem(404, "not_found", "Not found", "No such member.");
+    member.role = role;
+    return HttpResponse.json(member);
+  }),
+  http.delete(api("/projects/:projectId/members/:userId"), ({ params }) => {
+    const list = membersByProject.get(String(params.projectId)) ?? [];
+    membersByProject.set(
+      String(params.projectId),
+      list.filter((member) => member.userId !== params.userId),
+    );
+    return new HttpResponse(null, { status: 204 });
   }),
   // FE-14: the assistant's plan takes a moment, then answers the fixture plan for the repo asked.
   http.post(api("/agent/plans"), async ({ request }) => {

@@ -12,6 +12,7 @@ export const queryKeys = {
   databases: (projectId: string) => ["databases", projectId] as const,
   usage: (projectId: string) => ["usage", projectId] as const,
   tokens: ["tokens"] as const,
+  members: (projectId: string) => ["members", projectId] as const,
   plan: (planId: string) => ["plan", planId] as const,
   diagnosis: (deploymentId: string) => ["diagnosis", deploymentId] as const,
   githubRepos: (query: string) => ["github", "repos", query] as const,

@@ -1,7 +1,7 @@
 "use client";
 
 import { isLiftApiError } from "@lift/shared";
-import { FolderGit2Icon, PlusIcon } from "lucide-react";
+import { FolderGit2Icon, PlusIcon, SettingsIcon } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { DatabasesSection } from "@/components/databases-section";
@@ -69,14 +69,22 @@ export function ProjectOverview({ projectId }: { projectId: string }) {
           </Link>
           <h1 className="truncate font-heading font-semibold text-xl">{name}</h1>
         </div>
-        {canDeploy && services.length > 0 ? (
-          <Button asChild>
-            <Link href={newService}>
-              <PlusIcon aria-hidden="true" />
-              New service
+        <div className="flex shrink-0 items-center gap-2">
+          <Button asChild variant="outline">
+            <Link href={`/p/${projectId}/settings`}>
+              <SettingsIcon aria-hidden="true" />
+              Settings
             </Link>
           </Button>
-        ) : null}
+          {canDeploy && services.length > 0 ? (
+            <Button asChild>
+              <Link href={newService}>
+                <PlusIcon aria-hidden="true" />
+                New service
+              </Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
       {services.length === 0 ? (
         <EmptyState

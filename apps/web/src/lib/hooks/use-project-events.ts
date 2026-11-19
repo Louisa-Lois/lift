@@ -54,6 +54,11 @@ export function applyProjectEvent(queryClient: QueryClient, event: ProjectEvent)
       void queryClient.invalidateQueries({ queryKey: project });
       void queryClient.invalidateQueries({ queryKey: queryKeys.projects });
       return;
+    case "member.changed":
+      // BE-15: the members list, and the project, whose role may have changed for the viewer.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.members(event.projectId) });
+      void queryClient.invalidateQueries({ queryKey: project });
+      return;
     case "variables.changed":
       // Values never travel in events: refetch the (masked) list.
       void queryClient.invalidateQueries({ queryKey: queryKeys.variables(event.data.serviceId) });
