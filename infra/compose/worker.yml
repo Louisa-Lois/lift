@@ -69,6 +69,7 @@ services:
     depends_on:
       buildkit: { condition: service_healthy }
       lift-pg: { condition: service_healthy }
+      probe: { condition: service_started }
     environment:
       NODE_ENV: production
       LOG_LEVEL: info
@@ -87,6 +88,20 @@ services:
       # private IP on 4000 and 6379.
       system: {}
       build: {}
+
+  # The worker checks a new app's health from here (`docker exec lift-probe curl …`, through the
+  # Docker API), so the worker, which holds the Docker socket, never joins the apps' network. It
+  # runs nothing else and holds no secrets. Same image and settings as in dev.yml.
+  probe:
+    <<: *service
+    image: curlimages/curl:8.23.0@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93
+    container_name: lift-probe
+    entrypoint: ["tail", "-f", "/dev/null"]
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    mem_limit: 32m
+    networks: [edge]
 
   # Shared Postgres 17 for users' databases. The worker connects it to each project's network when
   # that project gets a database (INF-10). Those connections are lost if Compose recreates this
