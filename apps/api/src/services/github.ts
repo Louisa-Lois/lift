@@ -33,6 +33,30 @@ interface RawRepo {
   owner: { login: string };
 }
 
+/** A commit as deployments record it. */
+export interface GithubCommit {
+  sha: string;
+  /** The message's first line. */
+  message: string | null;
+  /** The author's GitHub login when GitHub knows it, otherwise their git name. */
+  author: string | null;
+}
+
+interface RawCommit {
+  sha: string;
+  commit: { message: string; author: { name: string } | null };
+  author: { login: string } | null;
+}
+
+function toCommit(raw: RawCommit): GithubCommit {
+  const subject = raw.commit.message.split("\n", 1)[0]?.trim().slice(0, 500);
+  return {
+    sha: raw.sha,
+    message: subject || null,
+    author: raw.author?.login ?? raw.commit.author?.name ?? null,
+  };
+}
+
 function toRepo(raw: RawRepo): GithubRepo {
   return {
     owner: raw.owner.login,
@@ -255,6 +279,27 @@ export function createGithub(options: GithubOptions) {
         api(token),
       );
       return response !== null;
+    },
+
+    /**
+     * A commit by branch name or SHA, or null when the repo or the ref doesn't exist or the user
+     * can't read it (GitHub answers 422 for an unknown SHA).
+     */
+    async getCommit(
+      token: string,
+      owner: string,
+      name: string,
+      ref: string,
+    ): Promise<GithubCommit | null> {
+      const what = `GET /repos/${owner}/${name}/commits/${ref}`;
+      const response = await send(
+        what,
+        `${API}/repos/${segment(owner)}/${segment(name)}/commits/${segment(ref)}`,
+        api(token),
+      );
+      if (response.status === 404 || response.status === 422) return null;
+      if (!response.ok) throw failure(what, response);
+      return toCommit((await response.json()) as RawCommit);
     },
   };
 }

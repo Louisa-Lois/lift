@@ -17,6 +17,7 @@ import { problem } from "../../lib/problem";
 import { requireUser } from "../../plugins/auth";
 import { accessProject } from "../../services/access";
 import type { SecretBox } from "../../services/crypto";
+import { resolveCommit, startDeployment } from "../../services/deployments";
 import { publishEvents } from "../../services/events";
 import type { Github } from "../../services/github";
 import {
@@ -26,12 +27,7 @@ import {
   projectDetail,
   renameProjectRows,
 } from "../../services/projects";
-import {
-  createServiceRows,
-  projectServices,
-  serviceViews,
-  toService,
-} from "../../services/services";
+import { createServiceRows, projectServices, serviceViews } from "../../services/services";
 import { githubTokenOf } from "../../services/users";
 
 const ProjectParams = z.object({ projectId: ProjectId });
@@ -206,8 +202,24 @@ export const projectRoutes: FastifyPluginAsyncZod<ProjectRoutesOptions> = async 
         appsDomain,
       });
       await publishEvents(app.redis, [event], request.log);
+      if (request.body.deploy) {
+        try {
+          const commit = await resolveCommit(github, token, row);
+          await startDeployment(
+            { db: app.db, redis: app.redis, queues: app.queues, log: request.log },
+            { service: row, trigger: "manual", commit, actor: { type: "user", id: user.id } },
+          );
+        } catch (error) {
+          // The service exists either way; an error answer now would only invite a duplicate.
+          request.log.warn(
+            { err: error, serviceId: row.id },
+            "created the service but couldn't start its first deployment",
+          );
+        }
+      }
+      const [view] = await serviceViews(app.db, [row], appsDomain);
       reply.code(201);
-      return toService(row, appsDomain);
+      return view as Service;
     },
   );
 };
