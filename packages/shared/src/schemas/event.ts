@@ -12,6 +12,7 @@ import { AgentAction } from "./agent";
 import { ListQuery, Timestamp, VariableKey } from "./common";
 import { Database } from "./database";
 import { Deployment } from "./deployment";
+import { Diagnosis } from "./diagnosis";
 import { EditorCommit } from "./editor";
 import { ProjectMember } from "./member";
 import { ProjectBase } from "./project";
@@ -64,6 +65,7 @@ export const ProjectEvent = z.discriminatedUnion("type", [
   eventOf("member.changed", MemberChange),
   eventOf("agent.action_proposed", AgentAction),
   eventOf("agent.action_completed", AgentAction),
+  eventOf("diagnosis.created", Diagnosis),
   eventOf("editor.committed", EditorCommit),
 ]);
 export type ProjectEvent = z.infer<typeof ProjectEvent>;

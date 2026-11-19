@@ -151,6 +151,7 @@ export const PROJECT_EVENT_TYPES = [
   "member.changed",
   "agent.action_proposed",
   "agent.action_completed",
+  "diagnosis.created",
   "editor.committed",
 ] as const;
 export const ProjectEventType = z.enum(PROJECT_EVENT_TYPES);

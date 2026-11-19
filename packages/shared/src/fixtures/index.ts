@@ -26,6 +26,7 @@ export {
   users,
   variables,
 } from "./demo";
+export { diagnosis } from "./diagnoses";
 export { githubBranches, githubRepos } from "./github";
 export { fixtureIds } from "./ids";
 export { onboardingPlan } from "./plans";

@@ -10,6 +10,7 @@ import {
 import { cursorPage, HealthResponse } from "./schemas/common";
 import { type CreateDatabaseBody, Database, DatabaseCredentials } from "./schemas/database";
 import { type CreateDeploymentBody, Deployment, DeploymentDetail } from "./schemas/deployment";
+import { Diagnosis } from "./schemas/diagnosis";
 import { isKnownProjectEvent } from "./schemas/event";
 import { GithubBranch, GithubFile, GithubRepo, GithubTree } from "./schemas/github";
 import { DeploymentLogEnd, LogLine, LogSnapshot } from "./schemas/logs";
@@ -257,6 +258,9 @@ export function createLiftClient(options: LiftClientOptions) {
       rollback: (deploymentId: string) =>
         call("POST", `/deployments/${segment(deploymentId)}/rollback`, Deployment),
       /** `GET /deployments/:id/logs?tail=`: the snapshot, oldest line first. */
+      /** `GET /deployments/:id/diagnosis`: the assistant's explanation of a failure (404 until then). */
+      diagnosis: (deploymentId: string) =>
+        call("GET", `/deployments/${segment(deploymentId)}/diagnosis`, Diagnosis),
       logs: (deploymentId: string, params: { tail?: number } = {}) =>
         call("GET", `/deployments/${segment(deploymentId)}/logs`, LogSnapshot, {
           query: { tail: params.tail },

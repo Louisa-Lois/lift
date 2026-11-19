@@ -7,6 +7,7 @@
  */
 
 export * from "./apps";
+export * from "./autofix";
 export * from "./client";
 export * from "./enums";
 export * from "./errors";

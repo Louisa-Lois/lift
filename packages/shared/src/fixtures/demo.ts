@@ -129,14 +129,14 @@ const webFailed = deployment(commits.webGrid, {
   finishedAt: "2026-11-17T14:06:10Z",
 });
 
-/** Autofix set NODE_VERSION=22 and redeployed the same commit. */
+/** Autofix set RAILPACK_NODE_VERSION=22 and redeployed the same commit (its deploy action). */
 const webActive = deployment(commits.webGrid, {
   id: D.webActive,
   serviceId: S.web,
   status: "active",
   trigger: "agent",
   ...built(S.web, D.webActive),
-  createdByActionId: ids.agentActions.setNodeVersion,
+  createdByActionId: ids.agentActions.redeployWeb,
   queuedAt: "2026-11-17T14:18:00Z",
   startedAt: "2026-11-17T14:18:02Z",
   finishedAt: "2026-11-17T14:20:12Z",
@@ -247,7 +247,11 @@ const timelines: Record<string, DeploymentTimelineEntry[]> = {
     ["failed", "2026-11-17T14:06:10Z", "Build failed: npm run build exited with code 1"],
   ]),
   [D.webActive]: timeline(D.webActive, [
-    ["queued", "2026-11-17T14:18:00Z", "Queued by the assistant after setting NODE_VERSION=22"],
+    [
+      "queued",
+      "2026-11-17T14:18:00Z",
+      "Queued by the assistant after setting RAILPACK_NODE_VERSION=22",
+    ],
     ["building", "2026-11-17T14:18:02Z", "Building with Railpack"],
     ["deploying", "2026-11-17T14:20:05Z", "Image built in 2m 03s"],
     ["active", "2026-11-17T14:20:12Z", live("web-demo-shop")],
@@ -447,7 +451,7 @@ export const revealedVariables = {
       ids.database,
     ),
     variable("web", "NEXT_PUBLIC_API_URL", url("api-demo-shop"), "user", "2026-11-16T10:20:00Z"),
-    variable("web", "NODE_VERSION", "22", "agent", "2026-11-17T14:17:40Z"),
+    variable("web", "RAILPACK_NODE_VERSION", "22", "agent", "2026-11-17T14:17:40Z"),
     variable(
       "web",
       "SESSION_SECRET",
@@ -499,7 +503,7 @@ const setNodeVersion = AgentAction.parse({
   projectId: ids.project,
   kind: "autofix",
   tool: "set_variables",
-  args: { serviceId: S.web, variables: { NODE_VERSION: "22" } },
+  args: { serviceId: S.web, variables: { RAILPACK_NODE_VERSION: "22" } },
   status: "completed",
   requiresApproval: false,
   result: { requiresRedeploy: true },
@@ -619,7 +623,7 @@ const history: ProjectEvent[] = [
   event("agent.action_completed", "2026-11-17T14:17:40Z", agent, setNodeVersion),
   event("variables.changed", "2026-11-17T14:17:41Z", agent, {
     serviceId: S.web,
-    keys: ["NODE_VERSION"],
+    keys: ["RAILPACK_NODE_VERSION"],
   }),
   event("deployment.created", "2026-11-17T14:18:00Z", agent, asQueued(webActive)),
   event("deployment.status_changed", "2026-11-17T14:20:12Z", worker, {
