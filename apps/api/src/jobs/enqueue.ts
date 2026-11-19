@@ -30,8 +30,11 @@ export async function dropQueuedBuild(queues: Queues, deploymentId: string): Pro
   await queues.build.remove(deploymentId).catch(() => 0);
 }
 
-/** The job ID that makes asking twice queue an op once. */
-function opJobId(payload: OpsJob): string {
+/**
+ * The job ID that makes asking twice queue an op once, for ops that happen once. A restart can be
+ * asked for again later, and a finished job keeps its ID for a day, so it gets none.
+ */
+function opJobId(payload: OpsJob): string | undefined {
   switch (payload.op) {
     case "remove_service":
       return `remove_service-${payload.serviceId}`;
@@ -39,13 +42,15 @@ function opJobId(payload: OpsJob): string {
     case "deprovision_db":
       return `${payload.op}-${payload.databaseId}`;
     case "stop":
+      return `stop-${payload.deploymentId}`;
     case "restart":
-      return `${payload.op}-${payload.deploymentId}`;
+      return undefined;
   }
 }
 
-/** Adds a `lift-ops` job, with a fixed job ID, so asking twice queues it once. */
+/** Adds a `lift-ops` job; one that happens once gets a fixed job ID. */
 export async function enqueueOp(queues: Queues, job: OpsJob): Promise<void> {
   const payload = OpsJob.parse(job);
-  await queues.ops.add(payload.op, payload, { ...RETENTION, jobId: opJobId(payload) });
+  const jobId = opJobId(payload);
+  await queues.ops.add(payload.op, payload, { ...RETENTION, ...(jobId ? { jobId } : {}) });
 }

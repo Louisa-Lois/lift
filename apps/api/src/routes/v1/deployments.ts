@@ -14,9 +14,11 @@ import { requireUser, triggerFor } from "../../plugins/auth";
 import type { SecretBox } from "../../services/crypto";
 import {
   accessDeployment,
+  cancelDeployment,
   deploymentDetail,
   listDeployments,
   resolveCommit,
+  rollbackDeployment,
   startDeployment,
   toDeployment,
 } from "../../services/deployments";
@@ -108,6 +110,65 @@ export const deploymentRoutes: FastifyPluginAsyncZod<{
       const user = requireUser(request);
       const { deployment } = await accessDeployment(app.db, request.params.deploymentId, user.id);
       return deploymentDetail(app.db, deployment);
+    },
+  );
+
+  app.post(
+    "/deployments/:deploymentId/rollback",
+    {
+      config: { scope: "deploy" },
+      schema: {
+        summary: "Roll back: a new deployment running this one's image, with no build",
+        description:
+          "Answers 202 with it `deploying`. It runs with today's variables and settings. Only a superseded deployment whose image Lift keeps (the service's last 3) can be the target; anything else gets 409.",
+        tags: ["deployments"],
+        params: DeploymentParams,
+        response: { 202: Deployment },
+      },
+    },
+    async (request, reply) => {
+      const user = requireUser(request);
+      const { deployment } = await accessDeployment(
+        app.db,
+        request.params.deploymentId,
+        user.id,
+        "editor",
+      );
+      const { service } = await accessService(app.db, deployment.serviceId, user.id, "editor");
+      const row = await rollbackDeployment(
+        { db: app.db, redis: app.redis, queues: app.queues, log: request.log },
+        { service, target: deployment, actor: { type: "user", id: user.id } },
+      );
+      reply.code(202);
+      return toDeployment(row);
+    },
+  );
+
+  app.post(
+    "/deployments/:deploymentId/cancel",
+    {
+      config: { scope: "deploy" },
+      schema: {
+        summary: "Cancel a deployment while it's queued or building",
+        description: "A running build is stopped. What's live keeps running.",
+        tags: ["deployments"],
+        params: DeploymentParams,
+        response: { 200: Deployment },
+      },
+    },
+    async (request) => {
+      const user = requireUser(request);
+      const { deployment } = await accessDeployment(
+        app.db,
+        request.params.deploymentId,
+        user.id,
+        "editor",
+      );
+      const row = await cancelDeployment(
+        { db: app.db, redis: app.redis, queues: app.queues, log: request.log },
+        { deployment, actor: { type: "user", id: user.id }, by: user.login },
+      );
+      return toDeployment(row);
     },
   );
 };

@@ -108,6 +108,35 @@ function lastBytes(lines: string[], maxBytes: number): string {
 }
 
 /**
+ * Appends one of Lift's own lines to a deployment's log, as the worker writes its system lines.
+ * Best effort: a log line never fails the request that writes it.
+ */
+export async function appendSystemLine(
+  deps: { redis: Redis; log: FastifyBaseLogger },
+  deploymentId: string,
+  line: string,
+): Promise<void> {
+  const stream = REDIS_STREAMS.deploymentLogs;
+  try {
+    await deps.redis.xadd(
+      stream.key(deploymentId),
+      "MAXLEN",
+      "~",
+      String(stream.maxLength),
+      "*",
+      "ts",
+      new Date().toISOString(),
+      "stream",
+      "system",
+      "line",
+      line,
+    );
+  } catch (error) {
+    deps.log.warn({ err: error, deploymentId }, "couldn't write a log line");
+  }
+}
+
+/**
  * When a deployment ends (active, failed or canceled): appends the end marker, so open streams
  * send `end` and close; copies the lines to `build_logs`; and lets the stream expire after 7
  * days. The worker sends its last line before its last report, so nothing follows the marker.

@@ -54,7 +54,13 @@ The REST API every client and the worker go through. **Owner:** WS1 Back end & A
   - The worker fetches `provision-context` and reports `ready` with `lift-pg:5432`. The API then writes `DATABASE_URL` (`source: database`) into every service of the project, unless a user set that key; a service added later gets it too.
   - `GET /databases/:id/credentials` (editors, admin tokens) shows the connection string once it's ready. `DELETE` answers 202 `deleting`, removes its `DATABASE_URL` from every service and queues `deprovision_db`; deleting the project does the same for its databases.
 
-**Next:** the rest of the Nov 22 work: rollback, cancel and restart (BE-11).
+- **Rollback, cancel and restart (BE-11):**
+  - `POST /deployments/:id/rollback` creates a deployment that starts at `deploying` with the target's image, commit and `rollback_of`, and queues the deploy job directly: no build. It runs with today's variables and settings. Queued deployments are canceled (newest wins); a running build still lands. The target must pass the shared rule in `@lift/shared` (`rollbackTarget`): a superseded deployment whose image is among the service's last 3, which INF-14's cleanup keeps.
+  - `POST /deployments/:id/cancel` works while it's queued (its build job is dropped) or building (the worker gets `stop`); anything else gets 409.
+  - `POST /services/:id/restart` queues `restart` for the active deployment and emits `service.restarted`; 409 when nothing runs.
+  - All three need an editor, and a token needs the deploy scope.
+
+**Next:** the AI plan (Nov 24).
 
 | Command | What it does |
 | --- | --- |

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { enqueueOp } from "../../jobs/enqueue";
 import { requireUser } from "../../plugins/auth";
 import type { SecretBox } from "../../services/crypto";
+import { restartService } from "../../services/deployments";
 import { publishEvents } from "../../services/events";
 import type { Github } from "../../services/github";
 import {
@@ -63,6 +64,33 @@ export const serviceRoutes: FastifyPluginAsyncZod<{
         appsDomain,
       });
       await publishEvents(app.redis, [event], request.log);
+      return view;
+    },
+  );
+
+  app.post(
+    "/services/:serviceId/restart",
+    {
+      config: { scope: "deploy" },
+      schema: {
+        summary: "Restart the running container: same image and variables",
+        description:
+          "Answers 202; the worker restarts it, so it's down for a few seconds. Variable changes need a deploy. 409 when nothing is running.",
+        tags: ["services"],
+        params: ServiceParams,
+        response: { 202: Service },
+      },
+    },
+    async (request, reply) => {
+      const user = requireUser(request);
+      const { service } = await accessService(app.db, request.params.serviceId, user.id, "editor");
+      const [view] = (await serviceViews(app.db, [service], appsDomain)) as Service[];
+      if (!view) throw new Error("no view of the service");
+      await restartService(
+        { db: app.db, redis: app.redis, queues: app.queues, log: request.log },
+        { service, view, actor: { type: "user", id: user.id } },
+      );
+      reply.code(202);
       return view;
     },
   );
