@@ -34,6 +34,7 @@ const SAMPLE_PARAMS: Record<string, string> = {
   deploymentId: newId("dep"),
   tokenId: newId("tok"),
   databaseId: newId("db"),
+  planId: newId("pln"),
   owner: "lift-demo",
   repo: "next-hello",
 };

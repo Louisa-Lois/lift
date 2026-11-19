@@ -57,7 +57,7 @@ export async function listVariables(
 /**
  * `PUT /services/:id/variables` in one transaction: each key with a value is set as the user's (a
  * value a database wrote becomes the user's, so deleting the database leaves it), and each key
- * whose value is null is deleted. Changes are staged until the next deployment. Returns the
+ * whose value is null is deleted. An applied plan writes the values it chose as the agent's. Changes are staged until the next deployment. Returns the
  * `variables.changed` event, which names the keys and never a value, or null when nothing changed.
  */
 export async function upsertVariables(
@@ -67,9 +67,12 @@ export async function upsertVariables(
     secretBox: SecretBox;
     changes: Record<string, string | null>;
     actorId: string;
+    /** Who chose the values: the user (the default), or the agent for a plan's own values. */
+    source?: "user" | "agent";
   },
 ): Promise<EventRow | null> {
   const { service, secretBox, changes } = input;
+  const source = input.source ?? "user";
   return db.transaction(async (tx) => {
     const now = new Date();
     const changed = new Set<string>();
@@ -87,13 +90,13 @@ export async function upsertVariables(
           serviceId: service.id,
           key,
           valueEnc,
-          source: "user",
+          source,
           databaseId: null,
           updatedAt: now,
         })
         .onConflictDoUpdate({
           target: [v.serviceId, v.key],
-          set: { valueEnc, source: "user", databaseId: null, updatedAt: now },
+          set: { valueEnc, source, databaseId: null, updatedAt: now },
         });
       changed.add(key);
     }

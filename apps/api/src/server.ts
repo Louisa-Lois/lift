@@ -24,11 +24,13 @@ import { githubRoutes } from "./routes/v1/github";
 import { healthRoutes } from "./routes/v1/health";
 import { logRoutes } from "./routes/v1/logs";
 import { meRoutes } from "./routes/v1/me";
+import { planRoutes } from "./routes/v1/plans";
 import { projectRoutes } from "./routes/v1/projects";
 import { serviceRoutes } from "./routes/v1/services";
 import { tokenRoutes } from "./routes/v1/tokens";
 import { variableRoutes } from "./routes/v1/variables";
 import { webhookRoutes } from "./routes/v1/webhooks";
+import { createAgentClient } from "./services/agent-client";
 import { createSecretBox } from "./services/crypto";
 import { createGithub } from "./services/github";
 
@@ -37,6 +39,8 @@ export interface ServerOptions {
   logStream?: { write(message: string): void };
   /** The fetch GitHub calls go through; tests answer them from recorded responses. */
   githubFetch?: typeof globalThis.fetch;
+  /** The fetch the agent service's calls go through; tests answer like the agent. */
+  agentFetch?: typeof globalThis.fetch;
   /** BullMQ key prefix; tests use their own so they never see each other's jobs. */
   queuePrefix?: string;
   /** How long an event stream may stay quiet before a heartbeat; tests shorten it. */
@@ -59,6 +63,11 @@ export function buildServer(env: Env, options: ServerOptions = {}) {
     fetch: options.githubFetch,
   });
   const secretBox = env.ENCRYPTION_KEY ? createSecretBox(env.ENCRYPTION_KEY) : null;
+  const agent = createAgentClient({
+    url: env.AGENT_URL,
+    token: env.AGENT_SERVICE_TOKEN,
+    fetch: options.agentFetch,
+  });
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
@@ -95,6 +104,14 @@ export function buildServer(env: Env, options: ServerOptions = {}) {
   app.register(variableRoutes, { prefix: API_BASE_PATH, secretBox });
   app.register(databaseRoutes, { prefix: API_BASE_PATH, secretBox });
   app.register(webhookRoutes, { prefix: API_BASE_PATH, secretBox });
+  app.register(planRoutes, {
+    prefix: API_BASE_PATH,
+    github,
+    secretBox,
+    agent,
+    appsDomain: env.APPS_DOMAIN,
+    publicUrl,
+  });
   const heartbeatMs = options.sseHeartbeatMs ?? SSE_HEARTBEAT_MS;
   app.register(eventRoutes, { prefix: API_BASE_PATH, heartbeatMs });
   app.register(logRoutes, { prefix: API_BASE_PATH, heartbeatMs });

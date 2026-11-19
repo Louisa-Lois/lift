@@ -14,6 +14,12 @@ import { isKnownProjectEvent } from "./schemas/event";
 import { GithubBranch, GithubFile, GithubRepo, GithubTree } from "./schemas/github";
 import { DeploymentLogEnd, LogLine, LogSnapshot } from "./schemas/logs";
 import {
+  type ApplyPlanBody,
+  ApplyPlanResponse,
+  type CreatePlanBody,
+  OnboardingPlan,
+} from "./schemas/plan";
+import {
   type CreateProjectBody,
   ProjectDetail,
   ProjectListItem,
@@ -297,6 +303,18 @@ export function createLiftClient(options: LiftClientOptions) {
         call("POST", "/tokens", CreatedApiToken, { body }),
       /** `DELETE /tokens/:id`: the token stops working at once. */
       revoke: (tokenId: string) => callVoid("DELETE", `/tokens/${segment(tokenId)}`),
+    },
+
+    /** BE-19 and BE-20: the assistant's deployment plan for a repo, and applying it. */
+    plans: {
+      /** `POST /agent/plans`: the assistant reads the repo and plans it (up to 60 seconds). */
+      create: (body: z.input<typeof CreatePlanBody>) =>
+        call("POST", "/agent/plans", OnboardingPlan, { body }),
+      /** `GET /agent/plans/:id`: a plan you asked for. */
+      get: (planId: string) => call("GET", `/agent/plans/${segment(planId)}`, OnboardingPlan),
+      /** `POST /agent/plans/:id/apply`: creates what the plan says, then the first deployment. */
+      apply: (planId: string, body: z.input<typeof ApplyPlanBody>) =>
+        call("POST", `/agent/plans/${segment(planId)}/apply`, ApplyPlanResponse, { body }),
     },
 
     /** Absolute URLs for things the browser opens itself: EventSource, the sign-in redirect. */
