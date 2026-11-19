@@ -10,12 +10,13 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLinkIcon, GitCommitHorizontalIcon, RotateCcwIcon } from "lucide-react";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CancelDeploymentButton,
   RedeployButton,
   RollbackDialog,
 } from "@/components/deployment-actions";
+import { awaitingDiagnosis, DiagnosisCard } from "@/components/diagnosis-card";
 import { EmptyState } from "@/components/empty-state";
 import { LogViewer } from "@/components/log-viewer";
 import { StatusBadge } from "@/components/status-badge";
@@ -24,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDuration, timeAgo } from "@/lib/format";
 import { useDeployment, useDeployments } from "@/lib/hooks/use-deployments";
+import { useDiagnosis } from "@/lib/hooks/use-diagnosis";
 import { useLogStream } from "@/lib/hooks/use-log-stream";
 import { useNow } from "@/lib/hooks/use-now";
 import { useProjectEvents } from "@/lib/hooks/use-project-events";
@@ -75,6 +77,21 @@ export function DeploymentView({
   const logs = useLogStream(deploymentId);
   const running = deployment.data ? IN_PROGRESS.has(deployment.data.status) : false;
   const now = useNow(running);
+  // FE-16: the diagnosis of a failure, and the line its evidence points at.
+  const waitingClock = useNow(deployment.data?.status === "failed", 5_000);
+  const waiting = deployment.data
+    ? awaitingDiagnosis(deployment.data, service.data?.autofix ?? false, waitingClock)
+    : false;
+  const diagnosis = useDiagnosis(deploymentId, {
+    enabled: deployment.data?.status === "failed",
+    waiting,
+  });
+  const [highlight, setHighlight] = useState<number | null>(null);
+  const logSection = useRef<HTMLElement>(null);
+  const showLine = (line: number) => {
+    setHighlight(line);
+    logSection.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
 
   useEffect(() => {
     if (logs.state === "ended") {
@@ -201,10 +218,19 @@ export function DeploymentView({
           {d.errorMessage ?? "The log below has the details."}
         </div>
       ) : null}
+      {d.status === "failed" ? (
+        <DiagnosisCard
+          projectId={projectId}
+          diagnosis={diagnosis.data}
+          waiting={waiting}
+          lines={logs.lines}
+          onEvidence={showLine}
+        />
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
-        <section aria-label="Logs" className="min-w-0">
-          <LogViewer lines={logs.lines} state={logs.state} />
+        <section ref={logSection} aria-label="Logs" className="min-w-0 scroll-mt-4">
+          <LogViewer lines={logs.lines} state={logs.state} highlight={highlight} />
         </section>
         <aside className="flex flex-col gap-3">
           <h2 className="font-medium text-muted-foreground text-sm">Timeline</h2>
