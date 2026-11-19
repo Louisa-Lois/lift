@@ -1,6 +1,6 @@
 "use client";
 
-import type { CreateServiceBody } from "@lift/shared";
+import type { CreateServiceBody, UpdateServiceBody } from "@lift/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
@@ -14,6 +14,22 @@ export function useCreateService() {
     onSuccess: (service) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.project(service.projectId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+    },
+  });
+}
+
+/**
+ * `PATCH /services/:id`: a settings change, used from the next deploy on. The answer replaces the
+ * service in the cache, and the project refetches.
+ */
+export function useUpdateService() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ serviceId, body }: { serviceId: string; body: UpdateServiceBody }) =>
+      api.services.update(serviceId, body),
+    onSuccess: (service) => {
+      queryClient.setQueryData(queryKeys.service(service.id), service);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.project(service.projectId) });
     },
   });
 }

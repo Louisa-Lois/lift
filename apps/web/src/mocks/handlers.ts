@@ -19,6 +19,7 @@ import {
   type ProjectDetail,
   type ProjectListItem,
   type Service,
+  UpdateServiceBody,
   UpsertVariablesBody,
   type Variable,
 } from "@lift/shared";
@@ -422,6 +423,13 @@ export const handlers = [
     return service
       ? HttpResponse.json(service)
       : problem(404, "not_found", "Not found", "No service with that ID.");
+  }),
+  // Settings changes, such as the autofix switch, apply to the in-memory service.
+  http.patch(api("/services/:serviceId"), async ({ params, request }) => {
+    const service = findService(String(params.serviceId));
+    if (!service) return problem(404, "not_found", "Not found", "No service with that ID.");
+    Object.assign(service, UpdateServiceBody.parse(await request.json()));
+    return HttpResponse.json(service);
   }),
   http.get(api("/services/:serviceId/deployments"), ({ params, request }) => {
     const limit = Number(new URL(request.url).searchParams.get("limit") ?? 20);
