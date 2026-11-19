@@ -265,9 +265,21 @@ describe("push deliveries", () => {
     expect(await deploymentsOf(service.id)).toHaveLength(1);
   });
 
+  const DELETED = /^Ignored: the push deleted the branch, or names no commit\.$/;
+  const ZERO_SHA = "0".repeat(40);
+
   it.each([
     ["another branch", "push", { ref: "refs/heads/dev" }, /this service deploys main/],
-    ["a deleted branch", "push", { deleted: true, after: "0".repeat(40) }, /deleted the branch/],
+    // What GitHub sends when the service's branch is deleted.
+    [
+      "the deletion of the service's branch",
+      "push",
+      { deleted: true, after: ZERO_SHA, head_commit: null, commits: [] },
+      DELETED,
+    ],
+    // Each signal alone is enough, so neither check can go unnoticed.
+    ["a push flagged deleted, even with a commit", "push", { deleted: true }, DELETED],
+    ["a push to the zero commit", "push", { deleted: false, after: ZERO_SHA }, DELETED],
     [
       "another repository",
       "push",
@@ -283,6 +295,15 @@ describe("push deliveries", () => {
     expect(response.statusCode).toBe(202);
     expect(response.body).toMatch(message);
     expect(await deploymentsOf(other.id)).toEqual([]);
+    const builds = await app.queues.build.getJobs([
+      "waiting",
+      "prioritized",
+      "delayed",
+      "active",
+      "completed",
+      "failed",
+    ]);
+    expect(builds.filter((job) => job.data?.serviceId === other.id)).toEqual([]);
   });
 
   it("answer 404 for a service with no webhook, or none at all", async () => {
