@@ -2,8 +2,14 @@
 
 The dashboard and the live editor (Next.js App Router). **Owner:** WS2 Front end. **Spec:** [docs/prd/02-frontend.md](../../docs/prd/02-frontend.md).
 
-**Today:** the app shell (FE-01). Tailwind CSS v4 and shadcn/ui take every colour, font and radius from `src/styles/theme.css`, which Louisa owns (`docs/briefs/louisa-design.md`). Signed-in screens live in `src/app/(app)/`, starting with `/projects`. In development, `/api/*` on this origin is proxied to the API on port 4000, so the session cookie works without CORS; `@lift/shared` is compiled through `transpilePackages`.
-**Next:** FE-02 to FE-05 (sign-in, projects, new service, deployments and live logs).
+**Today:** the app shell, sign-in, the projects page and Deploy from GitHub (FE-01 to FE-04).
+- Tailwind CSS v4 and shadcn/ui take every colour, font and radius from `src/styles/theme.css`, which Louisa owns (`docs/briefs/louisa-design.md`).
+- Signed-in screens live in `src/app/(app)/`, behind a guard that sends signed-out visitors to `/login?next=…`. The sign-in page explains invite-only and failed sign-ins.
+- `/projects` lists project cards and creates projects; `/new` picks a repo (search, or a pasted GitHub URL) and creates a service with "Configure manually"; `/p/[projectId]` lists a project's services until FE-06's canvas.
+- Every request goes through the typed client in `src/lib/api.ts`; forms validate with the shared Zod schemas, and the API's field errors land on their inputs.
+- `NEXT_PUBLIC_USE_MOCKS=1` answers from `@lift/shared/fixtures` (src/mocks).
+- In development, `/api/*` on this origin is proxied to the API on port 4000, so the session cookie works without CORS; `@lift/shared` is compiled through `transpilePackages`.
+**Next:** FE-05 (the deployment page and live logs).
 
 | Command | What it does |
 | --- | --- |
