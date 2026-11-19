@@ -10,6 +10,7 @@ import {
   DEPLOYMENT_TRIGGERS,
   Deployment,
   DeploymentDetail,
+  Diagnosis,
   Domain,
   GithubBranch,
   GithubRepo,
@@ -53,6 +54,7 @@ const parsesWith: Record<string, [z.ZodType, unknown]> = {
   apiTokens: [z.array(ApiToken), fixtures.apiTokens],
   createdApiToken: [CreatedApiToken, fixtures.createdApiToken],
   onboardingPlan: [OnboardingPlan, fixtures.onboardingPlan],
+  diagnosis: [Diagnosis, fixtures.diagnosis],
 };
 
 describe("every fixture", () => {

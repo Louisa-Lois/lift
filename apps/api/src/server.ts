@@ -14,6 +14,7 @@ import { registerOpenApi } from "./plugins/openapi";
 import { registerQueues } from "./plugins/queues";
 import { registerRedis } from "./plugins/redis";
 import { routeGuard } from "./plugins/scopes";
+import { internalAgentRoutes } from "./routes/internal/agent";
 import { internalDatabaseRoutes } from "./routes/internal/databases";
 import { internalDeploymentRoutes } from "./routes/internal/deployments";
 import { authRoutes } from "./routes/v1/auth";
@@ -127,6 +128,14 @@ export function buildServer(env: Env, options: ServerOptions = {}) {
     prefix: INTERNAL_BASE_PATH,
     workerToken: env.WORKER_TOKEN,
     secretBox,
+  });
+  // The agent service's routes (AI-06), with AGENT_SERVICE_TOKEN.
+  app.register(internalAgentRoutes, {
+    prefix: INTERNAL_BASE_PATH,
+    agentToken: env.AGENT_SERVICE_TOKEN,
+    github,
+    secretBox,
+    appsDomain: env.APPS_DOMAIN,
   });
 
   return app;

@@ -53,4 +53,12 @@ describe("project events in the cache", () => {
     );
     expect(list?.data.map((deployment) => deployment.id)).toEqual([newest.id, older.id]);
   });
+
+  it("put a new diagnosis on its failed deployment's page at once", () => {
+    const { queryClient } = cache();
+    applyProjectEvent(queryClient, event({ type: "diagnosis.created", data: fixtures.diagnosis }));
+    expect(queryClient.getQueryData(queryKeys.diagnosis(fixtures.diagnosis.deploymentId))).toEqual(
+      fixtures.diagnosis,
+    );
+  });
 });

@@ -58,7 +58,7 @@ describe("VariablesTab", () => {
     renderTab(false);
     const database = await row("DATABASE_URL");
     expect(within(database).getByText("database")).toBeTruthy();
-    expect(within(await row("NODE_VERSION")).getByText("agent")).toBeTruthy();
+    expect(within(await row("RAILPACK_NODE_VERSION")).getByText("agent")).toBeTruthy();
     expect(within(await row("NEXT_PUBLIC_API_URL")).getByText("you")).toBeTruthy();
     expect(document.body.textContent).not.toContain(plainValue("SESSION_SECRET"));
     expect(screen.queryByRole("button", { name: /Show / })).toBeNull();
@@ -80,7 +80,7 @@ describe("VariablesTab", () => {
       requiresRedeploy: true as const,
       variables: [
         ...masked
-          .filter((variable) => variable.key !== "NODE_VERSION")
+          .filter((variable) => variable.key !== "RAILPACK_NODE_VERSION")
           .map((variable) =>
             variable.key === "NEXT_PUBLIC_API_URL"
               ? { ...variable, updatedAt: SAVED_AT }
@@ -98,7 +98,7 @@ describe("VariablesTab", () => {
     fireEvent.change(screen.getByLabelText("New value for NEXT_PUBLIC_API_URL"), {
       target: { value: "https://api.new.example" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Delete NODE_VERSION" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete RAILPACK_NODE_VERSION" }));
     fireEvent.change(screen.getByLabelText("New variable's key"), {
       target: { value: "FEATURE_FLAG" },
     });
@@ -115,7 +115,7 @@ describe("VariablesTab", () => {
       {
         variables: {
           NEXT_PUBLIC_API_URL: "https://api.new.example",
-          NODE_VERSION: null,
+          RAILPACK_NODE_VERSION: null,
           FEATURE_FLAG: "on",
         },
       },

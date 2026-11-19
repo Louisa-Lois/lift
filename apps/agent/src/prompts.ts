@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
  * job to the model; every rule that must hold is checked in code after it answers, so a prompt
  * can change without weakening one. The build copies the folder next to the bundle.
  */
-export const PROMPT_NAMES = ["planner"] as const;
+export const PROMPT_NAMES = ["planner", "classifier", "autofix"] as const;
 export type PromptName = (typeof PROMPT_NAMES)[number];
 
 export interface Prompt {

@@ -5,9 +5,10 @@ import {
   DatabaseType,
   DeploymentErrorCode,
   DeploymentStatus,
+  FailureCategory,
   VariableSource,
 } from "./enums";
-import { DatabaseId, DeploymentId, ProjectId, ServiceId } from "./ids";
+import { DatabaseId, DeploymentId, ProjectId, ServiceId, UserId } from "./ids";
 import {
   CommitSha,
   Cpu,
@@ -22,9 +23,12 @@ import {
   Timestamp,
   VariableKey,
 } from "./schemas/common";
+import { Deployment } from "./schemas/deployment";
 import { CreateDiagnosisBody, Diagnosis } from "./schemas/diagnosis";
 import { CreateEvalRunBody, EvalRun } from "./schemas/eval";
 import { MetricSample } from "./schemas/metrics";
+import { Service } from "./schemas/service";
+import { StoredVariableSource } from "./schemas/variable";
 
 // Bodies of the internal API (docs/contracts.md, "Worker jobs"; docs/prd/01-backend-api.md, "API
 // surface"). These routes listen only on the control plane's private IP, under INTERNAL_BASE_PATH.
@@ -180,6 +184,30 @@ type InternalRoute = {
   response: z.ZodType;
 };
 
+/**
+ * `GET /agent/autofix/:deploymentId/context` (agent service only): what autofix needs about a
+ * failed deployment besides its logs and the repo's files, which it reads through the public API
+ * as `actAs`.
+ */
+export const AutofixContext = z.object({
+  deployment: Deployment,
+  service: Service,
+  /** The user the agent acts as: the project's owner, since a push deploy has no user. */
+  actAs: UserId,
+  /** The service's stored variables: keys and who set them, never values. */
+  variables: z.array(z.object({ key: VariableKey, source: StoredVariableSource })),
+  /** This failure's place in a chain of autofix redeploys. */
+  chain: z.object({
+    /** 1 for a first failure; one more for each redeploy autofix already made in the chain. */
+    attempt: z.number().int().min(1),
+    /** The category of the failure autofix last fixed in this chain. */
+    previousCategory: FailureCategory.nullable(),
+  }),
+  /** False once the service has a newer deployment: changes then become proposals. */
+  newest: z.boolean(),
+});
+export type AutofixContext = z.infer<typeof AutofixContext>;
+
 /** Every internal route. Paths are relative to INTERNAL_BASE_PATH (`/internal/v1`). */
 export const INTERNAL_ROUTES = {
   buildContext: {
@@ -226,6 +254,12 @@ export const INTERNAL_ROUTES = {
     path: () => "/worker/desired-state",
     auth: "worker",
     response: DesiredState,
+  },
+  autofixContext: {
+    method: "GET",
+    path: (deploymentId: string) => `/agent/autofix/${deploymentId}/context`,
+    auth: "agent",
+    response: AutofixContext,
   },
   diagnoses: {
     method: "POST",

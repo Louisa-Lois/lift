@@ -4,13 +4,16 @@ import {
   Deployment,
   DeploymentDetail,
   DeploymentId,
+  Diagnosis,
   ListQuery,
   ServiceId,
 } from "@lift/shared";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { numberCursor } from "../../lib/pagination";
+import { problem } from "../../lib/problem";
 import { requireUser, triggerFor } from "../../plugins/auth";
+import { findDiagnosis } from "../../services/autofix";
 import type { SecretBox } from "../../services/crypto";
 import {
   accessDeployment,
@@ -110,6 +113,27 @@ export const deploymentRoutes: FastifyPluginAsyncZod<{
       const user = requireUser(request);
       const { deployment } = await accessDeployment(app.db, request.params.deploymentId, user.id);
       return deploymentDetail(app.db, deployment);
+    },
+  );
+
+  app.get(
+    "/deployments/:deploymentId/diagnosis",
+    {
+      schema: {
+        summary: "The assistant's diagnosis of a failed deployment (AI-06)",
+        description:
+          "404 until autofix has written one, a few seconds to a minute after the failure; then what it found and what it did or proposes.",
+        tags: ["deployments"],
+        params: DeploymentParams,
+        response: { 200: Diagnosis },
+      },
+    },
+    async (request) => {
+      const user = requireUser(request);
+      const { deployment } = await accessDeployment(app.db, request.params.deploymentId, user.id);
+      const diagnosis = await findDiagnosis(app.db, deployment.id);
+      if (!diagnosis) throw problem("not_found", "This deployment has no diagnosis yet.");
+      return diagnosis;
     },
   );
 

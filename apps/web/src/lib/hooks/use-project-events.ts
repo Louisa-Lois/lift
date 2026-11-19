@@ -58,6 +58,10 @@ export function applyProjectEvent(queryClient: QueryClient, event: ProjectEvent)
       // Values never travel in events: refetch the (masked) list.
       void queryClient.invalidateQueries({ queryKey: queryKeys.variables(event.data.serviceId) });
       return;
+    case "diagnosis.created":
+      // FE-16: the card on the failed deployment's page shows it at once.
+      queryClient.setQueryData(queryKeys.diagnosis(event.data.deploymentId), event.data);
+      return;
     default:
       void queryClient.invalidateQueries({ queryKey: project });
   }

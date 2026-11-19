@@ -60,6 +60,7 @@ export const fixtureIds = {
   agentSessions: { autofix: fixtureId("ags", "autofix"), chat: fixtureId("ags", "chat") },
   agentActions: {
     setNodeVersion: fixtureId("act", "set-node-version"),
+    redeployWeb: fixtureId("act", "redeploy-web"),
     addRedis: fixtureId("act", "add-redis"),
   },
   editorCommit: fixtureId("ecm", "hero-copy"),

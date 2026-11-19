@@ -101,6 +101,7 @@ describe("GET /github/repos/:owner/:repo/tree", () => {
     expect(tree.truncated).toBe(false);
     // Folders and the submodule aren't files.
     expect(tree.files.map((file) => file.path)).toEqual([
+      ".env.example",
       "README.md",
       "app/page.tsx",
       BIG_FILE.path,

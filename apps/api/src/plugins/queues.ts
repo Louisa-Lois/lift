@@ -7,17 +7,20 @@ export interface Queues {
   build: Queue;
   deploy: Queue;
   ops: Queue;
+  /** `lift-agent`: the agent service's autofix jobs (AI-06). */
+  agent: Queue;
 }
 
 declare module "fastify" {
   interface FastifyInstance {
-    /** BullMQ queues the worker consumes; the API only adds jobs (jobs/enqueue.ts). */
+    /** BullMQ queues the worker and the agent consume; the API only adds jobs (jobs/enqueue.ts). */
     queues: Queues;
   }
 }
 
 /**
- * The worker's three queues on the control plane's Redis (docs/contracts.md, "Worker jobs").
+ * The worker's three queues and the agent's one, on the control plane's Redis (docs/contracts.md,
+ * "Worker jobs").
  * `prefix` keeps tests apart from each other and from a running worker.
  */
 export function registerQueues(app: FastifyInstance, url: string, prefix = "bull"): void {
@@ -34,6 +37,7 @@ export function registerQueues(app: FastifyInstance, url: string, prefix = "bull
     build: open(QUEUE_NAMES.build),
     deploy: open(QUEUE_NAMES.deploy),
     ops: open(QUEUE_NAMES.ops),
+    agent: open(QUEUE_NAMES.agent),
   };
   app.decorate("queues", queues);
   app.addHook("onClose", async () => {

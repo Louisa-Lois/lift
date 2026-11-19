@@ -337,7 +337,7 @@ function deploy(d: DeployInfo, image: string, at: number): Line[] {
   ];
 }
 
-/** A Next.js 16 build on Node 18: what autofix fixes by setting NODE_VERSION=22. */
+/** A Next.js 16 build on Node 18: what autofix fixes by setting RAILPACK_NODE_VERSION=22. */
 function nodeVersionFailure(b: BuildInfo): Line[] {
   const lines: Line[] = setup(b, 9200);
   const engine = [
@@ -391,7 +391,7 @@ function nodeVersionFailure(b: BuildInfo): Line[] {
 
 const { services, deployments: deps, project } = fixtureIds;
 
-/** The web service's active deployment: built by autofix after it set NODE_VERSION=22. */
+/** The web service's active deployment: built by autofix after it set RAILPACK_NODE_VERSION=22. */
 export const buildLog = render(
   "2026-11-17T14:18:02.000Z",
   successfulBuild(
@@ -401,7 +401,7 @@ export const buildLog = render(
       serviceId: services.web,
       deploymentId: deps.webActive,
       node: "22.21.1",
-      nodeSource: "NODE_VERSION variable (22)",
+      nodeSource: "RAILPACK_NODE_VERSION variable (22)",
     },
     {
       serviceSlug: "web",
@@ -439,7 +439,7 @@ const inProgressLog = render(
       serviceId: services.web,
       deploymentId: deps.webBuilding,
       node: "22.21.1",
-      nodeSource: "NODE_VERSION variable (22)",
+      nodeSource: "RAILPACK_NODE_VERSION variable (22)",
     },
     {
       serviceSlug: "web",

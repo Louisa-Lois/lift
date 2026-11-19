@@ -2,7 +2,7 @@
 
 import type { LogEntry } from "@lift/shared";
 import { ArrowDownIcon } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { AnsiLine } from "@/components/ansi-line";
 import { Button } from "@/components/ui/button";
@@ -10,12 +10,14 @@ import { clockTime } from "@/lib/format";
 import type { LogStreamState } from "@/lib/hooks/use-log-stream";
 import { cn } from "@/lib/utils";
 
-function LogRow({ line }: { line: LogEntry }) {
+function LogRow({ line, highlighted }: { line: LogEntry; highlighted: boolean }) {
   return (
     <div
       data-stream={line.stream}
+      data-highlighted={highlighted || undefined}
       className={cn(
         "flex gap-3 px-4 whitespace-pre-wrap break-all",
+        highlighted && "bg-primary/15",
         line.stream === "system" && "font-semibold text-foreground",
         line.stream === "deploy" && "text-muted-foreground",
       )}
@@ -35,9 +37,21 @@ function LogRow({ line }: { line: LogEntry }) {
  * lines scroll smoothly; follows new lines while you're at the bottom; "Jump to latest" when you
  * scrolled up; "Reconnecting…" while the stream is down.
  */
-export function LogViewer({ lines, state }: { lines: LogEntry[]; state: LogStreamState }) {
+export function LogViewer({
+  lines,
+  state,
+  highlight = null,
+}: {
+  lines: LogEntry[];
+  state: LogStreamState;
+  /** A line to show and mark (1 is the first), such as a diagnosis's evidence. */
+  highlight?: number | null;
+}) {
   const list = useRef<VirtuosoHandle>(null);
   const [atBottom, setAtBottom] = useState(true);
+  useEffect(() => {
+    if (highlight) list.current?.scrollToIndex({ index: highlight - 1, align: "center" });
+  }, [highlight]);
 
   return (
     <div className="relative flex h-[calc(100dvh-16rem)] min-h-96 flex-col overflow-hidden rounded-lg border bg-card font-mono text-xs leading-5">
@@ -59,7 +73,9 @@ export function LogViewer({ lines, state }: { lines: LogEntry[]; state: LogStrea
           aria-label="Log"
           data={lines}
           computeItemKey={(_, line) => line.id}
-          itemContent={(_, line) => <LogRow line={line} />}
+          itemContent={(index, line) => (
+            <LogRow line={line} highlighted={highlight === index + 1} />
+          )}
           initialTopMostItemIndex={lines.length - 1}
           followOutput={(bottom) => (bottom ? "auto" : false)}
           atBottomStateChange={setAtBottom}

@@ -526,6 +526,12 @@ export const handlers = [
       ? HttpResponse.json(detail)
       : problem(404, "not_found", "Not found", "No deployment with that ID.");
   }),
+  // FE-16: the demo's failed web build has autofix's diagnosis; other deployments have none.
+  http.get(api("/deployments/:deploymentId/diagnosis"), ({ params }) =>
+    params.deploymentId === fixtures.diagnosis.deploymentId
+      ? HttpResponse.json(fixtures.diagnosis)
+      : problem(404, "not_found", "Not found", "This deployment has no diagnosis yet."),
+  ),
   http.get(api("/deployments/:deploymentId/logs"), ({ params, request }) => {
     const tail = Number(new URL(request.url).searchParams.get("tail") ?? 500);
     return HttpResponse.json({ data: logOf(String(params.deploymentId)).slice(-tail) });

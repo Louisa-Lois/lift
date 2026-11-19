@@ -12,6 +12,7 @@ const BRANCHES = fixture("branches") as { name: string; commit: { sha: string } 
 
 /** next-hello's files, for the tree and contents routes; `public/logo.png` isn't text. */
 export const REPO_FILES: Record<string, string | Uint8Array> = {
+  ".env.example": "# Copy to .env\nGREETING=hello\nAPI_KEY=change-me\nSITE_NAME=your-site\n",
   "package.json": `${JSON.stringify(
     {
       name: "next-hello",
@@ -57,6 +58,11 @@ function treeOf(repo: string) {
   return {
     truncated: false,
     tree: [
+      {
+        path: ".env.example",
+        type: "blob",
+        size: bytesOf(REPO_FILES[".env.example"] ?? "").length,
+      },
       { path: "README.md", type: "blob", size: bytesOf(REPO_FILES["README.md"] ?? "").length },
       { path: "app", type: "tree" },
       {

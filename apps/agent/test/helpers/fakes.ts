@@ -18,6 +18,8 @@ export const USAGE: Usage = {
 /** Prompts for unit tests. Tests never look at a real prompt's wording. */
 export const TEST_PROMPTS: Prompts = {
   planner: { name: "planner", text: "Test planner prompt.", hash: "000000000000" },
+  classifier: { name: "classifier", text: "Test classifier prompt.", hash: "111111111111" },
+  autofix: { name: "autofix", text: "Test autofix prompt.", hash: "222222222222" },
 };
 
 type Scripted = ModelAnswer | ((request: ModelRequest) => ModelAnswer);
