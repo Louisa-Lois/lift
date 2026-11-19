@@ -114,10 +114,14 @@ services:
     image: postgres:17-alpine
     container_name: lift-pg
     shm_size: 256mb
+    # infra/compose/lift-pg/pg_hba.conf: the superuser only from lift-system, and each project's
+    # role only into its own database. A folder mount, so an edited file reaches the container.
+    command: ["postgres", "-c", "hba_file=/etc/lift/pg/pg_hba.conf"]
     environment:
       POSTGRES_PASSWORD: ${LIFT_PG_PASSWORD:?}
     volumes:
       - lift-pg-data:/var/lib/postgresql/data
+      - ${LIFT_CONFIG_DIR:-/opt/lift/config}/lift-pg:/etc/lift/pg:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
