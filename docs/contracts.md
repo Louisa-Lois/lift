@@ -212,7 +212,7 @@ Every server also reads `HOST` (default `127.0.0.1`, or `0.0.0.0` when `NODE_ENV
 
 **Branches and reviews**
 
-- `main` is protected: pull requests only, CI green, squash merge. Teammates' pull requests need Hakim's approval; until the handoff Hakim merges his own once CI is green.
+- `main` is protected: pull requests only, squash merges only, and CI must pass once `ci.yml` runs. Nobody can bypass this, the repo owner included. GitHub requires no approvals: by agreement, teammates' pull requests wait for Hakim's approval, and until the handoff Hakim merges his own once CI is green.
 - Branch names follow `{person}/{ID}-short-name`, e.g. `louisa/UI-02-landing-page` or `hakim/BE-06-deployments`. Commit messages follow Conventional Commits (`feat(api): add rollback endpoint`).
 - A PR written mostly by an agent says so in its description, and the reviewer reads it as carefully as human code.
 
