@@ -28,6 +28,7 @@ export {
 } from "./demo";
 export { githubBranches, githubRepos } from "./github";
 export { fixtureIds } from "./ids";
+export { apiTokens, createdApiToken } from "./tokens";
 
 /** Wraps a list the way list routes answer: `{ data, nextCursor }`. */
 export function page<T>(data: T[], nextCursor: string | null = null): CursorPage<T> {

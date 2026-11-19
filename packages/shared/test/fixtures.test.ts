@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import packageJson from "../package.json";
 import {
+  ApiToken,
+  CreatedApiToken,
   Database,
   DatabaseCredentials,
   DEPLOYMENT_STATUSES,
@@ -47,6 +49,8 @@ const parsesWith: Record<string, [z.ZodType, unknown]> = {
   deploymentLogs: [z.array(LogEntry), Object.values(fixtures.deploymentLogs).flat()],
   githubRepos: [z.array(GithubRepo), fixtures.githubRepos],
   githubBranches: [z.array(GithubBranch), Object.values(fixtures.githubBranches).flat()],
+  apiTokens: [z.array(ApiToken), fixtures.apiTokens],
+  createdApiToken: [CreatedApiToken, fixtures.createdApiToken],
 };
 
 describe("every fixture", () => {
@@ -62,6 +66,15 @@ describe("every fixture", () => {
 
   it("is published as @lift/shared/fixtures", () => {
     expect(packageJson.exports["./fixtures"]).toBe("./src/fixtures/index.ts");
+  });
+});
+
+describe("the token fixtures", () => {
+  it("carry a plaintext token only in the answer to POST /tokens", () => {
+    const { token } = fixtures.createdApiToken;
+    expect(JSON.stringify(fixtures.apiTokens)).not.toContain(token);
+    for (const listed of fixtures.apiTokens) expect(listed).not.toHaveProperty("token");
+    expect(fixtures.createdApiToken.prefix).toBe(token.slice(0, 12));
   });
 });
 
