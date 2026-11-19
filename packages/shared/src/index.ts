@@ -14,6 +14,7 @@ export * from "./events";
 export * from "./ids";
 export * from "./internal";
 export * from "./jobs";
+export * from "./rollback";
 export * from "./schemas";
 
 /** Base path of every public API route. */

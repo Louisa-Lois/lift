@@ -71,7 +71,7 @@ const segment = encodeURIComponent;
 const listQuery = (params: ListParams): Query => ({ limit: params.limit, cursor: params.cursor });
 
 /**
- * The typed client for the public API: methods for the routes BE-01 to BE-10 and BE-14 serve. Every response
+ * The typed client for the public API: methods for the routes BE-01 to BE-11 and BE-14 serve. Every response
  * is checked against its schema; an error response throws `LiftApiError`, a response that breaks
  * the contract throws `LiftContractError`, and network failures come through as fetch throws them.
  * Later routes get methods as they ship (an additive change).
@@ -219,6 +219,9 @@ export function createLiftClient(options: LiftClientOptions) {
       update: (serviceId: string, body: z.input<typeof UpdateServiceBody>) =>
         call("PATCH", `/services/${segment(serviceId)}`, Service, { body }),
       delete: (serviceId: string) => callVoid("DELETE", `/services/${segment(serviceId)}`),
+      /** `POST /services/:id/restart`: restarts the running container (202). */
+      restart: (serviceId: string) =>
+        call("POST", `/services/${segment(serviceId)}/restart`, Service),
     },
 
     deployments: {
@@ -231,6 +234,12 @@ export function createLiftClient(options: LiftClientOptions) {
         call("POST", `/services/${segment(serviceId)}/deployments`, Deployment, { body }),
       get: (deploymentId: string) =>
         call("GET", `/deployments/${segment(deploymentId)}`, DeploymentDetail),
+      /** `POST /deployments/:id/cancel`: while it's queued or building. */
+      cancel: (deploymentId: string) =>
+        call("POST", `/deployments/${segment(deploymentId)}/cancel`, Deployment),
+      /** `POST /deployments/:id/rollback`: a new deployment running this one's image, no build (202). */
+      rollback: (deploymentId: string) =>
+        call("POST", `/deployments/${segment(deploymentId)}/rollback`, Deployment),
       /** `GET /deployments/:id/logs?tail=`: the snapshot, oldest line first. */
       logs: (deploymentId: string, params: { tail?: number } = {}) =>
         call("GET", `/deployments/${segment(deploymentId)}/logs`, LogSnapshot, {
