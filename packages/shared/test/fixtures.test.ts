@@ -15,6 +15,7 @@ import {
   GithubRepo,
   LogEntry,
   maskVariableValue,
+  OnboardingPlan,
   ProjectDetail,
   ProjectEvent,
   ProjectListItem,
@@ -51,6 +52,7 @@ const parsesWith: Record<string, [z.ZodType, unknown]> = {
   githubBranches: [z.array(GithubBranch), Object.values(fixtures.githubBranches).flat()],
   apiTokens: [z.array(ApiToken), fixtures.apiTokens],
   createdApiToken: [CreatedApiToken, fixtures.createdApiToken],
+  onboardingPlan: [OnboardingPlan, fixtures.onboardingPlan],
 };
 
 describe("every fixture", () => {

@@ -16,6 +16,7 @@ export * from "./internal";
 export * from "./jobs";
 export * from "./rollback";
 export * from "./schemas";
+export * from "./secrets";
 
 /** Base path of every public API route. */
 export const API_BASE_PATH = "/api/v1";
