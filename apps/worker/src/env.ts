@@ -25,6 +25,8 @@ const EnvSchema = z
     /** Where clones live during a build; /var/lib/lift/builds (mode 700) on the VM. */
     BUILD_DIR: z.string().min(1).optional(),
     BUILD_CONCURRENCY: z.coerce.number().int().min(1).max(4).default(1),
+    /** Where health checks run from: a curl container on lift-edge (compose names it lift-probe). */
+    PROBE_CONTAINER: z.string().min(1).default("lift-probe"),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production" && !env.WORKER_TOKEN) {

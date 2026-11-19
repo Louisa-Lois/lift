@@ -2,15 +2,23 @@
 
 Runs on the worker VM: consumes the build, deploy and ops queues, builds images with Railpack on BuildKit, runs app containers with limits behind Traefik, ships logs and metrics, provisions databases and reconciles what should be running. **Owner:** WS4 Infrastructure & worker. **Spec:** [docs/prd/04-infrastructure.md](../../docs/prd/04-infrastructure.md).
 
-**Today:** the build job (INF-04).
-- It consumes `lift-build`: one build at a time (`BUILD_CONCURRENCY`).
-- For each job it reports `building`, fetches the build context from the API, clones exactly the commit, builds `lift/{serviceId}:{deploymentId}` with Railpack through BuildKit, checks Docker has the image, and reports `deploying` (or `failed` with `clone_failed`, `build_failed` or `build_timeout` after 15 minutes).
-- Every line goes to `logs:dep:{deploymentId}` in Redis before the report that ends the build. Each line is scrubbed of the clone token and cut at 8 KB.
-- The clone token travels only in `GIT_CONFIG_*` environment variables: never in argv, a URL, a file or a log. Tools run with `PATH` and `HOME` only, never the worker's own secrets.
-- A 409 from the API means the deployment moved on (canceled, or failed by the backstop): the job stops quietly.
-- Dockerfile builds fail with a clear message until INF-13.
+**Today:** the build job (INF-04) and the deploy job (INF-05).
+- **Build** (`lift-build`, one at a time by default, `BUILD_CONCURRENCY`):
+  - It reports `building`, fetches the build context from the API, clones exactly the commit, builds `lift/{serviceId}:{deploymentId}` with Railpack through BuildKit, checks Docker has the image, and reports `deploying`.
+  - On failure it reports `failed` with `clone_failed`, `build_failed`, or `build_timeout` after 15 minutes.
+  - The clone token travels only in `GIT_CONFIG_*` environment variables: never in argv, a URL, a file or a log. Tools run with `PATH` and `HOME` only, never the worker's own secrets.
+  - Dockerfile builds fail with a clear message until INF-13.
+- **Deploy** (`lift-deploy`, 4 at a time, one per service):
+  - It fetches the runtime environment and creates `lift-{slug}-{last 6 of the deployment ID}` with Traefik labels and hard limits (CPU, memory with no extra swap, 256 processes, no privilege escalation, no raw sockets). The container joins `lift-edge` and the project's network under its slug.
+  - It polls the health-check path every 2 s for up to 120 s, from `lift-probe` (`docker exec … curl`), so the worker never joins the apps' network.
+  - When healthy, it reports `active`, keeps the previous container serving for 10 s, then removes it.
+  - An app that exits fails as `crashed`; one that never answers fails as `healthcheck_failed`. Either way the app's last 100 lines go into the deployment's log, and the previous deployment keeps serving.
+  - The worker talks to Docker through its Engine API on the unix socket (`DOCKER_HOST` if set, else `/var/run/docker.sock`, else Docker Desktop's), so environment values travel in JSON, never in argv.
+- **Ops** (`lift-ops`): `remove_service` removes a deleted service's containers. The other ops fail loudly until INF-10.
+- **Logs:** every line goes to `logs:dep:{deploymentId}` before the report that ends the stage, scrubbed of the clone token and cut at 8 KB.
+- **409s:** a 409 from the API means the deployment moved on (canceled, or failed by the backstop), so the job stops quietly and removes anything it created.
 
-**Next:** INF-05 (deploy job), then INF-11 (hardening) before anyone outside the team can deploy.
+**Next:** INF-11 (hardening) before anyone outside the team can deploy; then INF-09 (runtime logs and metrics), INF-10 (databases) and INF-12 (reconciliation).
 
 **Tools the build job runs.** The worker image has them; on your Mac, install them once. The worker checks for them at startup: in production a missing tool stops it, in development it only warns.
 - git, which macOS has.
@@ -27,6 +35,6 @@ Runs on the worker VM: consumes the build, deploy and ops queues, builds images 
 | --- | --- |
 | `pnpm --filter worker dev` | Start with the root `.env`, restarting on changes |
 | `pnpm --filter @lift/worker test` | Vitest, with Redis from `pnpm stack:up` |
-| `pnpm --filter @lift/worker test:docker` | A real build: git, Railpack, the local BuildKit and Docker (a few minutes the first time, while Railpack pulls its images) |
+| `pnpm --filter @lift/worker test:docker` | Real builds and deploys on the local stack: Railpack, BuildKit, Docker, `lift-probe` and the dev Traefik. Set `LIFT_APPS_PORT` if Traefik isn't on port 80. The first run takes a few minutes while images download |
 | `pnpm --filter worker build` | Bundle to `dist/index.js` |
 | `pnpm --filter @lift/worker clean` | Remove the app containers and project networks the worker started on this machine (run it before `pnpm stack:down`) |

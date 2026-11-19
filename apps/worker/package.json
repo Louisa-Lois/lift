@@ -11,7 +11,7 @@
     "clean": "node scripts/clean.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "test:docker": "LIFT_DOCKER_TESTS=1 vitest run test/docker.test.ts"
+    "test:docker": "LIFT_DOCKER_TESTS=1 vitest run test/docker"
   },
   "dependencies": {
     "@lift/shared": "workspace:*",
