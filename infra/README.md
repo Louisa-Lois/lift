@@ -48,3 +48,19 @@ sudo nano /opt/lift/.env                                         # secrets; keys
 ```
 
 The full runbook (bootstrap from nothing, rotate secrets, restore a backup, replace the worker) lands with INF-15.
+
+## The worker's firewall
+
+Code people deploy runs on the worker, so the worker VM keeps it away from what it must not touch (INF-11). `scripts/firewall.sh` hangs one chain, `LIFT-FW`, from Docker's `DOCKER-USER` chain, which sees everything a container sends off the VM. In order:
+
+1. Replies to allowed connections pass.
+2. Nothing reaches the instance metadata endpoint, `169.254.169.254`. IMDSv2 with hop limit 1 already keeps tokens from containers; this is a second lock.
+3. Only `lift-system` (`172.30.0.0/24`, the worker's own network) reaches the control plane's private IP, and only on 4000 (the internal API) and 6379 (Redis).
+4. Nothing else reaches the control plane: not apps (`lift-edge`, project networks), not build steps (BuildKit on `lift-build`), not the probe.
+5. No container sends mail (TCP 25).
+
+- **When it applies:** `lift-firewall.service` applies it at boot before Docker starts, so no container runs without it; Docker keeps what it finds in `DOCKER-USER`. Every release installs or updates the unit and applies the script again (`lift-release.sh up`, and `boot`).
+- **The worker's own route:** the worker container is on `lift-build` too (to reach BuildKit). `gw_priority` in `compose/worker.yml` makes `lift-system` its default route, so its calls to the control plane come from `172.30.0.0/24`.
+- **Check it:** `sudo /opt/lift/current/scripts/firewall-check.sh` tries every path from throwaway containers on `lift-edge` and `lift-build`, and from the worker. It prints PASS or FAIL per path and exits with the number of failures.
+- **See it:** `sudo iptables -S LIFT-FW`.
+- **In an emergency:** `sudo iptables -D DOCKER-USER -j LIFT-FW` lifts it until the next release or boot.

@@ -1,0 +1,15 @@
+# The worker's container firewall (INF-11), installed by lift-release.sh. It runs before Docker,
+# so the containers Docker restarts at boot never run without it.
+[Unit]
+Description=Lift container firewall (LIFT-FW in DOCKER-USER)
+Wants=network-online.target
+After=network-online.target
+Before=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/lift/current/scripts/firewall.sh
+
+[Install]
+WantedBy=multi-user.target docker.service

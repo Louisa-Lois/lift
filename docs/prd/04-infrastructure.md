@@ -132,7 +132,7 @@
 - [ ] **Docker socket** mounted only into the worker container, which has no inbound ports.
 - [ ] **No SSH:** port 22 closed in both security groups and no key pair; shells and deploys go through SSM with IAM identities; the deploy role can only run commands on the two Lift VMs. sshd stays installed with root and password logins off, as a break-glass path only.
 - [ ] **Secrets:** `/opt/lift/.env` mode 600; the Cloudflare token limited to DNS on one zone; the Anthropic key only on the control plane.
-- [ ] **Firewall rules** live in `infra/scripts/firewall.sh`, installed by cloud-init and re-applied by a systemd unit after Docker starts.
+- [ ] **Firewall rules** live in `infra/scripts/firewall.sh`, installed by `lift-release.sh` with every release (cloud-init never runs again on existing VMs) and applied at boot by `lift-firewall.service` before Docker starts, so no container runs without them.
 - [ ] **Abuse (cut list):** default 0.5 vCPU and 512 MB, maximum 1 vCPU and 1 GB; a default-size container above 90% CPU for 10 minutes is stopped and its project flagged.
 - [ ] **Stretch:** run app containers under gVisor (`runsc`) for kernel isolation.
 
