@@ -21,6 +21,7 @@ import {
 import { type CreateServiceBody, Service, type UpdateServiceBody } from "./schemas/service";
 import { ApiToken, CreatedApiToken, type CreateTokenBody } from "./schemas/token";
 import { User } from "./schemas/user";
+import { type UpsertVariablesBody, UpsertVariablesResponse, Variable } from "./schemas/variable";
 
 export interface LiftClientOptions {
   /**
@@ -55,6 +56,7 @@ const DeploymentPage = cursorPage(Deployment);
 const GithubRepoPage = cursorPage(GithubRepo);
 const GithubBranchPage = cursorPage(GithubBranch);
 const ApiTokenPage = cursorPage(ApiToken);
+const VariablePage = cursorPage(Variable);
 /** A problem body whose `code` this version doesn't know: keep its text, take the code from the status. */
 const PartialProblem = z.object({
   type: z.string().optional(),
@@ -67,7 +69,7 @@ const segment = encodeURIComponent;
 const listQuery = (params: ListParams): Query => ({ limit: params.limit, cursor: params.cursor });
 
 /**
- * The typed client for the public API: methods for the routes BE-01 to BE-08 and BE-14 serve. Every response
+ * The typed client for the public API: methods for the routes BE-01 to BE-09 and BE-14 serve. Every response
  * is checked against its schema; an error response throws `LiftApiError`, a response that breaks
  * the contract throws `LiftContractError`, and network failures come through as fetch throws them.
  * Later routes get methods as they ship (an additive change).
@@ -235,6 +237,18 @@ export function createLiftClient(options: LiftClientOptions) {
       /** `GET /deployments/:id/logs/stream`: `log` events, then one `end`. */
       streamLogs: (deploymentId: string, options?: StreamOptions) =>
         streamDeploymentLogs(deploymentId, options),
+    },
+
+    /** BE-09: a service's variables; changes apply on its next deployment. */
+    variables: {
+      /** `GET /services/:id/variables`: every one, sorted by key; masked unless `reveal` (editors). */
+      list: (serviceId: string, params: { reveal?: boolean } = {}) =>
+        call("GET", `/services/${segment(serviceId)}/variables`, VariablePage, {
+          query: { reveal: params.reveal || undefined },
+        }),
+      /** `PUT /services/:id/variables`: `{ variables: { KEY: value } }`; null deletes a key. */
+      upsert: (serviceId: string, body: z.input<typeof UpsertVariablesBody>) =>
+        call("PUT", `/services/${segment(serviceId)}/variables`, UpsertVariablesResponse, { body }),
     },
 
     /** BE-14: your personal tokens (`lift_pat_…`). */
