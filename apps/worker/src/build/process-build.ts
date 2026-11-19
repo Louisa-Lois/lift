@@ -6,7 +6,13 @@ import { type LogSink, variableSecrets } from "../log-sink";
 import type { Logger } from "../logger";
 import type { RunResult } from "../process";
 import { type CloneInput, cloneCommit, tokenForms } from "./clone";
-import { type ImageBuildInput, imageExists, railpackBuild, splitBuildVariables } from "./railpack";
+import {
+  commandVariables,
+  type ImageBuildInput,
+  imageExists,
+  railpackBuild,
+  splitBuildVariables,
+} from "./railpack";
 import type { RunningBuilds } from "./running";
 
 /** docs/prd/04-infrastructure.md: after 15 minutes the build is killed. */
@@ -133,11 +139,18 @@ export async function processBuild(job: BuildJob, deps: BuildDeps): Promise<Buil
       );
     }
 
-    const variables = splitBuildVariables(context.buildVariables);
+    const commands = commandVariables(context);
+    const variables = splitBuildVariables({ ...context.buildVariables, ...commands });
     for (const key of variables.skipped) {
       sink.system(
         `Not passing ${key} to the build: the build tools use their own. The app gets it when it runs.`,
       );
+    }
+    if (commands.RAILPACK_BUILD_CMD) {
+      sink.system(`Build command, from the service's settings: ${commands.RAILPACK_BUILD_CMD}`);
+    }
+    if (commands.RAILPACK_START_CMD) {
+      sink.system(`Start command, from the service's settings: ${commands.RAILPACK_START_CMD}`);
     }
     sink.system("Building with Railpack");
     const imageTag = imageTagFor(context.serviceId, context.deploymentId);

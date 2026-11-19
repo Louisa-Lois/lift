@@ -2,7 +2,12 @@ import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { railpackArgs, railpackBuild, splitBuildVariables } from "../src/build/railpack";
+import {
+  commandVariables,
+  railpackArgs,
+  railpackBuild,
+  splitBuildVariables,
+} from "../src/build/railpack";
 
 describe("Railpack's arguments", () => {
   it("name each variable and never hold its value", () => {
@@ -36,6 +41,18 @@ describe("Railpack's arguments", () => {
       passed: { NEXT_PUBLIC_X: "shown", RAILPACK_START_CMD: "node server.js" },
       skipped: ["BUILDKIT_HOST", "DOCKER_HOST", "HOME", "HTTPS_PROXY", "LD_PRELOAD", "PATH"],
     });
+  });
+});
+
+describe("a service's commands", () => {
+  it("become the settings Railpack reads, only when they're set", () => {
+    expect(commandVariables({ buildCommand: "npm run build:prod", startCommand: null })).toEqual({
+      RAILPACK_BUILD_CMD: "npm run build:prod",
+    });
+    expect(commandVariables({ buildCommand: null, startCommand: "node server.js" })).toEqual({
+      RAILPACK_START_CMD: "node server.js",
+    });
+    expect(commandVariables({ buildCommand: null, startCommand: null })).toEqual({});
   });
 });
 

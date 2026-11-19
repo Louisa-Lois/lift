@@ -23,6 +23,22 @@ export function splitBuildVariables(variables: Record<string, string>): {
 }
 
 /**
+ * The service's own build and start commands, as the settings Railpack reads to override what it
+ * detects: `RAILPACK_BUILD_CMD` and `RAILPACK_START_CMD` (`GetConfigVariable("BUILD_CMD")` and
+ * `("START_CMD")` in v0.43.0). They travel like variables; a setting wins over a variable of the
+ * same name, and an unset one leaves Railpack's choice alone.
+ */
+export function commandVariables(service: {
+  buildCommand: string | null;
+  startCommand: string | null;
+}): Record<string, string> {
+  const commands: Record<string, string> = {};
+  if (service.buildCommand) commands.RAILPACK_BUILD_CMD = service.buildCommand;
+  if (service.startCommand) commands.RAILPACK_START_CMD = service.startCommand;
+  return commands;
+}
+
+/**
  * `railpack build` with plain progress, so every BuildKit step is a readable line. Variables go
  * in by name only (`--env KEY`): Railpack reads a bare name's value from its own environment, so
  * no value is ever in argv, where `ps` and error messages could show it.
