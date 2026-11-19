@@ -25,16 +25,20 @@ const TITLES: Record<ErrorCode, string> = {
 export function problem(
   code: ErrorCode,
   detail: string,
-  options: { fields?: Record<string, string>; type?: string } = {},
+  options: { fields?: Record<string, string>; type?: string; cause?: unknown } = {},
 ): LiftApiError {
-  return new LiftApiError({
-    type: options.type ?? "about:blank",
-    title: TITLES[code],
-    status: ERROR_STATUS[code],
-    detail,
-    code,
-    ...(options.fields ? { fields: options.fields } : {}),
-  });
+  return new LiftApiError(
+    {
+      type: options.type ?? "about:blank",
+      title: TITLES[code],
+      status: ERROR_STATUS[code],
+      detail,
+      code,
+      ...(options.fields ? { fields: options.fields } : {}),
+    },
+    // Kept for the logs; the response never includes it.
+    options.cause === undefined ? undefined : { cause: options.cause },
+  );
 }
 
 /** A problem for an HTTP error that didn't come from our code (bad JSON, body too large, …). */

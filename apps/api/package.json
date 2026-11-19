@@ -12,11 +12,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fastify/cookie": "11.1.5",
     "@fastify/swagger": "9.9.5",
     "@lift/db": "workspace:*",
     "@lift/shared": "workspace:*",
     "drizzle-orm": "catalog:",
     "fastify": "catalog:",
+    "fastify-plugin": "6.0.1",
     "fastify-type-provider-zod": "7.0.0",
     "ioredis": "catalog:",
     "postgres": "catalog:",

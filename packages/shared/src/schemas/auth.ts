@@ -16,7 +16,13 @@ export const ACT_AS_HEADER = "X-Lift-Act-As";
 /** Sent by the API to the agent service with the user's ID. */
 export const AGENT_USER_HEADER = "X-Lift-User";
 
-/** `GET /auth/github/start?next=/p/…`: where to land after sign-in (default `/`). */
+/**
+ * The problem `type` of the 401 a signed-in user gets once their GitHub login is no longer on the
+ * API's ALLOWED_GITHUB_LOGINS (sign-in is invite-only), so the dashboard can say why.
+ */
+export const INVITE_ONLY_PROBLEM_TYPE = "/problems/invite-only";
+
+/** `GET /auth/github/start?next=/p/…`: where to land after sign-in (default `/projects`). */
 export const GithubSignInQuery = z.object({ next: RedirectPath.optional() });
 export type GithubSignInQuery = z.infer<typeof GithubSignInQuery>;
 

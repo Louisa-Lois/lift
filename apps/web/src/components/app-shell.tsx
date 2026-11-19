@@ -1,15 +1,21 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
+import { LogOutIcon } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { api } from "@/lib/api";
 import { useMe } from "@/lib/hooks/use-me";
 
 /** The frame around every signed-in screen: top bar with logo, navigation and the user menu. */
@@ -44,8 +50,18 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 function UserMenu() {
   const { data: me, isPending } = useMe();
+  const queryClient = useQueryClient();
+  const router = useRouter();
   if (isPending) return <Skeleton className="size-8 rounded-full" />;
   if (!me) return null;
+
+  async function signOut() {
+    // Leave even if the API is unreachable: the next request signs you out anyway.
+    await api.logout().catch(() => undefined);
+    queryClient.clear();
+    router.replace("/login");
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -62,6 +78,11 @@ function UserMenu() {
           <div className="font-medium text-foreground">{me.name ?? me.login}</div>
           <div className="text-muted-foreground text-xs">@{me.login}</div>
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={signOut}>
+          <LogOutIcon />
+          Sign out
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

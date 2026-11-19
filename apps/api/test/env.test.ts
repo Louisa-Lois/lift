@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { loadEnv } from "../src/env";
+import { isAllowedLogin, loadEnv } from "../src/env";
 
 const PRODUCTION = {
   NODE_ENV: "production",
@@ -16,6 +16,7 @@ const PRODUCTION = {
   COLLAB_SECRET: "c".repeat(64),
   GITHUB_CLIENT_ID: "Ov23liexample",
   GITHUB_CLIENT_SECRET: "x".repeat(40),
+  ALLOWED_GITHUB_LOGINS: "vitalik-hakim,Louisa-Lois",
 };
 
 describe("loadEnv", () => {
@@ -64,5 +65,27 @@ describe("loadEnv", () => {
   it("refuses short secrets and bad ports", () => {
     expect(() => loadEnv({ ...PRODUCTION, WORKER_TOKEN: "short" })).toThrow(/WORKER_TOKEN/);
     expect(() => loadEnv({ API_PORT: "not-a-port" })).toThrow(/API_PORT/);
+  });
+
+  it("reads ALLOWED_GITHUB_LOGINS trimmed and lowercased", () => {
+    const env = loadEnv({ ALLOWED_GITHUB_LOGINS: " Vitalik-Hakim , louisa-lois ," });
+    expect(env.ALLOWED_GITHUB_LOGINS).toEqual(["vitalik-hakim", "louisa-lois"]);
+    expect(isAllowedLogin(env, "LOUISA-LOIS")).toBe(true);
+    expect(isAllowedLogin(env, "someone-else")).toBe(false);
+  });
+
+  it("lets anyone sign in when the list is empty, which only development allows", () => {
+    expect(isAllowedLogin(loadEnv({}), "anyone")).toBe(true);
+    expect(() => loadEnv({ ...PRODUCTION, ALLOWED_GITHUB_LOGINS: " , " })).toThrow(
+      /ALLOWED_GITHUB_LOGINS lists no logins/,
+    );
+    const { ALLOWED_GITHUB_LOGINS: _, ...withoutList } = PRODUCTION;
+    expect(() => loadEnv(withoutList)).toThrow(/production needs ALLOWED_GITHUB_LOGINS$/);
+  });
+
+  it("refuses something that isn't a GitHub login", () => {
+    expect(() => loadEnv({ ALLOWED_GITHUB_LOGINS: "ok-user,not a login!" })).toThrow(
+      /ALLOWED_GITHUB_LOGINS/,
+    );
   });
 });

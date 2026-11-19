@@ -99,6 +99,8 @@ services:
       COLLAB_SECRET: ${COLLAB_SECRET:?set COLLAB_SECRET in /opt/lift/.env}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:?set GITHUB_CLIENT_ID in /opt/lift/.env}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:?set GITHUB_CLIENT_SECRET in /opt/lift/.env}
+      # Sign-in is invite-only: the comma-separated GitHub logins that may sign in.
+      ALLOWED_GITHUB_LOGINS: ${ALLOWED_GITHUB_LOGINS:?set ALLOWED_GITHUB_LOGINS in /opt/lift/.env (comma-separated GitHub logins)}
     ports:
       # The worker's way in to /internal/v1 (docs/contracts.md). Bound to the private IP; the
       # security group admits port 4000 from the worker only. Traefik routes /api, never /internal.
