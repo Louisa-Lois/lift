@@ -15,7 +15,11 @@ You change only `.github/` (except `workflows/deploy.yml`, which is Hakim's), `e
 - Pre-commit checks with lefthook, as PRD 05 describes.
 - `CODEOWNERS` from the ownership table in `AGENTS.md`, with everyone's GitHub username.
 - Pull request and issue templates, as PRD 05 describes.
-- Branch protection on `main`: pull requests only, CI must pass, one approval. Leave "Do not allow bypassing the above settings" off, so Hakim can merge his own pull requests on green CI until Nov 26.
+- Branch protection on `main`, the same for everyone:
+  - Pull requests only, with no required approvals, so Hakim can merge his own on green CI until Nov 26. Teammates' pull requests still wait for Hakim's approval, by agreement rather than a setting.
+  - Nobody can bypass it, the owner included: tick "Do not allow bypassing the above settings".
+  - Squash merges only: in Settings → General → Pull Requests, untick "Allow merge commits" and "Allow rebase merging".
+  - CI must pass once `ci.yml` runs: add its checks under "Require status checks to pass before merging". GitHub lists a check there only after it has run in the repo.
 - With Hakim, before his deploy pipeline merges: a `production` environment that only the `main` branch can deploy to (Settings → Environments → Deployment branches → Selected branches and tags → `main`).
 - `.github/workflows/ci.yml`: install from the lockfile with caching, then lint, typecheck, test and build, with Postgres and Redis as services and a gitleaks secret scan. Aim for under 8 minutes.
 
