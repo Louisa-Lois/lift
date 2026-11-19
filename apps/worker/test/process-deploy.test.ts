@@ -1,7 +1,7 @@
 import type { DeployJob, DeploymentStatusReport, RuntimeEnv } from "@lift/shared";
 import { describe, expect, it } from "vitest";
 import type { ProbeResult } from "../src/deploy/probe";
-import { type DeployDeps, processDeploy } from "../src/deploy/process-deploy";
+import { crashMessage, type DeployDeps, processDeploy } from "../src/deploy/process-deploy";
 import { type InternalApi, StopDeployment } from "../src/internal-api";
 import type { LogSink } from "../src/log-sink";
 import { createLogger } from "../src/logger";
@@ -57,7 +57,10 @@ function setup(
   const docker = new Proxy(fake.docker, {
     get(target, key: keyof typeof fake.docker) {
       const value = target[key];
-      if (key !== "removeContainer" && key !== "createContainer") return value;
+      const recorded = ["removeContainer", "createContainer", "setRestartPolicy", "stopContainer"];
+      if (!recorded.includes(key)) {
+        return value;
+      }
       return async (...args: unknown[]) => {
         events.push(`docker:${key}:${String(args[0])}`);
         return (value as (...a: unknown[]) => unknown)(...args);
@@ -135,10 +138,14 @@ describe("the deploy job", () => {
       "system:Deployment is live at http://web-demo-shop.apps.localhost",
       "deploy:The previous deployment keeps serving for 0s, then its container is removed",
     ]);
-    // Every line is flushed before `active`; the old container goes only after it.
+    // Restarts come on, every line is flushed, then `active`; the old container goes after it.
     const report = events.indexOf("report:active");
-    expect(events[report - 1]).toBe("flush");
-    expect(events.indexOf("docker:removeContainer:old-1")).toBeGreaterThan(report);
+    expect(events.slice(report - 2, report)).toEqual(["docker:setRestartPolicy:new-2", "flush"]);
+    // The previous container is stopped gracefully, then removed.
+    expect(events.slice(report + 1)).toEqual([
+      "docker:stopContainer:old-1",
+      "docker:removeContainer:old-1",
+    ]);
   });
 
   it("removes what an earlier attempt at the same deployment left behind", async () => {
@@ -165,6 +172,17 @@ describe("the deploy job", () => {
     expect(events).toContain("deploy:Error: Cannot find module 'next'");
     expect(fake.containers.get("new-2")?.removed).toBe(true);
     expect(fake.containers.get("old-1")?.removed).toBe(false);
+  });
+
+  it("says so when the app runs out of memory", async () => {
+    const { deps, reports, fake } = setup({ docker: { behaviour: "oom" } });
+    expect(await processDeploy(job, deps)).toBe("failed");
+    expect(reports[0]).toMatchObject({
+      errorCode: "crashed",
+      message: "Deploy failed: the app ran out of memory (its limit is 512 MB)",
+    });
+    // A crashed container never gets its restarts switched on.
+    expect(fake.calls.some((call) => call.startsWith("restart-policy:"))).toBe(false);
   });
 
   it("fails as healthcheck_failed when the app never answers in time", async () => {
@@ -219,5 +237,26 @@ describe("the deploy job", () => {
     await Promise.all([processDeploy(job, deps), processDeploy(second, deps)]);
     const firstActive = events.indexOf("report:active");
     expect(events.indexOf("docker:createContainer:lift-web-9z9z9z")).toBeGreaterThan(firstActive);
+  });
+});
+
+describe("crash messages", () => {
+  it.each([
+    [1, "Deploy failed: the app exited with code 1 before it answered"],
+    [
+      0,
+      "Deploy failed: the app exited with code 0 before it answered: its start command finished instead of serving",
+    ],
+    [
+      127,
+      "Deploy failed: the app exited with code 127 before it answered: a command or a shared library it needs isn't in the image",
+    ],
+    [
+      126,
+      "Deploy failed: the app exited with code 126 before it answered: its start command isn't executable",
+    ],
+    [null, "Deploy failed: the app stopped before it answered"],
+  ])("exit code %s", (exitCode, message) => {
+    expect(crashMessage(exitCode, false, 512)).toBe(message);
   });
 });

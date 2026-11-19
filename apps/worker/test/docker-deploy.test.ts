@@ -51,7 +51,9 @@ const deps: DeployDeps = {
   probeContainer: "lift-probe",
   log,
   healthTimeoutMs: 6_000,
-  overlapMs: 1_000,
+  // Longer than Traefik's 2 s config refresh (providersThrottleDuration), as the real 10 s overlap
+  // is: shorter, and the old container goes before Traefik has added the new one.
+  overlapMs: 4_000,
 };
 
 function jobFor(serviceId: string, imageTag: string, hostname: string): DeployJob {
@@ -71,24 +73,29 @@ function jobFor(serviceId: string, imageTag: string, hostname: string): DeployJo
   };
 }
 
-/** GET through the dev Traefik with a Host header, retried while Traefik picks up the route. */
+/** One GET through the dev Traefik with a Host header. */
+function viaTraefikOnce(hostname: string): Promise<{ status: number; body: string }> {
+  return new Promise((resolve) => {
+    http
+      .get(
+        { host: "127.0.0.1", port: APPS_PORT, path: "/", headers: { host: hostname } },
+        (res) => {
+          let body = "";
+          res.on("data", (chunk) => {
+            body += chunk;
+          });
+          res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
+        },
+      )
+      .on("error", () => resolve({ status: 0, body: "" }));
+  });
+}
+
+/** GET through the dev Traefik, retried while Traefik picks up a new route. */
 async function viaTraefik(hostname: string): Promise<{ status: number; body: string }> {
   const deadline = Date.now() + 10_000;
   for (;;) {
-    const result = await new Promise<{ status: number; body: string }>((resolve, reject) => {
-      http
-        .get(
-          { host: "127.0.0.1", port: APPS_PORT, path: "/", headers: { host: hostname } },
-          (res) => {
-            let body = "";
-            res.on("data", (chunk) => {
-              body += chunk;
-            });
-            res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
-          },
-        )
-        .on("error", reject);
-    });
+    const result = await viaTraefikOnce(hostname);
     if (result.status === 200 || Date.now() > deadline) return result;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
@@ -128,9 +135,41 @@ describe.skipIf(!enabled)("real deploys on the local stack", () => {
     expect((await lines(first.deploymentId)).at(-1)).toBe(
       `Deployment is live at http://${hostname}`,
     );
+    // Restarts come on once it's healthy.
+    const live = reports.get(first.deploymentId)?.at(-1);
+    const container = await docker.inspectContainer(
+      live?.status === "active" ? live.containerId : "",
+    );
+    expect(container?.HostConfig?.RestartPolicy?.Name).toBe("unless-stopped");
 
+    // The redeploy loses no request: poll through Traefik for the whole swap, startup to removal.
+    const statuses: number[] = [];
+    const durations: number[] = [];
+    let polling = true;
+    const poller = (async () => {
+      while (polling) {
+        const began = Date.now();
+        statuses.push((await viaTraefikOnce(hostname)).status);
+        durations.push(Date.now() - began);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    })();
     const second = jobFor(service, "traefik/whoami:v1.11.0", hostname);
     expect(await processDeploy(second, deps)).toBe("active");
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    polling = false;
+    await poller;
+    expect(statuses.length).toBeGreaterThan(10);
+    expect(
+      statuses.flatMap((status, i) =>
+        status === 200
+          ? []
+          : [`${status} after ${durations[i]} ms (request ${i + 1} of ${statuses.length})`],
+      ),
+    ).toEqual([]);
+    // At worst one request lands on the removed container and fails over after Traefik's 2 s
+    // dial timeout (infra/traefik/dev/traefik.yml).
+    expect(Math.max(...durations)).toBeLessThan(5_000);
     const left = await docker.listContainers([`lift.service=${service}`]);
     expect(left.map((container) => container.Labels["lift.deployment"])).toEqual([
       second.deploymentId,
@@ -143,8 +182,14 @@ describe.skipIf(!enabled)("real deploys on the local stack", () => {
     services.push(service);
     const job = jobFor(service, "hello-world:latest", `hello-${service.slice(-6)}.apps.localhost`);
     expect(await processDeploy(job, deps)).toBe("failed");
-    expect(reports.get(job.deploymentId)?.at(-1)).toMatchObject({ errorCode: "crashed" });
-    expect(await lines(job.deploymentId)).toContain("Hello from Docker!");
+    expect(reports.get(job.deploymentId)?.at(-1)).toMatchObject({
+      errorCode: "crashed",
+      message:
+        "Deploy failed: the app exited with code 0 before it answered: its start command finished instead of serving",
+    });
+    // Its output once: no restarts repeated it.
+    const output = await lines(job.deploymentId);
+    expect(output.filter((line) => line === "Hello from Docker!")).toHaveLength(1);
     expect(await docker.listContainers([`lift.service=${service}`])).toEqual([]);
   }, 60_000);
 

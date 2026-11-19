@@ -59,8 +59,15 @@ export interface ContainerDetails {
   Id: string;
   Name: string;
   RestartCount: number;
-  State: { Status: string; Running: boolean; Restarting: boolean; ExitCode: number };
+  State: {
+    Status: string;
+    Running: boolean;
+    Restarting: boolean;
+    ExitCode: number;
+    OOMKilled: boolean;
+  };
   NetworkSettings: { Networks: Record<string, { IPAddress: string }> };
+  HostConfig?: { RestartPolicy?: { Name: string } };
 }
 
 /** The body of `POST /containers/create`, as far as Lift sets it. */
@@ -181,6 +188,13 @@ export function createDocker(socketPath: string = dockerSocketPath()) {
       return json<{ Id: string }>(response).Id;
     },
 
+    /** Changes a container's restart policy in place (`docker update --restart`). */
+    async setRestartPolicy(id: string, name: "no" | "unless-stopped"): Promise<void> {
+      await call("POST", `/containers/${encodeURIComponent(id)}/update`, [200], {
+        RestartPolicy: { Name: name },
+      });
+    },
+
     async startContainer(id: string): Promise<void> {
       await call("POST", `/containers/${id}/start`, [204, 304]);
     },
@@ -195,6 +209,20 @@ export function createDocker(socketPath: string = dockerSocketPath()) {
       const filters = encodeURIComponent(JSON.stringify({ label: labels }));
       return json<ContainerSummary[]>(
         await call("GET", `/containers/json?all=true&filters=${filters}`, [200]),
+      );
+    },
+
+    /**
+     * Stops a container gracefully: SIGTERM, then SIGKILL after `seconds`. The process exits while
+     * its network is still up, so its connections close cleanly. One already stopped or gone is fine.
+     */
+    async stopContainer(id: string, seconds: number): Promise<void> {
+      await call(
+        "POST",
+        `/containers/${encodeURIComponent(id)}/stop?t=${seconds}`,
+        [204, 304, 404],
+        undefined,
+        (seconds + 30) * 1000,
       );
     },
 

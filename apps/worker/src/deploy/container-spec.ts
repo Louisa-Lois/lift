@@ -7,9 +7,13 @@ export const PIDS_LIMIT = 256;
 /**
  * The container for a deployment (docs/prd/04-infrastructure.md, "Deploy job" and "Security
  * hardening"): its environment from runtime-env; hard CPU and memory limits with no extra swap;
- * at most 256 processes; no privilege escalation and no raw sockets; restarted unless stopped;
- * logs capped at 3 × 10 MB; on lift-edge for Traefik and on the project network under the
- * service's slug. Never privileged, never on the host network, never with a mount.
+ * at most 256 processes; no privilege escalation and no raw sockets; logs capped at 3 × 10 MB;
+ * on lift-edge for Traefik and on the project network under the service's slug. Never
+ * privileged, never on the host network, never with a mount.
+ *
+ * It starts with no restart policy: the deploy job switches it to `unless-stopped` once the app
+ * is healthy, so a crash during the health check keeps its real exit code and shows its output
+ * once, instead of being hidden by restarts.
  */
 export function containerSpec(
   job: DeployJob,
@@ -28,7 +32,7 @@ export function containerSpec(
       PidsLimit: PIDS_LIMIT,
       SecurityOpt: ["no-new-privileges:true"],
       CapDrop: ["NET_RAW"],
-      RestartPolicy: { Name: "unless-stopped" },
+      RestartPolicy: { Name: "no" },
       LogConfig: { Type: "json-file", Config: { "max-size": "10m", "max-file": "3" } },
       NetworkMode: EDGE_NETWORK,
     },

@@ -19,15 +19,19 @@ const job: DeployJob = {
 const router = "traefik.http.routers.dep-dep_aaaaaaaaaaaaaaaaaa1b2c3d";
 
 describe("a deployment's Traefik labels", () => {
-  it("route its hostname over HTTPS with the wildcard certificate", () => {
+  it("route its hostname over HTTPS, to its service's shared load balancer, with retries", () => {
     expect(deploymentLabels(job, "apps.trylift.dev")).toEqual({
       "traefik.enable": "true",
       "traefik.docker.network": "lift-edge",
       [`${router}.rule`]: "Host(`web-demo-shop.apps.trylift.dev`)",
       [`${router}.entrypoints`]: "websecure",
       [`${router}.tls`]: "true",
-      [`${router}.service`]: "dep-dep_aaaaaaaaaaaaaaaaaa1b2c3d",
-      "traefik.http.services.dep-dep_aaaaaaaaaaaaaaaaaa1b2c3d.loadbalancer.server.port": "3000",
+      // One Traefik service per Lift service: old and new containers share it during a swap.
+      [`${router}.service`]: `svc-${job.serviceId}`,
+      [`${router}.middlewares`]: "retry-dep_aaaaaaaaaaaaaaaaaa1b2c3d",
+      "traefik.http.middlewares.retry-dep_aaaaaaaaaaaaaaaaaa1b2c3d.retry.attempts": "3",
+      "traefik.http.middlewares.retry-dep_aaaaaaaaaaaaaaaaaa1b2c3d.retry.initialinterval": "100ms",
+      [`traefik.http.services.svc-${job.serviceId}.loadbalancer.server.port`]: "3000",
       "lift.project": job.projectId,
       "lift.service": job.serviceId,
       "lift.deployment": job.deploymentId,
@@ -76,11 +80,12 @@ describe("a deployment's container", () => {
     });
   });
 
-  it("is hardened: no privilege escalation, no raw sockets, restarted, logs capped", () => {
+  it("is hardened: no privilege escalation, no raw sockets, logs capped", () => {
     expect(spec.HostConfig).toMatchObject({
       SecurityOpt: ["no-new-privileges:true"],
       CapDrop: ["NET_RAW"],
-      RestartPolicy: { Name: "unless-stopped" },
+      // Restarts come on once it's healthy, so a crash during the check keeps its exit code.
+      RestartPolicy: { Name: "no" },
       LogConfig: { Type: "json-file", Config: { "max-size": "10m", "max-file": "3" } },
     });
     // INF-11: never privileged, never on the host's network, never with a mount.

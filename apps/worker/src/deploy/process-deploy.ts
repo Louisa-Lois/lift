@@ -12,6 +12,8 @@ export const HEALTH_TIMEOUT_MS = 120_000;
 export const HEALTH_INTERVAL_MS = 2_000;
 /** Old and new containers both serve this long, so no request fails during the swap. */
 export const OVERLAP_MS = 10_000;
+/** How long the previous container gets to finish its requests after SIGTERM. */
+export const STOP_SECONDS = 10;
 const LAST_LINES = 100;
 
 export interface DeployDeps {
@@ -32,8 +34,28 @@ export type DeployOutcome = "active" | "failed" | "stopped";
 
 type Health =
   | { kind: "healthy"; status: number; ms: number }
-  | { kind: "crashed"; exitCode: number | null }
+  | { kind: "crashed"; exitCode: number | null; oomKilled: boolean }
   | { kind: "unhealthy"; reason: string };
+
+/** What common exit codes mean, said plainly in the failure message. */
+const EXIT_HINTS: Record<number, string> = {
+  0: "its start command finished instead of serving",
+  126: "its start command isn't executable",
+  127: "a command or a shared library it needs isn't in the image",
+  137: "it was killed",
+};
+
+/** The failure line for an app that stopped before it answered. */
+export function crashMessage(
+  exitCode: number | null,
+  oomKilled: boolean,
+  memoryMb: number,
+): string {
+  if (oomKilled) return `Deploy failed: the app ran out of memory (its limit is ${memoryMb} MB)`;
+  if (exitCode === null) return "Deploy failed: the app stopped before it answered";
+  const hint = EXIT_HINTS[exitCode];
+  return `Deploy failed: the app exited with code ${exitCode} before it answered${hint ? `: ${hint}` : ""}`;
+}
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const seconds = (ms: number) => `${ms / 1000}s`;
@@ -71,9 +93,12 @@ async function waitHealthy(
   let lastReason = "";
   for (;;) {
     const state = await deps.docker.inspectContainer(containerId);
-    // Restarted even once means it exited: the restart policy hides crashes otherwise.
     if (!state?.State.Running || state.State.Restarting || state.RestartCount > 0) {
-      return { kind: "crashed", exitCode: state?.State.ExitCode ?? null };
+      return {
+        kind: "crashed",
+        exitCode: state && !state.State.Running ? state.State.ExitCode : null,
+        oomKilled: state?.State.OOMKilled ?? false,
+      };
     }
     const ip = state.NetworkSettings.Networks[EDGE_NETWORK]?.IPAddress;
     let result: ProbeResult = {
@@ -172,8 +197,7 @@ async function deploy(job: DeployJob, deps: DeployDeps): Promise<DeployOutcome> 
       await docker.removeContainer(containerId);
       containerId = null;
       if (health.kind === "crashed") {
-        const code = health.exitCode === null ? "" : ` with code ${health.exitCode}`;
-        return await fail("crashed", `Deploy failed: the app exited${code} before it answered`);
+        return await fail("crashed", crashMessage(health.exitCode, health.oomKilled, job.memoryMb));
       }
       const limit = seconds(deps.healthTimeoutMs ?? HEALTH_TIMEOUT_MS);
       return await fail(
@@ -194,6 +218,8 @@ async function deploy(job: DeployJob, deps: DeployDeps): Promise<DeployOutcome> 
         `The previous deployment keeps serving for ${seconds(overlapMs)}, then its container is removed`,
       );
     }
+    // Healthy: from now on Docker restarts it if it stops, and after a reboot.
+    await docker.setRestartPolicy(containerId, "unless-stopped");
     // The log ends with the report: nothing is written to it after `active`.
     await logs.flush();
     await api.reportStatus(id, { status: "active", containerId, at: at() });
@@ -201,6 +227,9 @@ async function deploy(job: DeployJob, deps: DeployDeps): Promise<DeployOutcome> 
 
     await sleep(overlapMs);
     for (const old of previous) {
+      // Gracefully first: a container removed by force vanishes with its network, and Traefik's
+      // keep-alive connections to it hang instead of closing, so requests on them can't be retried.
+      await docker.stopContainer(old.Id, STOP_SECONDS);
       await docker.removeContainer(old.Id);
       log.info({ deploymentId: id, removed: old.Names[0] }, "removed the previous container");
     }
