@@ -7,7 +7,13 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!**/*.md", "!**/next-env.d.ts", "!**/migrations/meta"]
+    "includes": [
+      "**",
+      "!**/*.md",
+      "!**/next-env.d.ts",
+      "!**/migrations/meta",
+      "!**/public/mockServiceWorker.js"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -34,6 +40,11 @@
       "source": {
         "organizeImports": "on"
       }
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
     }
   }
 }
