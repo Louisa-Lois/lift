@@ -23,6 +23,7 @@ export const tokenRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     "/tokens",
     {
+      config: { agent: false },
       schema: {
         summary: "Your personal tokens, newest first, revoked ones included",
         description: "A token's plaintext is never returned after it is created.",

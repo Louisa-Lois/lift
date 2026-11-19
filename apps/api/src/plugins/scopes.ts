@@ -11,6 +11,8 @@ declare module "fastify" {
     public?: boolean;
     /** The least scope a personal token needs here: by default read for GET, admin otherwise. */
     scope?: TokenScope;
+    /** `false`: the agent service may not call this route, though it only reads. */
+    agent?: false;
   }
 }
 
@@ -21,18 +23,26 @@ export function neededScope(request: FastifyRequest): TokenScope {
   return request.method === "GET" || request.method === "HEAD" ? "read" : "admin";
 }
 
-/** 403 when the caller is a token without `needed`. A session is limited only by its role. */
+/**
+ * 403 when the caller is a token without `needed`. The agent service counts as a read token, so
+ * it never writes and never reveals a secret through the public API. A session is limited only by
+ * its role.
+ */
 export function requireScope(request: FastifyRequest, needed: TokenScope): void {
   const credential = request.credential;
+  if (credential?.via === "agent") {
+    if (needed === "read" && request.routeOptions.config.agent !== false) return;
+    throw problem("forbidden", "The agent service can only read here, and never secrets.");
+  }
   if (credential?.via !== "token" || scopeCovers(credential.scope, needed)) return;
   throw problem("forbidden", `This token's scope is ${credential.scope}; this needs ${needed}.`);
 }
 
 /**
  * Deny by default: every `/api/v1` route needs a session or a token unless it is marked
- * `config: { public: true }`, and a token needs the route's scope. It runs before the body is
- * parsed, so a caller who isn't signed in learns nothing from validation errors. Handlers still
- * check the caller's role in the project.
+ * `config: { public: true }`, and a token needs the route's scope (the agent service only reads).
+ * It runs before the body is parsed, so a caller who isn't signed in learns nothing from
+ * validation errors. Handlers still check the caller's role in the project.
  */
 export const routeGuard = fp(
   async (app) => {

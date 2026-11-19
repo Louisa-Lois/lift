@@ -4,8 +4,16 @@ import { problem } from "../lib/problem";
 
 const digest = (value: string) => createHash("sha256").update(value).digest();
 
-/** Traefik adds these to everything it forwards; the worker calls the API directly. */
-function cameThroughProxy(request: FastifyRequest): boolean {
+/** Whether `given` equals `expected`, compared in constant time (through their SHA-256). */
+export function sameSecret(given: string, expected: string): boolean {
+  return timingSafeEqual(digest(given), digest(expected));
+}
+
+/**
+ * Traefik adds these to everything it forwards; the worker and the agent service call the API
+ * directly, on the internal network.
+ */
+export function cameThroughProxy(request: FastifyRequest): boolean {
   return Object.keys(request.headers).some(
     (name) => name.startsWith("x-forwarded-") || name === "forwarded" || name === "x-real-ip",
   );

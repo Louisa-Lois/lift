@@ -1,5 +1,6 @@
 import { type Db, schema } from "@lift/db";
 import { newId, type User } from "@lift/shared";
+import { eq } from "drizzle-orm";
 import { problem } from "../lib/problem";
 import type { SecretBox } from "./crypto";
 import type { UserRow } from "./sessions";
@@ -35,6 +36,12 @@ export async function upsertGithubUser(
     .returning();
   if (!row) throw new Error("upsert returned no user");
   return row;
+}
+
+/** A user by ID, for the agent service acting as them; null when there's none. */
+export async function findUserById(db: Db, id: string): Promise<UserRow | null> {
+  const [row] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
+  return row ?? null;
 }
 
 /** The `User` the API sends: never the token. */

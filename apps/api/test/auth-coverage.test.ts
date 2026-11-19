@@ -1,12 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { createTestDatabase, type TestDatabase } from "@lift/db/testing";
-import { API_BASE_PATH, CreatedApiToken, newId } from "@lift/shared";
+import { API_BASE_PATH, CreatedApiToken, newId, User } from "@lift/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildServer } from "../src/server";
 import { AUTH_ENV } from "./helpers/app";
 import { testEnv } from "./helpers/env";
 import { fakeGithub } from "./helpers/github";
-import { as, signIn } from "./helpers/session";
+import { as, asAgent, signIn } from "./helpers/session";
 
 /**
  * Every public API route needs a session or a token unless it's on this list, which matches the
@@ -20,6 +20,12 @@ const PUBLIC_ROUTES = [
   "POST /api/v1/auth/logout",
   "POST /api/v1/webhooks/github",
 ];
+
+/**
+ * GET routes the agent service may not call, though they only read: tokens are none of its
+ * business, and credentials hold a password. Every other GET route takes it; nothing else does.
+ */
+const AGENT_REFUSED = ["GET /api/v1/tokens", "GET /api/v1/databases/:databaseId/credentials"];
 
 /** A well-formed value for each path parameter; a route with a new parameter needs one here. */
 const SAMPLE_PARAMS: Record<string, string> = {
@@ -44,6 +50,7 @@ let database: TestDatabase;
 let app: ReturnType<typeof buildServer>;
 let valid: string;
 let revoked: string;
+let userId: string;
 
 beforeAll(async () => {
   database = await createTestDatabase();
@@ -62,6 +69,8 @@ beforeAll(async () => {
   await app.ready();
 
   const session = await signIn(app);
+  const me = await app.inject({ method: "GET", url: `${API_BASE_PATH}/me`, ...as(session) });
+  userId = User.parse(me.json()).id;
   const mint = async () => {
     const response = await app.inject({
       method: "POST",
@@ -133,6 +142,22 @@ describe("every API route", () => {
       const response = await call(route, `Bearer ${valid}`);
       // A made-up ID is a 404 and a missing body a 400; neither may be a 401.
       expect(response.statusCode, key(route)).not.toBe(401);
+    }
+  });
+
+  it("lets the agent service read, and nothing else", async () => {
+    for (const route of routes.filter((route) => !route.public)) {
+      const response = await app.inject({
+        method: route.method as "GET",
+        url: fill(route.url),
+        ...asAgent(userId),
+      });
+      if (route.method === "GET" && !AGENT_REFUSED.includes(key(route))) {
+        expect(response.statusCode, key(route)).not.toBe(401);
+        expect(response.statusCode, key(route)).not.toBe(403);
+      } else {
+        expect(response.statusCode, key(route)).toBe(403);
+      }
     }
   });
 
