@@ -19,6 +19,7 @@ import { deploymentRoutes } from "./routes/v1/deployments";
 import { eventRoutes } from "./routes/v1/events";
 import { githubRoutes } from "./routes/v1/github";
 import { healthRoutes } from "./routes/v1/health";
+import { logRoutes } from "./routes/v1/logs";
 import { meRoutes } from "./routes/v1/me";
 import { projectRoutes } from "./routes/v1/projects";
 import { serviceRoutes } from "./routes/v1/services";
@@ -74,10 +75,9 @@ export function buildServer(env: Env, options: ServerOptions = {}) {
   });
   app.register(serviceRoutes, { prefix: API_BASE_PATH, appsDomain: env.APPS_DOMAIN });
   app.register(deploymentRoutes, { prefix: API_BASE_PATH, github, secretBox });
-  app.register(eventRoutes, {
-    prefix: API_BASE_PATH,
-    heartbeatMs: options.sseHeartbeatMs ?? SSE_HEARTBEAT_MS,
-  });
+  const heartbeatMs = options.sseHeartbeatMs ?? SSE_HEARTBEAT_MS;
+  app.register(eventRoutes, { prefix: API_BASE_PATH, heartbeatMs });
+  app.register(logRoutes, { prefix: API_BASE_PATH, heartbeatMs });
 
   // The worker's routes: reachable only on the private IP, never through Traefik.
   app.register(internalDeploymentRoutes, {

@@ -6,7 +6,7 @@ const STREAM_ID = /^\d{1,20}-\d{1,20}$/;
 
 export interface SseConnection {
   /** Sends one event; waits while the client's buffer is full. */
-  send(message: { id: string; event: string; data: string }): Promise<void>;
+  send(message: { id?: string; event: string; data: string }): Promise<void>;
   /** A comment line: the heartbeat that keeps proxies from closing an idle stream. */
   comment(text: string): void;
   /** Aborted when the client goes away. */
@@ -36,7 +36,8 @@ export function openSse(request: FastifyRequest, reply: FastifyReply): SseConnec
   return {
     async send({ id, event, data }) {
       if (controller.signal.aborted) return;
-      if (!raw.write(`id: ${id}\nevent: ${event}\ndata: ${data}\n\n`)) {
+      const idLine = id === undefined ? "" : `id: ${id}\n`;
+      if (!raw.write(`${idLine}event: ${event}\ndata: ${data}\n\n`)) {
         await new Promise<void>((resolve) => {
           raw.once("drain", resolve);
           raw.once("close", resolve);
@@ -79,6 +80,8 @@ export async function followStream(
     sse: SseConnection;
     heartbeatMs: number;
     onEntry: (id: string, fields: Record<string, string>) => Promise<boolean>;
+    /** Called after each quiet period, with the heartbeat; returning false ends the stream. */
+    onIdle?: () => Promise<boolean>;
   },
 ): Promise<void> {
   const connection = redis.duplicate();
@@ -98,6 +101,7 @@ export async function followStream(
       );
       if (!result) {
         input.sse.comment("heartbeat");
+        if (input.onIdle && !(await input.onIdle())) return;
         continue;
       }
       for (const [, entries] of result) {
