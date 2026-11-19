@@ -4,6 +4,7 @@ import type { Service } from "@lift/shared";
 import { BracesIcon, ExternalLinkIcon, GitBranchIcon, RocketIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { RestartServiceButton } from "@/components/deployment-actions";
 import { ServiceDeployments } from "@/components/service-deployments";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -97,6 +98,9 @@ export function ServiceRow({ service, canDeploy }: { service: Service; canDeploy
             Variables
           </Link>
         </Button>
+        {canDeploy && service.activeDeploymentId ? (
+          <RestartServiceButton serviceId={service.id} serviceName={service.name} />
+        ) : null}
         {canDeploy ? (
           <Button variant="outline" size="sm" onClick={deployNow} disabled={deploy.isPending}>
             <RocketIcon aria-hidden="true" />
@@ -105,7 +109,7 @@ export function ServiceRow({ service, canDeploy }: { service: Service; canDeploy
         ) : null}
       </div>
       <div className="border-t bg-muted/20">
-        <ServiceDeployments service={service} />
+        <ServiceDeployments service={service} canEdit={canDeploy} />
       </div>
     </li>
   );
