@@ -1,23 +1,42 @@
 "use client";
 
-import { LockIcon, SlidersHorizontalIcon, SparklesIcon } from "lucide-react";
+import { isLiftApiError } from "@lift/shared";
+import { Loader2Icon, LockIcon, SlidersHorizontalIcon, SparklesIcon } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { NewServiceForm } from "@/components/new-service-form";
 import { type PickedRepo, RepoPicker } from "@/components/repo-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useCreatePlan } from "@/lib/hooks/use-plans";
 
 /**
- * /new (FE-04): pick a repo, then choose how to configure it. "Continue with AI" opens the plan
- * review once the agent's plans arrive (Nov 24); until then only "Configure manually" works.
- * `?project=` preselects the project.
+ * /new (FE-04): pick a repo, then choose how to configure it. "Continue with AI" (FE-14) asks the
+ * assistant for a plan, which takes up to a minute, then opens its review. `?project=`
+ * preselects the project, and the review adds the service there.
  */
 export function NewServiceFlow() {
   const router = useRouter();
   const projectId = useSearchParams().get("project");
   const [repo, setRepo] = useState<PickedRepo | null>(null);
   const [manual, setManual] = useState(false);
+  const createPlan = useCreatePlan();
+
+  function planWithAi(picked: PickedRepo) {
+    createPlan.mutate(
+      {
+        owner: picked.owner,
+        repo: picked.name,
+        ...(picked.defaultBranch ? { branch: picked.defaultBranch } : {}),
+      },
+      {
+        onSuccess: (plan) =>
+          router.push(
+            `/new/plan/${plan.id}${projectId ? `?project=${encodeURIComponent(projectId)}` : ""}`,
+          ),
+      },
+    );
+  }
 
   return (
     <div className="flex max-w-3xl flex-col gap-6">
@@ -51,7 +70,15 @@ export function NewServiceFlow() {
                 Private
               </Badge>
             ) : null}
-            <Button variant="ghost" size="sm" onClick={() => setRepo(null)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={createPlan.isPending}
+              onClick={() => {
+                createPlan.reset();
+                setRepo(null);
+              }}
+            >
               Change repo
             </Button>
           </div>
@@ -73,16 +100,33 @@ export function NewServiceFlow() {
                 <div className="flex items-center gap-2 font-medium">
                   <SparklesIcon className="size-4 text-muted-foreground" aria-hidden="true" />
                   Continue with AI
-                  <Badge variant="outline" className="font-normal text-muted-foreground">
-                    Coming soon
-                  </Badge>
                 </div>
                 <p className="text-muted-foreground text-xs">
-                  The assistant reads the repo and plans its services, databases and variables for
-                  you to review.
+                  The assistant reads the repo and plans its service, database and variables for you
+                  to review.
                 </p>
-                <Button variant="secondary" disabled className="mt-auto w-fit">
-                  Continue with AI
+                {createPlan.isPending ? (
+                  <p role="status" className="text-muted-foreground text-xs">
+                    Reading {repo.owner}/{repo.name}… this takes up to 30 seconds.
+                  </p>
+                ) : createPlan.isError ? (
+                  <p role="alert" className="text-destructive text-xs">
+                    {isLiftApiError(createPlan.error)
+                      ? createPlan.error.detail
+                      : "The assistant couldn't be reached. Check your connection and try again."}{" "}
+                    You can still configure it manually.
+                  </p>
+                ) : null}
+                <Button
+                  variant="secondary"
+                  className="mt-auto w-fit"
+                  disabled={createPlan.isPending}
+                  onClick={() => planWithAi(repo)}
+                >
+                  {createPlan.isPending ? (
+                    <Loader2Icon className="animate-spin" aria-hidden="true" />
+                  ) : null}
+                  {createPlan.isError ? "Try again" : "Continue with AI"}
                 </Button>
               </div>
               <div className="flex flex-col gap-3 rounded-lg border p-4">
@@ -96,7 +140,11 @@ export function NewServiceFlow() {
                 <p className="text-muted-foreground text-xs">
                   Choose the project, branch, folder and port yourself.
                 </p>
-                <Button className="mt-auto w-fit" onClick={() => setManual(true)}>
+                <Button
+                  className="mt-auto w-fit"
+                  disabled={createPlan.isPending}
+                  onClick={() => setManual(true)}
+                >
                   Configure manually
                 </Button>
               </div>

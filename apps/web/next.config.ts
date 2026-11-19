@@ -12,6 +12,10 @@ const nextConfig: NextConfig = {
   // packages/shared ships TypeScript source; Next compiles it along with the app.
   transpilePackages: ["@lift/shared"],
 
+  // The development proxy below cuts requests off after 30 s by default, and a plan may take up
+  // to 60 s (POST /api/v1/agent/plans). Production doesn't use it: Traefik routes /api.
+  experimental: { proxyTimeout: 70_000 },
+
   // In development the browser talks to one origin, so the session cookie just works.
   // In production Traefik sends /api to the API container instead.
   async rewrites() {

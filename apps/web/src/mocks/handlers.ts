@@ -4,6 +4,7 @@ import {
   appHostname,
   appUrl,
   CreateDatabaseBody,
+  CreatePlanBody,
   CreateProjectBody,
   CreateServiceBody,
   CreateTokenBody,
@@ -13,6 +14,7 @@ import {
   type LogEntry,
   maskVariableValue,
   newId,
+  type OnboardingPlan,
   PROBLEM_CONTENT_TYPE,
   type ProjectDetail,
   type ProjectListItem,
@@ -34,6 +36,10 @@ const APPS_DOMAIN = "apps.localhost";
 const projects: ProjectDetail[] = [
   { ...fixtures.project, databases: [...fixtures.project.databases] },
 ];
+/** Plans asked for with mocks on: every repo gets the express-postgres plan, under its own name. */
+const plans = new Map<string, OnboardingPlan>([
+  [fixtures.onboardingPlan.id, fixtures.onboardingPlan],
+]);
 /** Variables by service, kept in plaintext; answers mask them unless `?reveal=true`. */
 const variablesByService = new Map<string, Variable[]>([
   [fixtures.fixtureIds.services.web, [...fixtures.revealedVariables.web]],
@@ -545,6 +551,40 @@ export const handlers = [
       }
       send(`event: end\ndata: ${JSON.stringify({ status })}\n\n`);
     });
+  }),
+  // FE-14: the assistant's plan takes a moment, then answers the fixture plan for the repo asked.
+  http.post(api("/agent/plans"), async ({ request }) => {
+    const body = CreatePlanBody.parse(await request.json());
+    await pause(1_500);
+    const plan: OnboardingPlan = {
+      ...fixtures.onboardingPlan,
+      id: newId("pln"),
+      repo: {
+        ...fixtures.onboardingPlan.repo,
+        owner: body.owner,
+        name: body.repo,
+        branch: body.branch ?? fixtures.onboardingPlan.repo.branch,
+      },
+    };
+    plans.set(plan.id, plan);
+    return HttpResponse.json(plan, { status: 201 });
+  }),
+  http.get(api("/agent/plans/:planId"), ({ params }) => {
+    const plan = plans.get(String(params.planId));
+    return plan
+      ? HttpResponse.json(plan)
+      : problem(404, "not_found", "Not found", "No plan with that ID.");
+  }),
+  // Applying lands on the demo project's web service, whose latest deployment exists.
+  http.post(api("/agent/plans/:planId/apply"), async ({ params }) => {
+    if (!plans.has(String(params.planId))) {
+      return problem(404, "not_found", "Not found", "No plan with that ID.");
+    }
+    await pause(600);
+    return HttpResponse.json(
+      { project: projects[0], serviceId: fixtures.fixtureIds.services.web },
+      { status: 201 },
+    );
   }),
   // Nothing happens on its own in mock mode, so the project stream only sends heartbeats.
   http.get(api("/projects/:projectId/events/stream"), ({ request }) =>
