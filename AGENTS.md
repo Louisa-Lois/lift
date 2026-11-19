@@ -33,7 +33,7 @@ Run them from the repo root.
 | --- | --- |
 | `pnpm install` | Install everything; pnpm switches itself to the version pinned in `package.json` |
 | `pnpm env:init` | Create `.env` from `.env.example` with fresh development secrets; re-run when `.env.example` changes |
-| `pnpm stack:up` · `pnpm stack:down` | Start or stop Postgres and Redis in Docker |
+| `pnpm stack:up` · `pnpm stack:down` | Start or stop the local stack in Docker: Postgres, Redis, BuildKit and a Traefik for deployed apps at `*.apps.localhost` |
 | `pnpm dev` | Run web (3000), api (4000), agent (4100), collab (4200) and worker together |
 | `pnpm --filter <app> dev` | Run one app, for example `pnpm --filter web dev` |
 | `pnpm lint` · `pnpm format` | Check with Biome · fix formatting and import order |

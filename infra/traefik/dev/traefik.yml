@@ -1,0 +1,38 @@
+# Traefik v3 static configuration for the local stack (INF-06), mounted by infra/compose/dev.yml.
+# Plain HTTP on 127.0.0.1:80 for *.apps.localhost: no certificates and no redirect to HTTPS, so app
+# containers use entry point `web` without TLS here (the worker picks it from APPS_DOMAIN).
+# Otherwise as on the worker VM (infra/traefik/worker/traefik.yml): the same Docker provider on the
+# same network, so the worker's labels route the same way in both places.
+
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+log:
+  level: INFO
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      aliasHeadersStrategy: delete
+    transport:
+      respondingTimeouts:
+        # Apps may stream or hold WebSockets open; v3's 60 s default would cut them.
+        readTimeout: 0s
+  traefik:
+    address: ":8080"
+
+# The dashboard on the traefik entry point, published on 127.0.0.1 only.
+api:
+  dashboard: true
+  insecure: true
+
+ping:
+  entryPoint: traefik
+
+providers:
+  docker:
+    endpoint: "tcp://socket-proxy:2375"
+    exposedByDefault: false
+    network: lift-edge

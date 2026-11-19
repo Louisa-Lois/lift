@@ -7,6 +7,7 @@ Traefik v3 configuration for both routers. Compose mounts a stable copy of this 
 | `control/traefik.yml` | control plane (INF-02) | Ports 80 and 443, HTTP to HTTPS, `app.{domain}` by DNS-01 through Cloudflare, routers from the labels in `infra/compose/control.yml` |
 | `worker/traefik.yml` | worker (INF-03) | Ports 80 and 443, HTTP to HTTPS, routers from the labels the worker puts on app containers on `lift-edge` |
 | `worker/dynamic/tls.yml` | worker | The default certificate: one wildcard for `*.apps.{domain}` by DNS-01, so deploying an app never asks Let's Encrypt for anything |
+| `dev/traefik.yml` | your machine (INF-06) | Plain HTTP on 127.0.0.1:80 for `*.apps.localhost`, no certificates; the same Docker provider on `lift-edge` as the worker, so the worker's labels route the same way. `infra/compose/dev.yml` mounts it straight from the repo |
 
 **Routing on `app.{domain}`:** `/api` → api:4000, `/collab` → collab:4200 (WebSockets pass through), `/mcp` → mcp:4300 (only with the `mcp` profile), everything else → web:3000. `/internal` is never routed; the worker reaches it on the control plane's private IP.
 
