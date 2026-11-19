@@ -282,6 +282,44 @@ export function createGithub(options: GithubOptions) {
     },
 
     /**
+     * Adds a push webhook to a repo (BE-08); null when the user may not (GitHub answers 403 or 404
+     * without admin rights on the repo).
+     */
+    async createHook(
+      token: string,
+      owner: string,
+      name: string,
+      hook: { url: string; secret: string },
+    ): Promise<number | null> {
+      const what = `POST /repos/${owner}/${name}/hooks`;
+      const response = await send(what, `${API}/repos/${segment(owner)}/${segment(name)}/hooks`, {
+        method: "POST",
+        headers: { ...api(token).headers, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "web",
+          active: true,
+          events: ["push"],
+          config: { url: hook.url, content_type: "json", secret: hook.secret, insecure_ssl: "0" },
+        }),
+      });
+      if (response.status === 403 || response.status === 404) return null;
+      if (!response.ok) throw failure(what, response);
+      return ((await response.json()) as { id: number }).id;
+    },
+
+    /** Removes a webhook; one already gone, or one the user may not remove, is left alone. */
+    async deleteHook(token: string, owner: string, name: string, hookId: number): Promise<void> {
+      const what = `DELETE /repos/${owner}/${name}/hooks/${hookId}`;
+      const response = await send(
+        what,
+        `${API}/repos/${segment(owner)}/${segment(name)}/hooks/${hookId}`,
+        { method: "DELETE", ...api(token) },
+      );
+      if (response.ok || response.status === 403 || response.status === 404) return;
+      throw failure(what, response);
+    },
+
+    /**
      * A commit by branch name or SHA, or null when the repo or the ref doesn't exist or the user
      * can't read it (GitHub answers 422 for an unknown SHA).
      */

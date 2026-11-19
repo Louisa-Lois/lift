@@ -23,6 +23,7 @@ import {
 import type { Github } from "../../services/github";
 import { accessService } from "../../services/services";
 import { githubTokenOf } from "../../services/users";
+import { ensureWebhook } from "../../services/webhooks";
 
 const ServiceParams = z.object({ serviceId: ServiceId });
 const DeploymentParams = z.object({ deploymentId: DeploymentId });
@@ -31,7 +32,8 @@ const DeploymentParams = z.object({ deploymentId: DeploymentId });
 export const deploymentRoutes: FastifyPluginAsyncZod<{
   github: Github;
   secretBox: SecretBox | null;
-}> = async (app, { github, secretBox }) => {
+  publicUrl: string;
+}> = async (app, { github, secretBox, publicUrl }) => {
   app.get(
     "/services/:serviceId/deployments",
     {
@@ -73,12 +75,19 @@ export const deploymentRoutes: FastifyPluginAsyncZod<{
       const user = requireUser(request);
       const { service } = await accessService(app.db, request.params.serviceId, user.id, "editor");
       const token = githubTokenOf(secretBox, user);
+      // Services made before push webhooks existed get theirs on their next deploy.
+      await ensureWebhook(
+        { db: app.db, github, secretBox, publicUrl, log: request.log },
+        service,
+        token,
+      );
       const commit = await resolveCommit(github, token, service, request.body.commitSha);
       // A session deploys as `manual`; API tokens (`cli`) and the agent's (`agent`) come later.
       const row = await startDeployment(
         { db: app.db, redis: app.redis, queues: app.queues, log: request.log },
         { service, trigger: "manual", commit, actor: { type: "user", id: user.id } },
       );
+      if (!row) throw new Error("a manual deployment is never a duplicate");
       reply.code(202);
       return toDeployment(row);
     },

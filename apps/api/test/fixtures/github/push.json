@@ -1,0 +1,26 @@
+{
+  "ref": "refs/heads/main",
+  "before": "1111111111111111111111111111111111111111",
+  "after": "3f9c2a1b7d4e5f60718293a4b5c6d7e8f9012345",
+  "created": false,
+  "deleted": false,
+  "forced": false,
+  "compare": "https://github.com/lift-demo/next-hello/compare/1111111111...3f9c2a1b7d",
+  "repository": {
+    "id": 880001,
+    "name": "next-hello",
+    "full_name": "lift-demo/next-hello",
+    "private": false,
+    "owner": { "login": "lift-demo", "id": 7001, "type": "Organization" },
+    "default_branch": "main"
+  },
+  "pusher": { "name": "ama-owusu", "email": "ama@example.test" },
+  "sender": { "login": "ama-owusu", "id": 4242, "type": "User" },
+  "head_commit": {
+    "id": "3f9c2a1b7d4e5f60718293a4b5c6d7e8f9012345",
+    "message": "Add the checkout page\n\nWith the order summary and the pay button.",
+    "timestamp": "2026-11-22T09:14:03+01:00",
+    "author": { "name": "Ama Owusu", "email": "ama@example.test", "username": "ama-owusu" },
+    "committer": { "name": "GitHub", "email": "noreply@github.com", "username": "web-flow" }
+  }
+}

@@ -29,6 +29,7 @@ import {
 } from "../../services/projects";
 import { createServiceRows, projectServices, serviceViews } from "../../services/services";
 import { githubTokenOf } from "../../services/users";
+import { ensureWebhook } from "../../services/webhooks";
 
 const ProjectParams = z.object({ projectId: ProjectId });
 
@@ -36,12 +37,14 @@ export interface ProjectRoutesOptions {
   appsDomain: string;
   github: Github;
   secretBox: SecretBox | null;
+  /** Where GitHub sends push webhooks (no hooks while it's localhost). */
+  publicUrl: string;
 }
 
 /** BE-05: projects, and creating services in them (docs/prd/01-backend-api.md). */
 export const projectRoutes: FastifyPluginAsyncZod<ProjectRoutesOptions> = async (
   app,
-  { appsDomain, github, secretBox },
+  { appsDomain, github, secretBox, publicUrl },
 ) => {
   app.get(
     "/projects",
@@ -202,6 +205,11 @@ export const projectRoutes: FastifyPluginAsyncZod<ProjectRoutesOptions> = async 
         appsDomain,
       });
       await publishEvents(app.redis, [event], request.log);
+      await ensureWebhook(
+        { db: app.db, github, secretBox, publicUrl, log: request.log },
+        row,
+        token,
+      );
       if (request.body.deploy) {
         try {
           const commit = await resolveCommit(github, token, row);

@@ -23,6 +23,7 @@ import { logRoutes } from "./routes/v1/logs";
 import { meRoutes } from "./routes/v1/me";
 import { projectRoutes } from "./routes/v1/projects";
 import { serviceRoutes } from "./routes/v1/services";
+import { webhookRoutes } from "./routes/v1/webhooks";
 import { createSecretBox } from "./services/crypto";
 import { createGithub } from "./services/github";
 
@@ -67,14 +68,23 @@ export function buildServer(env: Env, options: ServerOptions = {}) {
   app.register(authRoutes, { prefix: API_BASE_PATH, env, github, secretBox });
   app.register(meRoutes, { prefix: API_BASE_PATH });
   app.register(githubRoutes, { prefix: API_BASE_PATH, github, secretBox });
+  const publicUrl = env.PUBLIC_URL;
   app.register(projectRoutes, {
     prefix: API_BASE_PATH,
     appsDomain: env.APPS_DOMAIN,
     github,
     secretBox,
+    publicUrl,
   });
-  app.register(serviceRoutes, { prefix: API_BASE_PATH, appsDomain: env.APPS_DOMAIN });
-  app.register(deploymentRoutes, { prefix: API_BASE_PATH, github, secretBox });
+  app.register(serviceRoutes, {
+    prefix: API_BASE_PATH,
+    appsDomain: env.APPS_DOMAIN,
+    github,
+    secretBox,
+    publicUrl,
+  });
+  app.register(deploymentRoutes, { prefix: API_BASE_PATH, github, secretBox, publicUrl });
+  app.register(webhookRoutes, { prefix: API_BASE_PATH, secretBox });
   const heartbeatMs = options.sseHeartbeatMs ?? SSE_HEARTBEAT_MS;
   app.register(eventRoutes, { prefix: API_BASE_PATH, heartbeatMs });
   app.register(logRoutes, { prefix: API_BASE_PATH, heartbeatMs });
