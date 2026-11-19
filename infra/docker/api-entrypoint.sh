@@ -5,6 +5,9 @@
 set -eu
 
 if [ "${1:-}" = migrate ]; then
+  # First check /opt/lift/.env against this release's API (key names only, never values), so a
+  # bad value stops the deploy here while the previous release keeps serving.
+  node /app/dist/index.js check-env
   cd /app/db
   if [ ! -f migrations/meta/_journal.json ]; then
     echo "migrate: packages/db has no migrations yet; nothing to apply"

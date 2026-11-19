@@ -5,7 +5,8 @@
   "description": "Drizzle schema, migrations and seed for the platform database",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
@@ -16,8 +17,8 @@
   },
   "dependencies": {
     "@lift/shared": "workspace:*",
-    "drizzle-orm": "^0.45.4",
-    "postgres": "^3.4.9"
+    "drizzle-orm": "catalog:",
+    "postgres": "catalog:"
   },
   "devDependencies": {
     "@lift/config": "workspace:*",
