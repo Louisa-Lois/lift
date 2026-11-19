@@ -1,5 +1,7 @@
 import { type Db, schema } from "@lift/db";
 import { newId, type User } from "@lift/shared";
+import { problem } from "../lib/problem";
+import type { SecretBox } from "./crypto";
 import type { UserRow } from "./sessions";
 
 export interface GithubAccount {
@@ -46,4 +48,15 @@ export function toUser(row: UserRow): User {
     avatarUrl: row.avatarUrl,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+/** The user's GitHub token, decrypted for one call to GitHub; never logged or returned. */
+export function githubTokenOf(secretBox: SecretBox | null, user: UserRow): string {
+  if (!secretBox) {
+    throw problem(
+      "upstream_unavailable",
+      "This server has no ENCRYPTION_KEY to read GitHub tokens.",
+    );
+  }
+  return secretBox.decrypt(user.githubTokenEnc);
 }

@@ -1,0 +1,35 @@
+[
+  {
+    "id": 9001,
+    "name": "next-hello",
+    "full_name": "lift-demo/next-hello",
+    "private": false,
+    "owner": { "login": "lift-demo", "id": 7001, "type": "Organization" },
+    "html_url": "https://github.com/lift-demo/next-hello",
+    "default_branch": "main",
+    "pushed_at": "2026-11-18T09:30:00Z",
+    "updated_at": "2026-11-18T09:30:00Z"
+  },
+  {
+    "id": 9002,
+    "name": "express-postgres",
+    "full_name": "lift-demo/express-postgres",
+    "private": false,
+    "owner": { "login": "lift-demo", "id": 7001, "type": "Organization" },
+    "html_url": "https://github.com/lift-demo/express-postgres",
+    "default_branch": "main",
+    "pushed_at": "2026-11-17T15:00:00Z",
+    "updated_at": "2026-11-17T15:00:00Z"
+  },
+  {
+    "id": 9003,
+    "name": "notes",
+    "full_name": "ama-owusu/notes",
+    "private": true,
+    "owner": { "login": "ama-owusu", "id": 4242, "type": "User" },
+    "html_url": "https://github.com/ama-owusu/notes",
+    "default_branch": "trunk",
+    "pushed_at": null,
+    "updated_at": "2026-10-01T08:00:00Z"
+  }
+]
