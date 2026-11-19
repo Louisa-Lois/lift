@@ -1,12 +1,21 @@
 import { type Env, loadEnv } from "./env";
 import { buildServer } from "./server";
 
+// `node dist/index.js check-env` validates the environment and exits. The deploy runs it before
+// the rollout (infra/docker/api-entrypoint.sh), so a bad /opt/lift/.env stops the deploy while
+// the previous release keeps serving. The messages name keys and rules, never values.
+const checkOnly = process.argv[2] === "check-env";
+
 let env: Env;
 try {
   env = loadEnv();
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
+}
+if (checkOnly) {
+  console.log("check-env: the API's environment is valid");
+  process.exit(0);
 }
 
 const app = buildServer(env);

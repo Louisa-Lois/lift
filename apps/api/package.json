@@ -12,13 +12,20 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fastify/swagger": "9.9.5",
+    "@lift/db": "workspace:*",
     "@lift/shared": "workspace:*",
+    "drizzle-orm": "catalog:",
     "fastify": "catalog:",
+    "fastify-type-provider-zod": "7.0.0",
+    "ioredis": "catalog:",
+    "postgres": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@lift/config": "workspace:*",
     "@types/node": "catalog:",
+    "openapi-types": "12.1.3",
     "tsup": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
