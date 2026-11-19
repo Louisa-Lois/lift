@@ -154,12 +154,14 @@ export interface NewDeployment {
 /**
  * Inserts a `queued` deployment with its first timeline step and `deployment.created`, and
  * cancels the service's older queued deployments: newest wins. Locking the service row first
- * means two triggers at once can't both stay queued.
+ * means two triggers at once can't both stay queued. A push or an editor commit deploys a commit
+ * once: a redelivered push, or the push that follows an editor commit, returns null and changes
+ * nothing (the `deployments_push_editor_dedup` index agrees).
  */
 export async function createDeploymentRows(
   db: Db,
   input: NewDeployment,
-): Promise<{ row: DeploymentRow; events: EventRow[]; canceled: DeploymentRow[] }> {
+): Promise<{ row: DeploymentRow; events: EventRow[]; canceled: DeploymentRow[] } | null> {
   const { service, commit, actor } = input;
   return db.transaction(async (tx) => {
     await tx
@@ -167,6 +169,20 @@ export async function createDeploymentRows(
       .from(schema.services)
       .where(eq(schema.services.id, service.id))
       .for("update");
+    if (input.trigger === "push" || input.trigger === "editor") {
+      const [already] = await tx
+        .select({ id: d.id })
+        .from(d)
+        .where(
+          and(
+            eq(d.serviceId, service.id),
+            eq(d.commitSha, commit.sha),
+            inArray(d.trigger, ["push", "editor"]),
+          ),
+        )
+        .limit(1);
+      if (already) return null;
+    }
     const now = new Date();
     const events: EventRow[] = [];
     const canceled: DeploymentRow[] = [];
@@ -247,14 +263,17 @@ export async function failDeployment(
 }
 
 /**
- * Creates a deployment and queues its build. If the build can't be queued (Redis is down), the
- * deployment fails at once with `upstream_unavailable` instead of waiting forever.
+ * Creates a deployment and queues its build; null when a push or editor commit was already
+ * deployed. If the build can't be queued (Redis is down), the deployment fails at once with
+ * `upstream_unavailable` instead of waiting forever.
  */
 export async function startDeployment(
   deps: DeploymentDeps,
   input: NewDeployment,
-): Promise<DeploymentRow> {
-  const { row, events, canceled } = await createDeploymentRows(deps.db, input);
+): Promise<DeploymentRow | null> {
+  const created = await createDeploymentRows(deps.db, input);
+  if (!created) return null;
+  const { row, events, canceled } = created;
   await publishEvents(deps.redis, events, deps.log);
   for (const old of canceled) {
     await dropQueuedBuild(deps.queues, old.id);

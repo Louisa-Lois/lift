@@ -22,6 +22,8 @@ export interface FakeGithubOptions {
   login?: string;
   id?: number;
   failTokenExchange?: boolean;
+  /** How GitHub answers a request to add a webhook: 201 (the default), or 403 without admin rights. */
+  hookStatus?: number;
 }
 
 /** `rel="next"` when there are more pages, like GitHub's Link header. */
@@ -73,6 +75,16 @@ export function fakeGithub(options: FakeGithubOptions = {}) {
     if (route === "GET api.github.com/user/repos") return page(REPOS, url);
     if (request.method === "DELETE" && url.pathname.startsWith("/applications/")) {
       return new Response(null, { status: 204 });
+    }
+    const hooksPath = url.pathname.match(/^\/repos\/([^/]+)\/([^/]+)\/hooks(?:\/(\d+))?$/);
+    if (url.host === "api.github.com" && hooksPath) {
+      if (request.method === "POST" && !hooksPath[3]) {
+        const status = options.hookStatus ?? 201;
+        return status === 201
+          ? Response.json({ id: 4242, name: "web", active: true }, { status: 201 })
+          : Response.json({ message: "Not allowed" }, { status });
+      }
+      if (request.method === "DELETE" && hooksPath[3]) return new Response(null, { status: 204 });
     }
     const commitPath = url.pathname.match(/^\/repos\/([^/]+)\/([^/]+)\/commits\/([^/]+)$/);
     if (request.method === "GET" && url.host === "api.github.com" && commitPath) {

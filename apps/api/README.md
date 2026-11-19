@@ -28,7 +28,14 @@ The REST API every client and the worker go through. **Owner:** WS1 Back end & A
   - `GET /deployments/:id/logs/stream` replays from the first line (or after `Last-Event-ID`), follows live, and ends with one `end` event carrying the final status.
   - When a deployment ends, the API appends an end marker to `logs:dep:{id}`, copies the lines to `build_logs` (NDJSON, the last 1 MB) and lets the stream expire after 7 days. After that, both routes read the copy.
 
-**Next:** BE-08 (push webhooks, after INF-11).
+- **Push deploys (BE-08):**
+  - Creating a service adds a GitHub webhook for `push` events, with a random secret of the service's own, stored encrypted. A service made before then gets its webhook on its next manual deploy, and deleting a service removes it.
+  - The webhook is best effort: none is added while `PUBLIC_URL` is localhost (GitHub can't deliver there), and a user without admin rights on the repo gets manual deploys only. It never fails the request that adds it.
+  - `POST /webhooks/github?service=svc_…` checks `X-Hub-Signature-256` against the raw body in constant time (401 if wrong) and answers `ping` with 200.
+  - A push to the service's branch deploys its head commit with `trigger: push`, once per commit: a redelivered push changes nothing.
+  - Other branches, branch deletions, other repos and other events get a 202 with the reason, for GitHub's delivery log.
+
+**Next:** the Nov 22 work: variables (BE-09), Postgres databases, rollback and API tokens.
 
 | Command | What it does |
 | --- | --- |

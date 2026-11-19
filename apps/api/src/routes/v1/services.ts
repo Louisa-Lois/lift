@@ -3,21 +3,27 @@ import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { enqueueOp } from "../../jobs/enqueue";
 import { requireUser } from "../../plugins/auth";
+import type { SecretBox } from "../../services/crypto";
 import { publishEvents } from "../../services/events";
+import type { Github } from "../../services/github";
 import {
   accessService,
   deleteServiceRows,
   serviceViews,
   updateServiceRows,
 } from "../../services/services";
+import { githubTokenOf } from "../../services/users";
+import { removeWebhook } from "../../services/webhooks";
 
 const ServiceParams = z.object({ serviceId: ServiceId });
 
 /** BE-05: one service: read, change settings (used from the next deploy on), delete. */
-export const serviceRoutes: FastifyPluginAsyncZod<{ appsDomain: string }> = async (
-  app,
-  { appsDomain },
-) => {
+export const serviceRoutes: FastifyPluginAsyncZod<{
+  appsDomain: string;
+  github: Github;
+  secretBox: SecretBox | null;
+  publicUrl: string;
+}> = async (app, { appsDomain, github, secretBox, publicUrl }) => {
   app.get(
     "/services/:serviceId",
     {
@@ -80,6 +86,13 @@ export const serviceRoutes: FastifyPluginAsyncZod<{ appsDomain: string }> = asyn
         serviceId: service.id,
         projectId: service.projectId,
       });
+      if (service.webhookId !== null) {
+        await removeWebhook(
+          { db: app.db, github, secretBox, publicUrl, log: request.log },
+          service,
+          githubTokenOf(secretBox, user),
+        );
+      }
       return reply.code(204).send();
     },
   );
