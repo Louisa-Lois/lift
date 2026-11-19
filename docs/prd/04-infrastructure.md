@@ -125,14 +125,22 @@
 
 ### Hardening checklist
 
-- [ ] **Metadata endpoint blocked:** IMDSv2 required with hop limit 1 (Terraform), plus `iptables -I DOCKER-USER -d 169.254.169.254 -j DROP`, so no app can read the instance's credentials.
-- [ ] **Control plane unreachable from apps:** in `DOCKER-USER`, allow `172.30.0.0/24` (the worker's network) to the control plane's private IP on ports 4000 and 6379, and drop every other Docker subnet to that IP.
-- [ ] **No spam:** drop outbound TCP 25 from Docker subnets.
-- [ ] **Limits on every app container:** CPU, memory, swap and process count; no privileged containers, host networking or host mounts; `no-new-privileges`; `NET_RAW` dropped.
-- [ ] **Docker socket** mounted only into the worker container, which has no inbound ports.
-- [ ] **No SSH:** port 22 closed in both security groups and no key pair; shells and deploys go through SSM with IAM identities; the deploy role can only run commands on the two Lift VMs. sshd stays installed with root and password logins off, as a break-glass path only.
+- [x] **Metadata endpoint blocked:** IMDSv2 required with hop limit 1 (Terraform), plus `iptables -I DOCKER-USER -d 169.254.169.254 -j DROP`, so no app can read the instance's credentials.
+  - *Checked Nov 19:* both instances require IMDSv2 with hop limit 1 (`aws ec2 describe-instances`); `LIFT-FW` drops `169.254.169.254`; `firewall-check.sh` finds it blocked from `lift-edge` and `lift-build`, before and after a worker reboot.
+- [x] **Control plane unreachable from apps:** in `DOCKER-USER`, allow `172.30.0.0/24` (the worker's network) to the control plane's private IP on ports 4000 and 6379, and drop every other Docker subnet to that IP.
+  - *Checked Nov 19:* `firewall-check.sh` finds `:4000` and `:6379` blocked from `lift-edge` (apps) and `lift-build` (build steps), and reachable from the worker through `lift-system`; the control plane's security group admits 4000 and 6379 only from the worker's group.
+- [x] **No spam:** drop outbound TCP 25 from Docker subnets.
+  - *Checked Nov 19:* `LIFT-FW` drops TCP 25 leaving through `ens5`.
+- [x] **Limits on every app container:** CPU, memory, swap and process count; no privileged containers, host networking or host mounts; `no-new-privileges`; `NET_RAW` dropped.
+  - *Checked Nov 19:* both live apps run with `NanoCpus` 500000000, `Memory` = `MemorySwap` = 536870912, `PidsLimit` 256, `no-new-privileges`, `NET_RAW` dropped, not privileged, on `lift-edge`, with no binds or mounts; `apps/worker/test/deploy-spec.test.ts` checks the same.
+- [x] **Docker socket** mounted only into the worker container, which has no inbound ports, and read-only into the socket proxy Traefik reads through.
+  - *Checked Nov 19:* on the worker, `lift-worker-1` (read-write) and `lift-socket-proxy-1` (read-only, internal network); on the control plane, only the read-only socket proxy. None of them publishes a port.
+- [x] **No SSH:** port 22 closed in both security groups and no key pair; shells and deploys go through SSM with IAM identities; the deploy role can only run commands on the two Lift VMs. sshd stays installed with root and password logins off, as a break-glass path only.
+  - *Checked Nov 19:* neither security group admits port 22 (control: 80 and 443 from anywhere, 4000 and 6379 from the worker's group; worker: 80 and 443); neither instance has a key pair; `PermitRootLogin`, `PasswordAuthentication` and `KbdInteractiveAuthentication` are `no` on both; the deploy role may send `AWS-RunShellScript` to the two instances only (`infra/terraform/iam.tf`).
 - [ ] **Secrets:** `/opt/lift/.env` mode 600; the Cloudflare token limited to DNS on one zone; the Anthropic key only on the control plane.
-- [ ] **Firewall rules** live in `infra/scripts/firewall.sh`, installed by `lift-release.sh` with every release (cloud-init never runs again on existing VMs) and applied at boot by `lift-firewall.service` before Docker starts, so no container runs without them.
+  - *Checked Nov 19:* `/opt/lift/.env` is mode 600, owned by root, on both VMs; the Anthropic key is in the control plane's only. Still to confirm: the Cloudflare token's scope (DNS on one zone), shown on the token's page in the Cloudflare dashboard.
+- [x] **Firewall rules** live in `infra/scripts/firewall.sh`, installed by `lift-release.sh` with every release (cloud-init never runs again on existing VMs) and applied at boot by `lift-firewall.service` before Docker starts, so no container runs without them.
+  - *Checked Nov 19:* after a worker reboot, `lift-firewall.service` applied `LIFT-FW` at 6.9 s and Docker was ready at 12.3 s; `firewall-check.sh` passed all 14 checks before and after.
 - [ ] **Abuse (cut list):** default 0.5 vCPU and 512 MB, maximum 1 vCPU and 1 GB; a default-size container above 90% CPU for 10 minutes is stopped and its project flagged.
 - [ ] **Stretch:** run app containers under gVisor (`runsc`) for kernel isolation.
 
