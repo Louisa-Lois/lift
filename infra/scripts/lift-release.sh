@@ -89,6 +89,25 @@ ensure_networks() {
   fi
 }
 
+# The worker's container firewall (INF-11). Each release installs its unit, because cloud-init
+# never runs again on existing VMs; at boot the unit applies it before Docker starts.
+install_firewall() {
+  [ "$ROLE" = worker ] || return 0
+  local unit=/etc/systemd/system/lift-firewall.service
+  if ! cmp -s "$RELEASE_DIR/scripts/lift-firewall.service" "$unit"; then
+    install -m 0644 "$RELEASE_DIR/scripts/lift-firewall.service" "$unit"
+    systemctl daemon-reload
+  fi
+  systemctl enable --quiet lift-firewall.service
+  apply_firewall
+}
+
+# Applying it again is harmless: LIFT-FW is replaced in one transaction.
+apply_firewall() {
+  [ "$ROLE" = worker ] || return 0
+  "$RELEASE_DIR/scripts/firewall.sh"
+}
+
 activate() {
   ln -sfn "$RELEASE_DIR" "$LIFT_DIR/current.next"
   mv -Tf "$LIFT_DIR/current.next" "$LIFT_DIR/current"
@@ -150,6 +169,8 @@ cmd_up() {
   log "$ROLE: starting $(env_value "$RELEASE_ENV" IMAGE_TAG | cut -c1-7)"
   # --wait fails the deploy if a container exits or stays unhealthy.
   compose up --detach --remove-orphans --wait --wait-timeout 300
+  # After compose up: the worker container is recreated with its route through lift-system first.
+  install_firewall
   activate
   prune
   compose ps --format 'table {{.Service}}\t{{.Status}}'
@@ -160,6 +181,8 @@ cmd_boot() {
   require_release_env
   install_config
   ensure_networks
+  # lift-firewall.service applied it before Docker started; again here in case Docker reset it.
+  apply_firewall
   compose up --detach --remove-orphans
 }
 

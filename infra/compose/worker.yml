@@ -85,8 +85,11 @@ services:
       - /var/lib/lift:/var/lib/lift
     networks:
       # 172.30.0.0/24: the one Docker subnet INF-11's firewall lets reach the control plane's
-      # private IP on 4000 and 6379.
-      system: {}
+      # private IP on 4000 and 6379. gw_priority makes it the worker's default route: without it
+      # Docker picks lift-build (first by name), and the worker's calls to the control plane
+      # would leave from a 10.200.x.x address that the firewall drops.
+      system:
+        gw_priority: 1
       build: {}
 
   # The worker checks a new app's health from here (`docker exec lift-probe curl …`, through the
