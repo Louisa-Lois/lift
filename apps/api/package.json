@@ -23,6 +23,7 @@
     "fastify-type-provider-zod": "7.0.0",
     "ioredis": "catalog:",
     "postgres": "catalog:",
+    "yjs": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

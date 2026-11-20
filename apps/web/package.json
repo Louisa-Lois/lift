@@ -12,6 +12,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@hocuspocus/provider": "catalog:",
     "@hookform/resolvers": "7.0.3",
     "@lift/shared": "workspace:*",
     "@tanstack/react-query": "5.108.0",
@@ -20,6 +21,7 @@
     "cn": "^0.5.2",
     "geist": "1.9.2",
     "lucide-react": "^1.75.0",
+    "monaco-editor": "0.57.0",
     "next": "16.4.6",
     "radix-ui": "^1.8.1",
     "react": "^19.3.1",
@@ -27,6 +29,9 @@
     "react-hook-form": "7.91.0",
     "react-virtuoso": "4.18.20",
     "sonner": "^2.0.8",
+    "y-monaco": "0.1.6",
+    "y-protocols": "catalog:",
+    "yjs": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

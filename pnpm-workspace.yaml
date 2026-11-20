@@ -8,6 +8,8 @@ packages:
 # instead of a version number. Add a library here when a second package starts using it.
 catalog:
   "@biomejs/biome": 2.6.8
+  # The live editor's client and server must speak the same Hocuspocus protocol.
+  "@hocuspocus/provider": 4.8.0
   "@types/node": ^24.19.2
   # BullMQ at least two weeks old (6.7.7 was two days old on Nov 19); bump deliberately.
   bullmq: 6.7.0
@@ -23,6 +25,7 @@ catalog:
   # need. Stay on 6.x, the last JavaScript release, until they support 7.
   typescript: 6.0.3
   vitest: ^5.1.0
+  y-protocols: ^1.0.7
   yjs: ^13.6.33
   zod: ^4.6.7
 
