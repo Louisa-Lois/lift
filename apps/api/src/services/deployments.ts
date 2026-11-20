@@ -283,6 +283,20 @@ export async function startDeployment(
   deps: DeploymentDeps,
   input: NewDeployment,
 ): Promise<DeploymentRow | null> {
+  const row = await createDeployment(deps, input);
+  if (row) await queueBuild(deps, row, input.service);
+  return row;
+}
+
+/**
+ * The first half of `startDeployment`: the `queued` deployment and its events, with no build yet.
+ * An editor commit creates its deployment before the branch moves, so the push webhook that
+ * follows always finds it (BE-18), and queues the build once the branch has moved.
+ */
+export async function createDeployment(
+  deps: DeploymentDeps,
+  input: NewDeployment,
+): Promise<DeploymentRow | null> {
   const created = await createDeploymentRows(deps.db, input);
   if (!created) return null;
   const { row, events, canceled } = created;
@@ -291,8 +305,17 @@ export async function startDeployment(
     await dropQueuedBuild(deps.queues, old.id);
     await finishLogs(deps, old.id, "canceled");
   }
+  return row;
+}
+
+/** The second half of `startDeployment`: queues the build, or fails the deployment at once. */
+export async function queueBuild(
+  deps: DeploymentDeps,
+  row: DeploymentRow,
+  service: ServiceRow,
+): Promise<void> {
   try {
-    await enqueueBuild(deps.queues, buildJobFor(row, input.service));
+    await enqueueBuild(deps.queues, buildJobFor(row, service));
   } catch (error) {
     deps.log.error({ err: error, deploymentId: row.id }, "couldn't queue a build");
     await failDeployment(deps, row.id, {
@@ -303,7 +326,6 @@ export async function startDeployment(
       cause: error,
     });
   }
-  return row;
 }
 
 /**
@@ -654,7 +676,7 @@ export async function rollbackDeployment(
  */
 export async function cancelDeployment(
   deps: DeploymentDeps,
-  input: { deployment: DeploymentRow; actor: Actor; by: string },
+  input: { deployment: DeploymentRow; actor: Actor; by: string; message?: string },
 ): Promise<DeploymentRow> {
   const result = await deps.db.transaction(async (tx) => {
     const [row] = await tx.select().from(d).where(eq(d.id, input.deployment.id)).for("update");
@@ -668,7 +690,7 @@ export async function cancelDeployment(
     const now = new Date();
     const change = await changeStatus(tx, row, "canceled", {
       at: now,
-      message: `Canceled by ${input.by}`,
+      message: input.message ?? `Canceled by ${input.by}`,
       actor: input.actor,
       set: { finishedAt: now },
     });

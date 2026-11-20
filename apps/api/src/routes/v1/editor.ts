@@ -1,4 +1,10 @@
 import {
+  cursorPage,
+  EditorChange,
+  EditorCommitBody,
+  EditorCommitResponse,
+  EditorDiscardBody,
+  EditorDiscardResponse,
   EditorSession,
   EditorSessionBody,
   EditorTree,
@@ -11,13 +17,23 @@ import { z } from "zod";
 import { requireUser } from "../../plugins/auth";
 import type { CollabClient } from "../../services/collab-client";
 import type { SecretBox } from "../../services/crypto";
-import { type EditorDeps, editorTree, openSession } from "../../services/editor";
+import {
+  commitChanges,
+  discardChanges,
+  type EditorDeps,
+  editorTree,
+  listChanges,
+  openSession,
+} from "../../services/editor";
 import type { Github } from "../../services/github";
 import { accessService } from "../../services/services";
 
 const ServiceParams = z.object({ serviceId: ServiceId });
 
-/** BE-17: the live editor's file tree and sessions. The editing itself goes through collab. */
+/**
+ * BE-17 and BE-18: the live editor's file tree and sessions, its changes, Commit & deploy, and
+ * discard. The editing itself goes through the collab server.
+ */
 export const editorRoutes: FastifyPluginAsyncZod<{
   github: Github;
   secretBox: SecretBox | null;
@@ -26,6 +42,8 @@ export const editorRoutes: FastifyPluginAsyncZod<{
 }> = async (app, { github, secretBox, collab, collabSecret }) => {
   const deps = (log: FastifyBaseLogger): EditorDeps => ({
     db: app.db,
+    redis: app.redis,
+    queues: app.queues,
     github,
     secretBox,
     collab,
@@ -83,6 +101,81 @@ export const editorRoutes: FastifyPluginAsyncZod<{
         user,
         path: request.body.path,
       });
+    },
+  );
+
+  app.get(
+    "/services/:serviceId/editor/changes",
+    {
+      schema: {
+        summary: "The files with drafts: what Commit & deploy would commit",
+        tags: ["editor"],
+        params: ServiceParams,
+        response: { 200: cursorPage(EditorChange) },
+      },
+    },
+    async (request) => {
+      const user = requireUser(request);
+      const { service } = await accessService(app.db, request.params.serviceId, user.id);
+      return { data: await listChanges(deps(request.log), service), nextCursor: null };
+    },
+  );
+
+  app.post(
+    "/services/:serviceId/editor/commit",
+    {
+      // It deploys, so a personal token needs the deploy scope.
+      config: { scope: "deploy" },
+      schema: {
+        summary: "Commit the drafts to the branch, as you, and deploy the commit",
+        description:
+          "Every draft, or `paths`. A 409 `conflict` names each file that changed on GitHub since its draft started, in `fields`; discard and reload those. The deployment has trigger `editor`, and the push webhook that follows is skipped.",
+        tags: ["editor"],
+        params: ServiceParams,
+        body: EditorCommitBody,
+        response: { 200: EditorCommitResponse },
+      },
+    },
+    async (request) => {
+      const user = requireUser(request);
+      const { service, project } = await accessService(
+        app.db,
+        request.params.serviceId,
+        user.id,
+        "editor",
+      );
+      return commitChanges(deps(request.log), {
+        service,
+        project,
+        user,
+        message: request.body.message,
+        paths: request.body.paths,
+      });
+    },
+  );
+
+  app.post(
+    "/services/:serviceId/editor/discard",
+    {
+      config: { scope: "deploy" },
+      schema: {
+        summary: "Reload drafts from the branch, for everyone editing them",
+        description: "Every draft, or `paths`.",
+        tags: ["editor"],
+        params: ServiceParams,
+        body: EditorDiscardBody,
+        response: { 200: EditorDiscardResponse },
+      },
+    },
+    async (request) => {
+      const user = requireUser(request);
+      const { service, project } = await accessService(
+        app.db,
+        request.params.serviceId,
+        user.id,
+        "editor",
+      );
+      return discardChanges(deps(request.log), { service, project, paths: request.body.paths });
     },
   );
 };

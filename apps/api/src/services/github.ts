@@ -494,5 +494,92 @@ export function createGithub(options: GithubOptions) {
       if (content === null) return { kind: "binary" };
       return { kind: "file", file: { path: raw.path, sha: raw.sha, size: raw.size, content } };
     },
+    /**
+     * BE-18: a commit of these files on top of `parent`, with the Git Data API: a blob each, a
+     * tree on the parent's, then the commit. Made with the user's token, so the commit is theirs.
+     * The branch doesn't move: see `fastForward`. A user who can't push gets `forbidden`.
+     */
+    async writeCommit(
+      token: string,
+      owner: string,
+      name: string,
+      input: {
+        parent: string;
+        baseTree: string;
+        message: string;
+        files: { path: string; mode: string; content: string }[];
+      },
+    ): Promise<{ sha: string; blobs: Record<string, string> }> {
+      const repo = `${segment(owner)}/${segment(name)}`;
+      async function post<T>(what: string, path: string, body: unknown): Promise<T> {
+        const response = await send(what, `${API}/repos/${repo}/${path}`, {
+          method: "POST",
+          headers: { ...api(token).headers, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        // GitHub answers 403 or 404 to a user who can read the repo but not push to it.
+        if (response.status === 403 || response.status === 404) {
+          throw problem(
+            "forbidden",
+            `Your GitHub account can't push to ${owner}/${name}. Ask for write access, or let someone who has it commit.`,
+          );
+        }
+        if (!response.ok) throw failure(what, response);
+        return (await response.json()) as T;
+      }
+      const blobs: Record<string, string> = {};
+      for (const file of input.files) {
+        const blob = await post<{ sha: string }>(
+          `POST /repos/${owner}/${name}/git/blobs`,
+          "git/blobs",
+          { content: file.content, encoding: "utf-8" },
+        );
+        blobs[file.path] = blob.sha;
+      }
+      const tree = await post<{ sha: string }>(
+        `POST /repos/${owner}/${name}/git/trees`,
+        "git/trees",
+        {
+          base_tree: input.baseTree,
+          tree: input.files.map((file) => ({
+            path: file.path,
+            mode: file.mode,
+            type: "blob",
+            sha: blobs[file.path],
+          })),
+        },
+      );
+      const commit = await post<{ sha: string }>(
+        `POST /repos/${owner}/${name}/git/commits`,
+        "git/commits",
+        { message: input.message, tree: tree.sha, parents: [input.parent] },
+      );
+      return { sha: commit.sha, blobs };
+    },
+    /**
+     * Moves a branch to a commit that has its head as parent, never forcing. False when GitHub
+     * refuses (422): someone pushed meanwhile, or the branch is protected.
+     */
+    async fastForward(
+      token: string,
+      owner: string,
+      name: string,
+      branch: string,
+      sha: string,
+    ): Promise<boolean> {
+      const what = `PATCH /repos/${owner}/${name}/git/refs/heads/${branch}`;
+      const response = await send(
+        what,
+        `${API}/repos/${segment(owner)}/${segment(name)}/git/refs/heads/${pathSegments(branch)}`,
+        {
+          method: "PATCH",
+          headers: { ...api(token).headers, "Content-Type": "application/json" },
+          body: JSON.stringify({ sha, force: false }),
+        },
+      );
+      if (response.status === 422 || response.status === 409) return false;
+      if (!response.ok) throw failure(what, response);
+      return true;
+    },
   };
 }
