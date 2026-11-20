@@ -91,3 +91,35 @@ describe("problem+json errors", () => {
     expect(expectProblem(response, 400).code).toBe("validation_failed");
   });
 });
+
+describe("logging problems", () => {
+  it("logs what a 5xx problem told the person, never its cause, and leaves 4xx ones out", async () => {
+    const lines: string[] = [];
+    const logged = buildServer(testEnv({ LOG_LEVEL: "warn" }), {
+      logStream: { write: (line) => void lines.push(line) },
+    });
+    const detail = "GitHub answered 403 to GET /repos/lift-demo/next-hello/commits/main.";
+    logged.get(`${API_BASE_PATH}/test/github`, { config: { public: true } }, async () => {
+      throw problem("github_error", detail, { cause: new Error("GitHub said gho_cause_token") });
+    });
+    logged.get(`${API_BASE_PATH}/test/conflict`, { config: { public: true } }, async () => {
+      throw problem("conflict", "The deployment was canceled.");
+    });
+    try {
+      expect((await logged.inject({ url: `${API_BASE_PATH}/test/github` })).statusCode).toBe(502);
+      expect((await logged.inject({ url: `${API_BASE_PATH}/test/conflict` })).statusCode).toBe(409);
+    } finally {
+      await logged.close();
+    }
+    const problems = lines
+      .map((line) => JSON.parse(line) as { level: number; msg: string; problem?: unknown })
+      .filter((entry) => entry.msg === "answered with a problem");
+    expect(problems).toEqual([
+      expect.objectContaining({
+        level: 40,
+        problem: { code: "github_error", status: 502, detail },
+      }),
+    ]);
+    expect(lines.join("")).not.toContain("gho_cause_token");
+  });
+});

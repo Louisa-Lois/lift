@@ -3,6 +3,10 @@ import { type Db, schema } from "@lift/db";
 import {
   COLLAB_TEXT_NAME,
   EDITOR_LIMITS,
+  type EditorChange,
+  type EditorCommit,
+  type EditorCommitResponse,
+  type EditorDiscardResponse,
   type EditorSession,
   type EditorTree,
   editorDocumentName,
@@ -13,27 +17,27 @@ import {
 } from "@lift/shared";
 import { signCollabToken } from "@lift/shared/collab-token";
 import { and, asc, eq, inArray } from "drizzle-orm";
-import type { FastifyBaseLogger } from "fastify";
 import * as Y from "yjs";
 import { problem } from "../lib/problem";
 import type { ProjectRow } from "./access";
 import type { CollabClient } from "./collab-client";
 import type { SecretBox } from "./crypto";
-import { type Github, type GithubContents, SYMLINK_MODE } from "./github";
+import { cancelDeployment, createDeployment, type DeploymentDeps, queueBuild } from "./deployments";
+import { publishEvents, recordEvent } from "./events";
+import { type Github, type GithubContents, isTokenRefused, SYMLINK_MODE } from "./github";
 import type { ServiceRow } from "./services";
 import type { UserRow } from "./sessions";
 import { findUserById, githubTokenOf } from "./users";
 
 const documents = schema.editorDocuments;
 
-export interface EditorDeps {
-  db: Db;
+/** The database, Redis and queues for the deployment a commit starts, and GitHub and collab. */
+export interface EditorDeps extends DeploymentDeps {
   github: Github;
   secretBox: SecretBox | null;
   collab: CollabClient;
   /** Signs the collab tokens; without it the editor answers 503. */
   collabSecret: string | undefined;
-  log: FastifyBaseLogger;
 }
 
 /**
@@ -75,30 +79,53 @@ function yjsStateOf(text: string): Buffer {
   return Buffer.from(Y.encodeStateAsUpdate(doc));
 }
 
+/** Reads of a service's repo, with its project owner's GitHub token (see `readAsOwner`). */
+interface RepoReader {
+  getFiles(ref: string): ReturnType<Github["getFiles"]>;
+  getContents(path: string, ref: string): ReturnType<Github["getContents"]>;
+  getCommit(ref: string): ReturnType<Github["getCommit"]>;
+}
+
 /**
- * The project owner's GitHub token. The editor reads the repo as its owner, as builds do, so a
- * member who can't see the repo on GitHub can still open its files in Lift.
+ * The editor reads the repo with the project owner's GitHub token, as builds do, so a member who
+ * can't see the repo on GitHub can still open its files in Lift. If GitHub refuses that token,
+ * only the owner can fix it, by signing in again: anyone else is told whose token it is, rather
+ * than to sign in again themselves.
  */
-async function ownerToken(deps: EditorDeps, project: ProjectRow): Promise<string> {
+async function readAsOwner(
+  deps: EditorDeps,
+  service: ServiceRow,
+  project: ProjectRow,
+  user: UserRow,
+): Promise<RepoReader> {
   const owner = await findUserById(deps.db, project.ownerId);
   if (!owner) throw new Error(`project ${project.id} has no owner`);
-  return githubTokenOf(deps.secretBox, owner);
+  const token = githubTokenOf(deps.secretBox, owner);
+  const { repoOwner, repoName } = service;
+  const naming = <T>(read: Promise<T>): Promise<T> =>
+    read.catch((error: unknown) => {
+      if (owner.id === user.id || !isTokenRefused(error)) throw error;
+      throw problem(
+        "github_error",
+        `The editor reads the repo with the project owner's GitHub token, and GitHub refused it. Ask ${owner.login} to sign out of Lift and sign in again.`,
+      );
+    });
+  return {
+    getFiles: (ref) => naming(deps.github.getFiles(token, repoOwner, repoName, ref)),
+    getContents: (path, ref) =>
+      naming(deps.github.getContents(token, repoOwner, repoName, path, ref)),
+    getCommit: (ref) => naming(deps.github.getCommit(token, repoOwner, repoName, ref)),
+  };
 }
 
 /** BE-17: the files the editor lists, at the service's branch unless `ref` says otherwise. */
 export async function editorTree(
   deps: EditorDeps,
-  service: ServiceRow,
-  project: ProjectRow,
-  ref: string | undefined,
+  input: { service: ServiceRow; project: ProjectRow; user: UserRow; ref: string | undefined },
 ): Promise<EditorTree> {
-  const token = await ownerToken(deps, project);
-  const tree = await deps.github.getFiles(
-    token,
-    service.repoOwner,
-    service.repoName,
-    ref ?? service.branch,
-  );
+  const { service, project, user, ref } = input;
+  const reader = await readAsOwner(deps, service, project, user);
+  const tree = await reader.getFiles(ref ?? service.branch);
   if (!tree) {
     const repo = `${service.repoOwner}/${service.repoName}`;
     throw problem(
@@ -202,19 +229,13 @@ async function makeRoom(deps: EditorDeps, serviceId: string): Promise<void> {
 async function createDocument(
   deps: EditorDeps,
   service: ServiceRow,
-  token: string,
+  reader: RepoReader,
   path: string,
 ): Promise<string> {
   if (isBinaryPath(path)) {
     throw cantOpen("The editor can't open binary files.", "Can't edit binary files");
   }
-  const head = await deps.github.getContents(
-    token,
-    service.repoOwner,
-    service.repoName,
-    path,
-    service.branch,
-  );
+  const head = await reader.getContents(path, service.branch);
   const file = editableFile(head, path, service.branch);
   await makeRoom(deps, service.id);
   const [created] = await deps.db
@@ -243,18 +264,12 @@ async function createDocument(
 async function refreshDocument(
   deps: EditorDeps,
   service: ServiceRow,
-  token: string,
+  reader: RepoReader,
   row: DocumentRow,
 ): Promise<string> {
   let head: GithubContents;
   try {
-    head = await deps.github.getContents(
-      token,
-      service.repoOwner,
-      service.repoName,
-      row.path,
-      service.branch,
-    );
+    head = await reader.getContents(row.path, service.branch);
   } catch (error) {
     // The document opens without GitHub; only the reload waits.
     deps.log.warn(
@@ -301,11 +316,11 @@ export async function openSession(
       "The live editor isn't set up on this server (COLLAB_SECRET).",
     );
   }
-  const token = await ownerToken(deps, project);
+  const reader = await readAsOwner(deps, service, project, user);
   const row = await findDocument(deps.db, service.id, path);
   const baseSha = row
-    ? await refreshDocument(deps, service, token, row)
-    : await createDocument(deps, service, token, path);
+    ? await refreshDocument(deps, service, reader, row)
+    : await createDocument(deps, service, reader, path);
   return {
     documentName: editorDocumentName(service.id, path),
     token: await signCollabToken({ sub: user.id, svc: service.id, path, role }, deps.collabSecret),
@@ -318,4 +333,255 @@ export async function openSession(
       avatarUrl: user.avatarUrl,
     },
   };
+}
+
+/** One commit or discard at a time for each service, in this process (the API runs as one). */
+const busy = new Map<string, Promise<unknown>>();
+
+async function oneAtATime<T>(serviceId: string, work: () => Promise<T>): Promise<T> {
+  const run = (busy.get(serviceId) ?? Promise.resolve()).catch(() => undefined).then(work);
+  busy.set(serviceId, run);
+  try {
+    return await run;
+  } finally {
+    if (busy.get(serviceId) === run) busy.delete(serviceId);
+  }
+}
+
+interface Draft {
+  row: DocumentRow;
+  text: string;
+}
+
+/** The service's documents whose live text differs from their base, by path. */
+async function draftsOf(deps: EditorDeps, serviceId: string): Promise<Draft[]> {
+  const rows = await deps.db
+    .select({
+      id: documents.id,
+      path: documents.path,
+      baseSha: documents.baseSha,
+      updatedAt: documents.updatedAt,
+    })
+    .from(documents)
+    .where(eq(documents.serviceId, serviceId))
+    .orderBy(asc(documents.path));
+  if (rows.length === 0) return [];
+  const texts = await deps.collab.texts(rows.map((row) => editorDocumentName(serviceId, row.path)));
+  return rows.flatMap((row) => {
+    const text = texts[editorDocumentName(serviceId, row.path)];
+    return typeof text === "string" && blobSha(text) !== row.baseSha ? [{ row, text }] : [];
+  });
+}
+
+/** BE-18: the files with drafts, which a commit would include. */
+export async function listChanges(deps: EditorDeps, service: ServiceRow): Promise<EditorChange[]> {
+  return (await draftsOf(deps, service.id)).map(({ row }) => ({
+    path: row.path,
+    baseSha: row.baseSha,
+    updatedAt: row.updatedAt.toISOString(),
+  }));
+}
+
+const subjectOf = (message: string) => message.split("\n", 1)[0]?.trim().slice(0, 500) || null;
+
+/**
+ * BE-18, Commit & deploy (decision 7 of the Nov 26 plan):
+ * 1. Read each draft's live text from collab, and the branch head with each file's blob SHA.
+ * 2. A file that changed on GitHub since its draft started is a 409, named in `fields`.
+ * 3. Write the blobs, a tree on the head's (keeping each file's mode) and the commit, with the
+ *    user's own token, so the commit is theirs.
+ * 4. Create the `editor` deployment before the branch moves, so the push webhook that follows
+ *    always finds it and skips. Then fast-forward the branch, never forcing, and queue the build.
+ *    If the branch won't move, the deployment is canceled and nothing was committed: 409 when
+ *    someone pushed meanwhile, 502 otherwise (a protected branch, say).
+ * 5. Move each document's base to the commit, record it, and emit `editor.committed`.
+ */
+export async function commitChanges(
+  deps: EditorDeps,
+  input: {
+    service: ServiceRow;
+    project: ProjectRow;
+    user: UserRow;
+    message: string;
+    paths: string[] | undefined;
+  },
+): Promise<EditorCommitResponse> {
+  const { service, project, user } = input;
+  return oneAtATime(service.id, async () => {
+    const drafts = await draftsOf(deps, service.id);
+    const unknown = (input.paths ?? []).filter(
+      (path) => !drafts.some((draft) => draft.row.path === path),
+    );
+    if (unknown.length > 0) {
+      throw problem("validation_failed", `No changes to commit in ${unknown.join(", ")}.`, {
+        fields: { paths: "Pick files that have changes" },
+      });
+    }
+    const chosen = input.paths
+      ? drafts.filter((draft) => input.paths?.includes(draft.row.path))
+      : drafts;
+    if (chosen.length === 0) {
+      throw problem("validation_failed", "Nothing to commit: every file matches the last commit.");
+    }
+
+    const { repoOwner: owner, repoName: name, branch } = service;
+    const reader = await readAsOwner(deps, service, project, user);
+    const head = await reader.getFiles(branch);
+    if (!head) throw problem("github_error", `Couldn't read ${branch} in ${owner}/${name}.`);
+    const upstream = new Map(head.files.map((file) => [file.path, file]));
+    const conflicts: Record<string, string> = {};
+    for (const { row } of chosen) {
+      let sha = upstream.get(row.path)?.sha;
+      // GitHub lists at most 5,000 files of a big repo; ask about the others one by one.
+      if (!sha && head.truncated) {
+        const found = await reader.getContents(row.path, head.sha);
+        if (found.kind === "file") sha = found.file.sha;
+      }
+      if (!sha) conflicts[row.path] = "Deleted on GitHub since you opened it";
+      else if (sha !== row.baseSha) conflicts[row.path] = "Changed on GitHub since you opened it";
+    }
+    if (Object.keys(conflicts).length > 0) {
+      throw problem(
+        "conflict",
+        "Some files changed on GitHub since you opened them. Discard and reload them, then make your change again.",
+        { fields: conflicts },
+      );
+    }
+
+    const token = githubTokenOf(deps.secretBox, user);
+    const commit = await deps.github.writeCommit(token, owner, name, {
+      parent: head.sha,
+      baseTree: head.treeSha,
+      message: input.message,
+      files: chosen.map(({ row, text }) => ({
+        path: row.path,
+        mode: upstream.get(row.path)?.mode ?? "100644",
+        content: text,
+      })),
+    });
+    const deployment = await createDeployment(deps, {
+      service,
+      trigger: "editor",
+      commit: { sha: commit.sha, message: subjectOf(input.message), author: user.login },
+      actor: { type: "user", id: user.id },
+    });
+    if (!deployment) throw new Error(`commit ${commit.sha} was deployed before its branch moved`);
+    if (!(await deps.github.fastForward(token, owner, name, branch, commit.sha))) {
+      await cancelDeployment(deps, {
+        deployment,
+        actor: { type: "system", id: null },
+        by: "Lift",
+        message: `${branch} didn't move, so nothing was committed`,
+      });
+      const now = await reader.getCommit(branch);
+      if (now && now.sha !== head.sha) {
+        throw problem(
+          "conflict",
+          `Someone pushed to ${branch} while you were committing, so nothing was committed. Commit again.`,
+        );
+      }
+      throw problem(
+        "github_error",
+        `GitHub wouldn't move ${branch}; it may be protected. Nothing was committed.`,
+      );
+    }
+    // The commit has landed: a build that can't be queued fails its deployment, which says so.
+    await queueBuild(deps, deployment, service).catch(() => undefined);
+
+    const event = await deps.db.transaction(async (tx) => {
+      for (const { row, text } of chosen) {
+        await tx
+          .update(documents)
+          .set({ baseSha: commit.blobs[row.path] ?? blobSha(text) })
+          .where(eq(documents.id, row.id));
+      }
+      const [record] = await tx
+        .insert(schema.editorCommits)
+        .values({
+          id: newId("ecm"),
+          serviceId: service.id,
+          commitSha: commit.sha,
+          message: input.message,
+          paths: chosen.map(({ row }) => row.path),
+          authorUserId: user.id,
+          deploymentId: deployment.id,
+        })
+        .returning();
+      if (!record) throw new Error("insert returned no editor commit");
+      const data: EditorCommit = {
+        id: record.id,
+        serviceId: record.serviceId,
+        commitSha: record.commitSha,
+        message: record.message,
+        paths: record.paths,
+        authorUserId: record.authorUserId,
+        deploymentId: record.deploymentId,
+        createdAt: record.createdAt.toISOString(),
+      };
+      return recordEvent(tx, {
+        projectId: service.projectId,
+        actorType: "user",
+        actorId: user.id,
+        type: "editor.committed",
+        data,
+      });
+    });
+    await publishEvents(deps.redis, [event], deps.log);
+    return { commitSha: commit.sha, deploymentId: deployment.id };
+  });
+}
+
+/**
+ * BE-18: reloads drafts from the branch head, all of them without `paths`. Each document resets
+ * through collab, so everyone editing it sees the reload, and its base moves to the head. A file
+ * that's gone from the branch (or can't be edited any more) loses its document.
+ */
+export async function discardChanges(
+  deps: EditorDeps,
+  input: { service: ServiceRow; project: ProjectRow; user: UserRow; paths: string[] | undefined },
+): Promise<EditorDiscardResponse> {
+  const { service, project, user } = input;
+  return oneAtATime(service.id, async () => {
+    const rows = input.paths
+      ? await deps.db
+          .select({
+            id: documents.id,
+            path: documents.path,
+            baseSha: documents.baseSha,
+            updatedAt: documents.updatedAt,
+          })
+          .from(documents)
+          .where(and(eq(documents.serviceId, service.id), inArray(documents.path, input.paths)))
+          .orderBy(asc(documents.path))
+      : (await draftsOf(deps, service.id)).map(({ row }) => row);
+    if (rows.length === 0) return { paths: [] };
+    const reader = await readAsOwner(deps, service, project, user);
+    const reloaded: { row: DocumentRow; file: GithubFile }[] = [];
+    const gone: string[] = [];
+    for (const row of rows) {
+      const head = await reader.getContents(row.path, service.branch);
+      if (
+        head.kind === "file" &&
+        head.file.path === row.path &&
+        head.file.size <= EDITOR_LIMITS.maxTextFileBytes
+      ) {
+        reloaded.push({ row, file: head.file });
+      } else {
+        gone.push(row.id);
+      }
+    }
+    await deps.collab.reset(
+      reloaded.map(({ row, file }) => ({
+        name: editorDocumentName(service.id, row.path),
+        text: file.content,
+      })),
+    );
+    await deps.db.transaction(async (tx) => {
+      for (const { row, file } of reloaded) {
+        await tx.update(documents).set({ baseSha: file.sha }).where(eq(documents.id, row.id));
+      }
+      if (gone.length > 0) await tx.delete(documents).where(inArray(documents.id, gone));
+    });
+    return { paths: rows.map((row) => row.path) };
+  });
 }

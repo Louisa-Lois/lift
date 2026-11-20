@@ -1,4 +1,10 @@
-import { EditorSession, EditorTree, editorDocumentName, presenceColor } from "../schemas/editor";
+import {
+  EditorChange,
+  EditorSession,
+  EditorTree,
+  editorDocumentName,
+  presenceColor,
+} from "../schemas/editor";
 import { services, users } from "./demo";
 import { fixtureHex } from "./ids";
 
@@ -34,3 +40,17 @@ export const editorSession = EditorSession.parse({
     avatarUrl: users.owner.avatarUrl,
   },
 });
+
+/** `GET /services/:id/editor/changes`: drafts of server.js and an orders route. */
+export const editorChanges = [
+  EditorChange.parse({
+    path: "server.js",
+    baseSha: editorSession.baseSha,
+    updatedAt: "2026-11-18T10:14:00Z",
+  }),
+  EditorChange.parse({
+    path: "src/routes/orders.js",
+    baseSha: fixtureHex("api-orders-js-blob", 40),
+    updatedAt: "2026-11-18T10:12:30Z",
+  }),
+];

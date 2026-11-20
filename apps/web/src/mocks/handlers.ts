@@ -12,6 +12,8 @@ import {
   type Deployment,
   type DeploymentDetail,
   EDITOR_LIMITS,
+  EditorCommitBody,
+  EditorDiscardBody,
   EditorSessionBody,
   editorDocumentName,
   ID_PREFIXES,
@@ -558,6 +560,23 @@ export const handlers = [
     return HttpResponse.json({
       ...fixtures.editorSession,
       documentName: editorDocumentName(String(params.serviceId), path),
+    });
+  }),
+  // BE-18: two drafts; a commit "deploys" as the demo API's active deployment.
+  http.get(api("/services/:serviceId/editor/changes"), () =>
+    HttpResponse.json(fixtures.page(fixtures.editorChanges)),
+  ),
+  http.post(api("/services/:serviceId/editor/commit"), async ({ request }) => {
+    EditorCommitBody.parse(await request.json());
+    return HttpResponse.json({
+      commitSha: "c0ffee0".padEnd(40, "0"),
+      deploymentId: fixtures.services.api.activeDeploymentId,
+    });
+  }),
+  http.post(api("/services/:serviceId/editor/discard"), async ({ request }) => {
+    const { paths } = EditorDiscardBody.parse(await request.json());
+    return HttpResponse.json({
+      paths: paths ?? fixtures.editorChanges.map((change) => change.path),
     });
   }),
   // FE-16: the demo's failed web build has autofix's diagnosis; other deployments have none.

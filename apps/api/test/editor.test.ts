@@ -48,8 +48,14 @@ const github = fakeGithub({
 /** While set, reads of this file wait for each other in pairs, so two opens really race. */
 let racing: string | null = null;
 const waiting: (() => void)[] = [];
+/** While true, GitHub answers 401 to the owner's token, as it does once a token is revoked. */
+let ownerTokenRevoked = false;
 const githubFetch: typeof globalThis.fetch = async (input, init) => {
   const url = new URL(input instanceof Request ? input.url : String(input));
+  const headers = new Headers(input instanceof Request ? input.headers : init?.headers);
+  if (ownerTokenRevoked && headers.get("authorization") === `Bearer ${OWNER_TOKEN}`) {
+    return Response.json({ message: "Bad credentials" }, { status: 401 });
+  }
   if (racing && url.pathname.endsWith(`/contents/${racing}`)) {
     await new Promise<void>((resolve) => {
       waiting.push(resolve);
@@ -337,6 +343,34 @@ describe("opening a file", () => {
       });
     } finally {
       await bare.close();
+    }
+  });
+});
+
+describe("when GitHub refuses the owner's token", () => {
+  it("tells the owner to sign in again, and everyone else whose token it is", async () => {
+    ownerTokenRevoked = true;
+    try {
+      const tree = `/services/${serviceId}/editor/tree`;
+      expect(Problem.parse((await call("GET", tree)).json())).toMatchObject({
+        status: 502,
+        detail: "GitHub refused the token Lift holds for you. Sign out and sign in again.",
+      });
+      // Kofi signing in again wouldn't help: the tree and a file nobody opened yet name the owner.
+      for (const response of [
+        await call("GET", tree, undefined, kofi),
+        await open("package.json", kofi),
+      ]) {
+        expect(Problem.parse(response.json())).toMatchObject({
+          status: 502,
+          detail:
+            "The editor reads the repo with the project owner's GitHub token, and GitHub refused it. Ask ama-owusu to sign out of Lift and sign in again.",
+        });
+      }
+      // A file someone already opened still opens from its document; only the reload waits.
+      expect((await open("server.js", kofi)).statusCode).toBe(200);
+    } finally {
+      ownerTokenRevoked = false;
     }
   });
 });

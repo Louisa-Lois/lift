@@ -27,7 +27,7 @@ export {
   variables,
 } from "./demo";
 export { diagnosis } from "./diagnoses";
-export { editorSession, editorTree } from "./editor";
+export { editorChanges, editorSession, editorTree } from "./editor";
 export { githubBranches, githubRepos } from "./github";
 export { fixtureIds } from "./ids";
 export { onboardingPlan } from "./plans";

@@ -8,7 +8,7 @@ import {
   type ProjectEvent,
 } from "@lift/shared";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useEffectEvent } from "react";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import { reconnectDelay, wait } from "@/lib/reconnect";
@@ -67,6 +67,12 @@ export function applyProjectEvent(queryClient: QueryClient, event: ProjectEvent)
       // FE-16: the card on the failed deployment's page shows it at once.
       queryClient.setQueryData(queryKeys.diagnosis(event.data.deploymentId), event.data);
       return;
+    case "editor.committed":
+      // BE-18: the committed files are no longer changes, for everyone in the editor.
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.editorChanges(event.data.serviceId),
+      });
+      return;
     default:
       void queryClient.invalidateQueries({ queryKey: project });
   }
@@ -77,8 +83,13 @@ export function applyProjectEvent(queryClient: QueryClient, event: ProjectEvent)
  * (docs/prd/02-frontend.md, "Talking to the API"). Reconnects with backoff, resuming after the
  * last event; after a gap it refetches the project, in case something was missed.
  */
-export function useProjectEvents(projectId: string): void {
+export function useProjectEvents(
+  projectId: string,
+  /** Runs for each event once the cache has it, for a screen that says something about it. */
+  onEvent?: (event: ProjectEvent) => void,
+): void {
   const queryClient = useQueryClient();
+  const notify = useEffectEvent((event: ProjectEvent) => onEvent?.(event));
 
   useEffect(() => {
     const controller = new AbortController();
@@ -94,6 +105,7 @@ export function useProjectEvents(projectId: string): void {
             attempt = 0;
             if (message.id) lastId = message.id;
             applyProjectEvent(queryClient, message.data);
+            notify(message.data);
           }
         } catch (error) {
           if (controller.signal.aborted) return;

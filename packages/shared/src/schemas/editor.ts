@@ -124,6 +124,18 @@ export const CollabTokenClaims = z.object({
 export type CollabTokenClaims = z.infer<typeof CollabTokenClaims>;
 
 /**
+ * `GET /services/:id/editor/changes` (as a page, all at once): each file whose live text differs
+ * from the commit its draft started from (`baseSha`, the file's git blob SHA there).
+ */
+export const EditorChange = z.object({
+  path: FilePath,
+  baseSha: GitSha,
+  /** When the draft last changed. */
+  updatedAt: Timestamp,
+});
+export type EditorChange = z.infer<typeof EditorChange>;
+
+/**
  * `POST /services/:id/editor/commit`. On a 409 `conflict`, the problem's `fields` has a key for
  * each file that changed upstream since it was opened.
  */

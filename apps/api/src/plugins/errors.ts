@@ -22,7 +22,18 @@ function dotPath(instancePath: string): string {
  */
 export function registerErrorHandling(app: FastifyInstance): void {
   app.setErrorHandler((error: FastifyError, request, reply) => {
-    if (isLiftApiError(error)) return send(reply, error.toProblem());
+    if (isLiftApiError(error)) {
+      // A 5xx problem means something Lift relies on failed (GitHub, collab, the agent): log what
+      // the person was told, which names the failing call. Lift writes every detail, never with a
+      // token in it; the cause can hold an upstream's raw answer, so it stays out.
+      if (error.status >= 500) {
+        request.log.warn(
+          { problem: { code: error.code, status: error.status, detail: error.detail } },
+          "answered with a problem",
+        );
+      }
+      return send(reply, error.toProblem());
+    }
 
     if (hasZodFastifySchemaValidationErrors(error)) {
       const fields: Record<string, string> = {};
