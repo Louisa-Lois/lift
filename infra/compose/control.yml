@@ -92,6 +92,7 @@ services:
       DATABASE_URL: postgres://lift:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in /opt/lift/.env}@postgres:5432/lift
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in /opt/lift/.env}@redis:6379
       AGENT_URL: http://agent:4100
+      COLLAB_URL: http://collab:4200
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in /opt/lift/.env}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY in /opt/lift/.env}
       WORKER_TOKEN: ${WORKER_TOKEN:?set WORKER_TOKEN in /opt/lift/.env}

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 // GitHub is mocked with recorded responses (docs/prd/01-backend-api.md, "Testing"): the shapes
@@ -34,81 +35,90 @@ export const treeShaOf = (commitSha: string) => [...commitSha].reverse().join(""
 
 const bytesOf = (content: string | Uint8Array) =>
   typeof content === "string" ? Buffer.from(content, "utf8") : Buffer.from(content);
-const blobSha = (path: string) => Buffer.from(path).toString("hex").padEnd(40, "0").slice(0, 40);
+/** The git blob SHA of some bytes, as GitHub answers it. */
+export const gitBlobSha = (content: string | Uint8Array) => {
+  const bytes = bytesOf(content);
+  return createHash("sha1").update(`blob ${bytes.length}\0`).update(bytes).digest("hex");
+};
+
+type RepoFiles = Record<string, string | Uint8Array>;
 
 /**
- * Each repo's tree, as `git/trees/{sha}?recursive=1` answers: next-hello has the files above
- * (with their folders and a submodule, which aren't files); express-postgres has 6,000 files;
- * notes is one GitHub itself truncated.
+ * Each repo's tree, as `git/trees/{sha}?recursive=1` answers: next-hello has its files (with
+ * their folders, any symlinks and a submodule, which aren't files); express-postgres has 6,000
+ * files; notes is one GitHub itself truncated.
  */
-function treeOf(repo: string) {
+function treeOf(repo: string, files: RepoFiles, symlinks: Record<string, string>) {
   if (repo === "express-postgres") {
     return {
       truncated: false,
-      tree: Array.from({ length: 6_000 }, (_, i) => ({
-        path: `src/file-${String(i).padStart(4, "0")}.ts`,
-        type: "blob",
-        size: 10,
-      })),
+      tree: Array.from({ length: 6_000 }, (_, i) => {
+        const path = `src/file-${String(i).padStart(4, "0")}.ts`;
+        return { path, mode: "100644", type: "blob", sha: gitBlobSha(path), size: 10 };
+      }),
     };
   }
   if (repo === "notes") {
-    return { truncated: true, tree: [{ path: "notes.md", type: "blob", size: 5 }] };
+    return {
+      truncated: true,
+      tree: [{ path: "notes.md", mode: "100644", type: "blob", sha: gitBlobSha("notes"), size: 5 }],
+    };
   }
-  return {
-    truncated: false,
-    tree: [
-      {
-        path: ".env.example",
-        type: "blob",
-        size: bytesOf(REPO_FILES[".env.example"] ?? "").length,
-      },
-      { path: "README.md", type: "blob", size: bytesOf(REPO_FILES["README.md"] ?? "").length },
-      { path: "app", type: "tree" },
-      {
-        path: "app/page.tsx",
-        type: "blob",
-        size: bytesOf(REPO_FILES["app/page.tsx"] ?? "").length,
-      },
-      { path: "data", type: "tree" },
-      { path: BIG_FILE.path, type: "blob", size: BIG_FILE.size },
-      {
-        path: "package.json",
-        type: "blob",
-        size: bytesOf(REPO_FILES["package.json"] ?? "").length,
-      },
-      { path: "public", type: "tree" },
-      { path: "public/logo.png", type: "blob", size: 12 },
-      { path: "vendor/ui", type: "commit" },
-    ],
+  const folders = new Set<string>();
+  const entries: { path: string; mode: string; type: string; sha: string; size?: number }[] = [];
+  const add = (entry: (typeof entries)[number]) => {
+    const parts = entry.path.split("/");
+    for (let i = 1; i < parts.length; i += 1) folders.add(parts.slice(0, i).join("/"));
+    entries.push(entry);
   };
+  for (const [path, content] of Object.entries(files)) {
+    const size = bytesOf(content).length;
+    add({ path, mode: "100644", type: "blob", sha: gitBlobSha(content), size });
+  }
+  const big = { mode: "100644", type: "blob", sha: gitBlobSha(BIG_FILE.path) };
+  add({ path: BIG_FILE.path, ...big, size: BIG_FILE.size });
+  for (const [path, target] of Object.entries(symlinks)) {
+    add({ path, mode: "120000", type: "blob", sha: gitBlobSha(target), size: target.length });
+  }
+  add({ path: "vendor/ui", mode: "160000", type: "commit", sha: "c".repeat(40) });
+  for (const path of folders)
+    entries.push({ path, mode: "040000", type: "tree", sha: "d".repeat(40) });
+  entries.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  return { truncated: false, tree: entries };
 }
 
-/** `contents/{path}`: a file (base64 in 60-character lines, like GitHub), a folder, or 404. */
-function contentsOf(path: string): Response {
+/**
+ * `contents/{path}`: a file (base64 in 60-character lines, like GitHub), a folder, or 404. A
+ * symlink to a file answers with that file, under its own path, as GitHub does.
+ */
+function contentsOf(path: string, files: RepoFiles, symlinks: Record<string, string>): Response {
   if (path === BIG_FILE.path) {
     return Response.json({
       type: "file",
       path,
-      sha: blobSha(path),
+      sha: gitBlobSha(BIG_FILE.path),
       size: BIG_FILE.size,
       encoding: "none",
       content: "",
     });
   }
-  const content = REPO_FILES[path];
+  const target = symlinks[path];
+  if (target !== undefined && files[target] !== undefined) {
+    return contentsOf(target, files, symlinks);
+  }
+  const content = files[path];
   if (content !== undefined) {
     const bytes = bytesOf(content);
     return Response.json({
       type: "file",
       path,
-      sha: blobSha(path),
+      sha: gitBlobSha(content),
       size: bytes.length,
       encoding: "base64",
       content: `${bytes.toString("base64").replace(/.{60}/g, "$&\n")}\n`,
     });
   }
-  const children = Object.keys(REPO_FILES).filter((file) => file.startsWith(`${path}/`));
+  const children = Object.keys(files).filter((file) => file.startsWith(`${path}/`));
   if (children.length > 0) {
     return Response.json(children.map((file) => ({ type: "file", path: file, size: 1 })));
   }
@@ -129,6 +139,15 @@ export interface FakeGithubOptions {
   failTokenExchange?: boolean;
   /** How GitHub answers a request to add a webhook: 201 (the default), or 403 without admin rights. */
   hookStatus?: number;
+  /** The access token the sign-in gets, instead of the fixture's. */
+  accessToken?: string;
+  /**
+   * next-hello's files, instead of REPO_FILES. Read on every call, so a test can change one to
+   * play a push.
+   */
+  files?: RepoFiles;
+  /** next-hello's symlinks: path → target. */
+  symlinks?: Record<string, string>;
 }
 
 /** `rel="next"` when there are more pages, like GitHub's Link header. */
@@ -153,6 +172,8 @@ export function fakeGithub(options: FakeGithubOptions = {}) {
   const calls: RecordedCall[] = [];
   const findRepo = (owner: string, name: string) =>
     REPOS.find((repo) => repo.owner.login === owner && repo.name === name);
+  const files = () => options.files ?? REPO_FILES;
+  const symlinks = options.symlinks ?? {};
 
   const fetch: typeof globalThis.fetch = async (input, init) => {
     const request = new Request(input, init);
@@ -165,9 +186,8 @@ export function fakeGithub(options: FakeGithubOptions = {}) {
     });
     const route = `${request.method} ${url.host}${url.pathname}`;
     if (route === "POST github.com/login/oauth/access_token") {
-      return options.failTokenExchange
-        ? new Response("Service Unavailable", { status: 503 })
-        : Response.json(TOKEN);
+      if (options.failTokenExchange) return new Response("Service Unavailable", { status: 503 });
+      return Response.json({ ...TOKEN, access_token: options.accessToken ?? TOKEN.access_token });
     }
     if (route === "GET api.github.com/user") {
       return Response.json({
@@ -220,7 +240,7 @@ export function fakeGithub(options: FakeGithubOptions = {}) {
         return new Response("Not Found", { status: 404 });
       }
       if (url.searchParams.get("recursive") !== "1") return Response.json({ message: "flat" });
-      return Response.json({ sha, ...treeOf(decodeURIComponent(name)) });
+      return Response.json({ sha, ...treeOf(decodeURIComponent(name), files(), symlinks) });
     }
     const contentsPath = url.pathname.match(/^\/repos\/([^/]+)\/([^/]+)\/contents\/(.+)$/);
     if (request.method === "GET" && url.host === "api.github.com" && contentsPath) {
@@ -231,7 +251,7 @@ export function fakeGithub(options: FakeGithubOptions = {}) {
       if (!findRepo(decodeURIComponent(owner), decodeURIComponent(name)) || !knownRef) {
         return Response.json({ message: "Not Found" }, { status: 404 });
       }
-      return contentsOf(path.split("/").map(decodeURIComponent).join("/"));
+      return contentsOf(path.split("/").map(decodeURIComponent).join("/"), files(), symlinks);
     }
     const repoPath = url.pathname.match(/^\/repos\/([^/]+)\/([^/]+)(\/branches(?:\/([^/]+))?)?$/);
     if (request.method === "GET" && url.host === "api.github.com" && repoPath) {
@@ -245,5 +265,5 @@ export function fakeGithub(options: FakeGithubOptions = {}) {
     }
     return new Response("Not Found", { status: 404 });
   };
-  return { fetch, calls, token: TOKEN.access_token, user: USER };
+  return { fetch, calls, token: options.accessToken ?? TOKEN.access_token, user: USER };
 }

@@ -192,6 +192,8 @@ Three BullMQ queues on the control plane's Redis, plus `lift-agent`, where the A
 
 Internal routes listen only on the control plane's private IP, never behind the public router, and require `Authorization: Bearer {WORKER_TOKEN}` (the agent's two internal routes require `AGENT_SERVICE_TOKEN` instead).
 
+The collab server has two internal routes of its own, which only the API calls, at `COLLAB_URL` on the compose network, with `Authorization: Bearer {COLLAB_SECRET}`. It holds the live text of every open document (the database copy lags by up to 10 seconds), so the API reads and resets drafts through it: `POST /internal/documents/text` (`{ names }`: each document's text, unsaved edits included) and `POST /internal/documents/reset` (`{ documents: [{ name, text }] }`: replaces each document's text for everyone editing it). Both answer 404 to anything that came through Traefik. Their schemas are in `packages/shared/src/schemas/editor.ts`.
+
 **Logs** go straight from the worker into Redis Streams: `logs:dep:{deploymentId}` for build and deploy output (capped near 5,000 lines) and `logs:svc:{serviceId}` for runtime output (near 20,000 lines). Each entry has the fields `ts`, `stream` and `line`.
 
 ## Environment, ports, local development and working rules
@@ -199,7 +201,7 @@ Internal routes listen only on the control plane's private IP, never behind the 
 | App | Dev port | Production address | Key variables |
 | --- | --- | --- | --- |
 | web | 3000 | `https://app.{domain}/` | `NEXT_PUBLIC_COLLAB_URL` |
-| api | 4000 | `https://app.{domain}/api` (public); `http://{control-private-ip}:4000/internal` (worker only) | `DATABASE_URL`, `REDIS_URL`, `SESSION_SECRET`, `ENCRYPTION_KEY`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `PUBLIC_URL`, `APPS_DOMAIN`, `WORKER_TOKEN`, `AGENT_SERVICE_TOKEN`, `AGENT_URL`, `COLLAB_SECRET` |
+| api | 4000 | `https://app.{domain}/api` (public); `http://{control-private-ip}:4000/internal` (worker only) | `DATABASE_URL`, `REDIS_URL`, `SESSION_SECRET`, `ENCRYPTION_KEY`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `PUBLIC_URL`, `APPS_DOMAIN`, `WORKER_TOKEN`, `AGENT_SERVICE_TOKEN`, `AGENT_URL`, `COLLAB_URL`, `COLLAB_SECRET` |
 | collab | 4200 | `wss://app.{domain}/collab` | `DATABASE_URL`, `COLLAB_SECRET` |
 | agent | 4100 | internal only | `API_URL`, `AGENT_SERVICE_TOKEN`, `ANTHROPIC_API_KEY`, `REDIS_URL` |
 | mcp | 4300 | `https://app.{domain}/mcp`, or local over stdio | `LIFT_API_URL`, `LIFT_TOKEN` |

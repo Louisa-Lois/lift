@@ -74,7 +74,28 @@ export type GithubContents =
 
 interface RawTree {
   truncated: boolean;
-  tree: { path: string; type: string; size?: number }[];
+  tree: { path: string; mode: string; type: string; sha: string; size?: number }[];
+}
+
+/** A symlink's mode in a git tree: GitHub lists it as a blob, whose content is its target. */
+export const SYMLINK_MODE = "120000";
+
+/** One file of a tree, with what the editor and its commits need. */
+export interface GithubTreeFile {
+  path: string;
+  size: number;
+  /** `100644`, `100755` (executable) or `120000` (a symlink). */
+  mode: string;
+  /** The blob's SHA, which is the git blob SHA of the file's bytes. */
+  sha: string;
+}
+
+/** The files at a ref, with the commit it resolved to and that commit's tree. */
+export interface GithubFiles {
+  sha: string;
+  treeSha: string;
+  truncated: boolean;
+  files: GithubTreeFile[];
 }
 
 interface RawContents {
@@ -177,6 +198,48 @@ export function createGithub(options: GithubOptions) {
       api(token),
     );
     return response ? toRepo((await response.json()) as RawRepo) : null;
+  }
+
+  async function getFiles(
+    token: string,
+    owner: string,
+    name: string,
+    ref: string | undefined,
+  ): Promise<GithubFiles | null> {
+    const wanted = ref ?? (await getRepo(token, owner, name))?.defaultBranch;
+    if (!wanted) return null;
+    const what = `GET /repos/${owner}/${name}/commits/${wanted}`;
+    const commitResponse = await send(
+      what,
+      `${API}/repos/${segment(owner)}/${segment(name)}/commits/${segment(wanted)}`,
+      api(token),
+    );
+    if (commitResponse.status === 404 || commitResponse.status === 422) return null;
+    if (!commitResponse.ok) throw failure(what, commitResponse);
+    const commit = (await commitResponse.json()) as {
+      sha: string;
+      commit: { tree: { sha: string } };
+    };
+    const treeSha = commit.commit.tree.sha;
+    const treeResponse = await callOrNull(
+      `GET /repos/${owner}/${name}/git/trees/${treeSha}`,
+      `${API}/repos/${segment(owner)}/${segment(name)}/git/trees/${treeSha}?recursive=1`,
+      api(token),
+    );
+    if (!treeResponse) return null;
+    const raw = (await treeResponse.json()) as RawTree;
+    const blobs = raw.tree.filter((entry) => entry.type === "blob" && entry.path.length <= 1024);
+    return {
+      sha: commit.sha,
+      treeSha,
+      truncated: raw.truncated || blobs.length > GITHUB_TREE_MAX_FILES,
+      files: blobs.slice(0, GITHUB_TREE_MAX_FILES).map((entry) => ({
+        path: entry.path,
+        size: entry.size ?? 0,
+        mode: entry.mode,
+        sha: entry.sha,
+      })),
+    };
   }
 
   function requireOAuth(): { clientId: string; clientSecret: string } {
@@ -396,38 +459,16 @@ export function createGithub(options: GithubOptions) {
       name: string,
       ref: string | undefined,
     ): Promise<GithubTree | null> {
-      const wanted = ref ?? (await getRepo(token, owner, name))?.defaultBranch;
-      if (!wanted) return null;
-      const what = `GET /repos/${owner}/${name}/commits/${wanted}`;
-      const commitResponse = await send(
-        what,
-        `${API}/repos/${segment(owner)}/${segment(name)}/commits/${segment(wanted)}`,
-        api(token),
-      );
-      if (commitResponse.status === 404 || commitResponse.status === 422) return null;
-      if (!commitResponse.ok) throw failure(what, commitResponse);
-      const commit = (await commitResponse.json()) as {
-        sha: string;
-        commit: { tree: { sha: string } };
-      };
-
-      const treeResponse = await callOrNull(
-        `GET /repos/${owner}/${name}/git/trees/${commit.commit.tree.sha}`,
-        `${API}/repos/${segment(owner)}/${segment(name)}/git/trees/${commit.commit.tree.sha}?recursive=1`,
-        api(token),
-      );
-      if (!treeResponse) return null;
-      const raw = (await treeResponse.json()) as RawTree;
-      const blobs = raw.tree.filter((entry) => entry.type === "blob" && entry.path.length <= 1024);
+      const tree = await getFiles(token, owner, name, ref);
+      if (!tree) return null;
       return {
-        sha: commit.sha,
-        truncated: raw.truncated || blobs.length > GITHUB_TREE_MAX_FILES,
-        files: blobs
-          .slice(0, GITHUB_TREE_MAX_FILES)
-          .map((entry) => ({ path: entry.path, size: entry.size ?? 0 })),
+        sha: tree.sha,
+        truncated: tree.truncated,
+        files: tree.files.map((file) => ({ path: file.path, size: file.size })),
       };
     },
-
+    /** Like `getTree`, with each file's mode and blob SHA, and the commit's tree SHA. */
+    getFiles,
     /** One text file at a branch, tag or commit (the default branch without `ref`), up to 1 MB. */
     async getContents(
       token: string,
