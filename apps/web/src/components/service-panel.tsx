@@ -5,6 +5,7 @@ import { ExternalLinkIcon } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RestartServiceButton } from "@/components/deployment-actions";
 import { ServiceDeployments } from "@/components/service-deployments";
+import { ServiceSettingsTab } from "@/components/service-settings-tab";
 import { StatusBadge } from "@/components/status-badge";
 import {
   Sheet,
@@ -16,13 +17,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VariablesTab } from "@/components/variables-tab";
 
-const TABS = ["deployments", "variables"] as const;
+const TABS = ["deployments", "variables", "settings"] as const;
 type Tab = (typeof TABS)[number];
 
 /**
  * The service panel (docs/prd/02-frontend.md): a sheet over the project page that keeps the URL in
- * sync (`?service=&tab=`), so it can be shared. Deployments and Variables for now; FE-06 brings
- * the canvas under it and the other tabs.
+ * sync (`?service=&tab=`), so it can be shared. Deployments, Variables and Settings (autofix) for
+ * now; FE-06 brings the canvas under it and the other tabs.
  */
 export function ServicePanel({ services, canEdit }: { services: Service[]; canEdit: boolean }) {
   const params = useSearchParams();
@@ -89,6 +90,7 @@ export function ServicePanel({ services, canEdit }: { services: Service[]; canEd
               <TabsList>
                 <TabsTrigger value="deployments">Deployments</TabsTrigger>
                 <TabsTrigger value="variables">Variables</TabsTrigger>
+                <TabsTrigger value="settings">Settings</TabsTrigger>
               </TabsList>
               <TabsContent value="deployments" className="mt-3 rounded-lg border">
                 <ServiceDeployments service={service} canEdit={canEdit} />
@@ -99,6 +101,9 @@ export function ServicePanel({ services, canEdit }: { services: Service[]; canEd
                   canEdit={canEdit}
                   onDeployed={() => go({ service: service.id, tab: "deployments" })}
                 />
+              </TabsContent>
+              <TabsContent value="settings" className="mt-3">
+                <ServiceSettingsTab service={service} canEdit={canEdit} />
               </TabsContent>
             </Tabs>
           </>
