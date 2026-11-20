@@ -1,4 +1,4 @@
-import type { ProjectEvent, ProjectRole } from "@lift/shared";
+import { LiftApiError, type ProjectEvent, type ProjectRole } from "@lift/shared";
 import * as fixtures from "@lift/shared/fixtures";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
@@ -44,11 +44,17 @@ const person = (n: number) => ({
   },
 });
 
-function renderEditor(role: ProjectRole = "owner", changes = fixtures.editorChanges) {
+function renderEditor(
+  role: ProjectRole = "owner",
+  changes = fixtures.editorChanges,
+  /** What the file tree request fails with, instead of answering. */
+  treeError?: unknown,
+) {
   vi.mocked(api.me).mockResolvedValue(fixtures.me);
   vi.mocked(api.projects.get).mockResolvedValue({ ...fixtures.project, role });
   vi.mocked(api.members.list).mockResolvedValue(fixtures.page(fixtures.members));
-  vi.mocked(api.editor.tree).mockResolvedValue(fixtures.editorTree);
+  if (treeError) vi.mocked(api.editor.tree).mockRejectedValue(treeError);
+  else vi.mocked(api.editor.tree).mockResolvedValue(fixtures.editorTree);
   vi.mocked(api.editor.changes).mockResolvedValue(fixtures.page(changes));
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
@@ -145,6 +151,27 @@ describe("the live editor", () => {
     );
     expect(screen.getByText("Can't open this file")).toBeTruthy();
     expect(screen.getByText("This is a link")).toBeTruthy();
+  });
+
+  it("says why the editor couldn't open, in the API's words when it answered", async () => {
+    const detail =
+      "The editor reads the repo with the project owner's GitHub token, and GitHub refused it. Ask ama-owusu to sign out of Lift and sign in again.";
+    const problem = (status: number, code: "github_error" | "not_found") =>
+      new LiftApiError({ type: "about:blank", title: "Failed", status, detail, code });
+
+    renderEditor("editor", [], problem(502, "github_error"));
+    expect(await screen.findByText("Can't open the editor")).toBeTruthy();
+    expect(screen.getByText(detail)).toBeTruthy();
+    cleanup();
+
+    renderEditor("editor", [], problem(404, "not_found"));
+    expect(await screen.findByText("Nothing to edit here")).toBeTruthy();
+    cleanup();
+
+    renderEditor("editor", [], new TypeError("Failed to fetch"));
+    expect(
+      await screen.findByText("Lift didn't answer. Check your connection, then reload the page."),
+    ).toBeTruthy();
   });
 
   it("counts the changes, dots changed tabs, and lists them in the rail", async () => {

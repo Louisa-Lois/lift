@@ -1,6 +1,6 @@
 "use client";
 
-import type { ProjectEvent } from "@lift/shared";
+import { isLiftApiError, type ProjectEvent } from "@lift/shared";
 import {
   ArrowLeftIcon,
   FileCode2Icon,
@@ -131,15 +131,20 @@ export function EditorScreen({ projectId, serviceId }: { projectId: string; serv
   }
 
   if (project.isError || tree.isError) {
-    const status = (project.error ?? tree.error) as { status?: number } | null;
+    const error = project.error ?? tree.error;
+    const missing = isLiftApiError(error) && error.status === 404;
     return (
       <div className="p-6">
         <EmptyState
-          title={status?.status === 404 ? "Nothing to edit here" : "Can't open the editor"}
+          title={missing ? "Nothing to edit here" : "Can't open the editor"}
           description={
-            status?.status === 404
+            missing
               ? "This service or its branch doesn't exist, or you're not a member of its project."
-              : "Lift didn't answer. Check your connection, then reload the page."
+              : // The API says what went wrong and what to do, such as whose GitHub token GitHub
+                // refused. Only a request that got no answer at all is about the connection.
+                isLiftApiError(error)
+                ? error.detail || error.title
+                : "Lift didn't answer. Check your connection, then reload the page."
           }
           action={
             <Link href={`/p/${projectId}`} className="text-sm underline underline-offset-4">
