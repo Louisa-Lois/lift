@@ -20,6 +20,7 @@ import { internalDeploymentRoutes } from "./routes/internal/deployments";
 import { authRoutes } from "./routes/v1/auth";
 import { databaseRoutes } from "./routes/v1/databases";
 import { deploymentRoutes } from "./routes/v1/deployments";
+import { editorRoutes } from "./routes/v1/editor";
 import { eventRoutes } from "./routes/v1/events";
 import { githubRoutes } from "./routes/v1/github";
 import { healthRoutes } from "./routes/v1/health";
@@ -33,6 +34,7 @@ import { tokenRoutes } from "./routes/v1/tokens";
 import { variableRoutes } from "./routes/v1/variables";
 import { webhookRoutes } from "./routes/v1/webhooks";
 import { createAgentClient } from "./services/agent-client";
+import { createCollabClient } from "./services/collab-client";
 import { createSecretBox } from "./services/crypto";
 import { createGithub } from "./services/github";
 
@@ -43,6 +45,8 @@ export interface ServerOptions {
   githubFetch?: typeof globalThis.fetch;
   /** The fetch the agent service's calls go through; tests answer like the agent. */
   agentFetch?: typeof globalThis.fetch;
+  /** The fetch the collab server's internal calls go through; tests answer like collab. */
+  collabFetch?: typeof globalThis.fetch;
   /** BullMQ key prefix; tests use their own so they never see each other's jobs. */
   queuePrefix?: string;
   /** How long an event stream may stay quiet before a heartbeat; tests shorten it. */
@@ -69,6 +73,11 @@ export function buildServer(env: Env, options: ServerOptions = {}) {
     url: env.AGENT_URL,
     token: env.AGENT_SERVICE_TOKEN,
     fetch: options.agentFetch,
+  });
+  const collab = createCollabClient({
+    url: env.COLLAB_URL,
+    secret: env.COLLAB_SECRET,
+    fetch: options.collabFetch,
   });
 
   app.setValidatorCompiler(validatorCompiler);
@@ -105,6 +114,13 @@ export function buildServer(env: Env, options: ServerOptions = {}) {
   app.register(deploymentRoutes, { prefix: API_BASE_PATH, github, secretBox, publicUrl });
   app.register(variableRoutes, { prefix: API_BASE_PATH, secretBox });
   app.register(memberRoutes, { prefix: API_BASE_PATH });
+  app.register(editorRoutes, {
+    prefix: API_BASE_PATH,
+    github,
+    secretBox,
+    collab,
+    collabSecret: env.COLLAB_SECRET,
+  });
   app.register(databaseRoutes, { prefix: API_BASE_PATH, secretBox });
   app.register(webhookRoutes, { prefix: API_BASE_PATH, secretBox });
   app.register(planRoutes, {

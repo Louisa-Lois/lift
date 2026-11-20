@@ -9,6 +9,7 @@ const PRODUCTION = {
   PUBLIC_URL: "https://app.example.test",
   APPS_DOMAIN: "apps.example.test",
   AGENT_URL: "http://agent:4100",
+  COLLAB_URL: "http://collab:4200",
   SESSION_SECRET: "s".repeat(64),
   ENCRYPTION_KEY: randomBytes(32).toString("base64"),
   WORKER_TOKEN: "w".repeat(64),

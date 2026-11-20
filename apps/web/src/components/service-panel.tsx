@@ -1,12 +1,14 @@
 "use client";
 
 import type { Service } from "@lift/shared";
-import { ExternalLinkIcon } from "lucide-react";
+import { CodeIcon, ExternalLinkIcon } from "lucide-react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RestartServiceButton } from "@/components/deployment-actions";
 import { ServiceDeployments } from "@/components/service-deployments";
 import { ServiceSettingsTab } from "@/components/service-settings-tab";
 import { StatusBadge } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
@@ -65,6 +67,12 @@ export function ServicePanel({ services, canEdit }: { services: Service[]; canEd
                 {canEdit && service.activeDeploymentId ? (
                   <RestartServiceButton serviceId={service.id} serviceName={service.name} />
                 ) : null}
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href={`/p/${service.projectId}/services/${service.id}/editor`}>
+                    <CodeIcon aria-hidden="true" />
+                    Open editor
+                  </Link>
+                </Button>
               </div>
               <SheetDescription asChild>
                 {service.activeDeploymentId ? (

@@ -52,6 +52,8 @@ const EnvSchema = z.object({
   /** Deployed apps get {service}-{project}.{APPS_DOMAIN}. */
   APPS_DOMAIN: withDefault(Hostname, "apps.localhost"),
   AGENT_URL: withDefault(z.url(), `http://localhost:${DEV_PORTS.agent}`),
+  /** The live editor's collab server, for its internal routes (http://collab:4200 in production). */
+  COLLAB_URL: withDefault(z.url(), `http://localhost:${DEV_PORTS.collab}`),
   SESSION_SECRET: optional(Secret),
   ENCRYPTION_KEY: optional(EncryptionKey),
   WORKER_TOKEN: optional(Secret),
@@ -73,6 +75,7 @@ const PRODUCTION_REQUIRED = [
   "PUBLIC_URL",
   "APPS_DOMAIN",
   "AGENT_URL",
+  "COLLAB_URL",
   "SESSION_SECRET",
   "ENCRYPTION_KEY",
   "WORKER_TOKEN",

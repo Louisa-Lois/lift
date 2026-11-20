@@ -72,4 +72,4 @@ Run them from the repo root.
 - In development every app reads the one `.env` at the repo root; nothing reads `apps/*/.env`.
 - `apps/web` has no server actions and no API routes of its own. The API is a separate service at `/api/v1`: proxied to port 4000 in development, routed by Traefik in production.
 - Internal routes (`/internal/v1/…`) listen only on the control plane's private IP and are never routed by Traefik.
-- The collab server refuses every connection until BE-17 adds token authentication.
+- The collab server lets in only a collab token from `POST /services/:id/editor/session`, for that one file. The live text of an open file is on the collab server, not in the database, which lags it by up to 10 seconds; the API reads it through collab's internal routes.

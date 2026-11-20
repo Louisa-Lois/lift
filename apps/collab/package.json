@@ -12,13 +12,18 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@hocuspocus/extension-database": "4.8.0",
     "@hocuspocus/server": "^4.8.0",
+    "@lift/db": "workspace:*",
     "@lift/shared": "workspace:*",
-    "y-protocols": "^1.0.7",
+    "drizzle-orm": "catalog:",
+    "postgres": "catalog:",
+    "y-protocols": "catalog:",
     "yjs": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@hocuspocus/provider": "catalog:",
     "@lift/config": "workspace:*",
     "@types/node": "catalog:",
     "tsup": "catalog:",

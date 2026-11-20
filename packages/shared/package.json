@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./fixtures": "./src/fixtures/index.ts"
+    "./fixtures": "./src/fixtures/index.ts",
+    "./collab-token": "./src/collab-token.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

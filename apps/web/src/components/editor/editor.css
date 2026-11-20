@@ -1,0 +1,28 @@
+/* The live editor: Monaco on the dashboard's background, and other people's cursors. Their
+   colours and names come from editor-files.ts (cursorCss), one rule per connection. */
+
+.lift-editor .monaco-editor,
+.lift-editor .monaco-editor-background,
+.lift-editor .monaco-editor .margin {
+  background-color: var(--background);
+}
+
+.lift-editor .yRemoteSelectionHead {
+  position: absolute;
+  height: 100%;
+  box-sizing: border-box;
+  border-left: 2px solid;
+}
+
+.lift-editor .yRemoteSelectionHead::after {
+  position: absolute;
+  top: -1.35em;
+  left: -2px;
+  padding: 0 0.35em;
+  border-radius: 0.25em 0.25em 0.25em 0;
+  color: var(--background);
+  font: 600 10px / 1.5 var(--font-sans);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+}

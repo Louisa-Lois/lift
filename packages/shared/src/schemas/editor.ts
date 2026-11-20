@@ -142,3 +142,47 @@ export type EditorDiscardBody = z.infer<typeof EditorDiscardBody>;
 
 export const EditorDiscardResponse = z.object({ paths: z.array(FilePath) });
 export type EditorDiscardResponse = z.infer<typeof EditorDiscardResponse>;
+
+// ── The collab server's internal routes ───────────────────────────────────────────────────────
+// Only the API calls them, on the internal network, with `Authorization: Bearer {COLLAB_SECRET}`.
+// The collab server holds the live text of every open document (the database copy lags by up to
+// 10 s), so the API reads and resets drafts through it.
+
+export const COLLAB_INTERNAL_ROUTES = {
+  text: "/internal/documents/text",
+  reset: "/internal/documents/reset",
+} as const;
+
+const CollabDocumentNames = z
+  .array(z.string().min(1))
+  .min(1)
+  .max(EDITOR_LIMITS.maxOpenDocumentsPerService);
+
+/** `POST /internal/documents/text`. */
+export const CollabTextBody = z.strictObject({ names: CollabDocumentNames });
+export type CollabTextBody = z.infer<typeof CollabTextBody>;
+
+/** Each document's live text, unsaved edits included; null for a name with no document row. */
+export const CollabTextResponse = z.object({ texts: z.record(z.string(), z.string().nullable()) });
+export type CollabTextResponse = z.infer<typeof CollabTextResponse>;
+
+/** `POST /internal/documents/reset`: replaces each document's text for everyone editing it. */
+export const CollabResetBody = z.strictObject({
+  documents: z
+    .array(
+      z.strictObject({
+        name: z.string().min(1),
+        text: z.string().max(EDITOR_LIMITS.maxTextFileBytes),
+      }),
+    )
+    .min(1)
+    .max(EDITOR_LIMITS.maxOpenDocumentsPerService),
+});
+export type CollabResetBody = z.infer<typeof CollabResetBody>;
+
+/** `missing`: names with no document row, which nothing was done to. */
+export const CollabResetResponse = z.object({
+  reset: z.array(z.string()),
+  missing: z.array(z.string()),
+});
+export type CollabResetResponse = z.infer<typeof CollabResetResponse>;
