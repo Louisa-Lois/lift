@@ -1,5 +1,6 @@
 "use client";
 
+import type { ProjectEvent } from "@lift/shared";
 import {
   ArrowLeftIcon,
   FileCode2Icon,
@@ -9,14 +10,22 @@ import {
   XIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buildFileTree, fileName, fileProblem } from "@/lib/editor-files";
-import { useEditorTree } from "@/lib/hooks/use-editor";
+import { useEditorChanges, useEditorTree } from "@/lib/hooks/use-editor";
+import { useMe } from "@/lib/hooks/use-me";
+import { useMembers } from "@/lib/hooks/use-members";
+import { useProjectEvents } from "@/lib/hooks/use-project-events";
 import { useProject } from "@/lib/hooks/use-projects";
 import { cn } from "@/lib/utils";
+import { ChangesRail } from "./changes-rail";
+import { CommitDialog } from "./commit-dialog";
 import { FileTree } from "./file-tree";
 import { LazyMonacoPane } from "./lazy-monaco-pane";
 import type { Connection, LiveFileState } from "./live-file";
@@ -42,7 +51,9 @@ const PLACEHOLDER = {
 /**
  * The live editor (FE-13, docs/prd/02-frontend.md): the service's files, a tab per open file,
  * and Monaco on each file's live document, which everyone with the file open edits together.
- * Viewers read along. Phones get a note instead: the editor needs a larger screen.
+ * Viewers read along. Editors commit and deploy the changes (BE-18): "Changes (N)" opens the list,
+ * a dot marks a changed tab, and everyone hears about a commit. Phones get a note instead: the
+ * editor needs a larger screen.
  */
 export function EditorScreen({ projectId, serviceId }: { projectId: string; serviceId: string }) {
   const project = useProject(projectId);
@@ -51,6 +62,39 @@ export function EditorScreen({ projectId, serviceId }: { projectId: string; serv
   const [tabs, setTabs] = useState<string[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [states, setStates] = useState<Record<string, LiveFileState>>({});
+  const [railOpen, setRailOpen] = useState(false);
+  const [commitOpen, setCommitOpen] = useState(false);
+  const router = useRouter();
+  const me = useMe();
+  const members = useMembers(projectId);
+  const changes = useEditorChanges(serviceId);
+  const changed = useMemo(
+    () => new Set((changes.data?.data ?? []).map((change) => change.path)),
+    [changes.data],
+  );
+
+  // Someone else's commit: their files are no longer changes (the cache sees to that); say so.
+  useProjectEvents(projectId, (event: ProjectEvent) => {
+    if (event.type !== "editor.committed" || event.data.serviceId !== serviceId) return;
+    if (event.actorId === me.data?.id) return;
+    const author = members.data?.data.find((member) => member.userId === event.actorId)?.user;
+    const count = event.data.paths.length;
+    toast(
+      `${author?.name ?? author?.login ?? "Someone"} committed ${count === 1 ? fileName(event.data.paths[0] ?? "") : `${count} files`}`,
+      {
+        description: event.data.message.split("\n", 1)[0],
+        ...(event.data.deploymentId
+          ? {
+              action: {
+                label: "Open deployment",
+                onClick: () =>
+                  router.push(`/p/${projectId}/deployments/${event.data.deploymentId}`),
+              },
+            }
+          : {}),
+      },
+    );
+  });
 
   const files = useMemo(
     () => new Map((tree.data?.files ?? []).map((file) => [file.path, file])),
@@ -110,7 +154,8 @@ export function EditorScreen({ projectId, serviceId }: { projectId: string; serv
   const activeFile = active ? files.get(active) : undefined;
   const problem = activeFile ? fileProblem(activeFile) : null;
   const state = active ? states[active] : undefined;
-  const readOnly = project.data?.role === "viewer" || state?.readOnly === true;
+  const canEdit = project.data !== undefined && project.data.role !== "viewer";
+  const readOnly = !canEdit || state?.readOnly === true;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -147,8 +192,36 @@ export function EditorScreen({ projectId, serviceId }: { projectId: string; serv
             </span>
           ) : null}
           <PresenceAvatars people={state?.people ?? []} />
+          <Button
+            variant="outline"
+            size="sm"
+            aria-pressed={railOpen}
+            onClick={() => setRailOpen((open) => !open)}
+            className="hidden md:inline-flex"
+          >
+            Changes ({changed.size})
+          </Button>
+          {canEdit ? (
+            <Button
+              size="sm"
+              disabled={changed.size === 0}
+              onClick={() => setCommitOpen(true)}
+              className="hidden md:inline-flex"
+            >
+              Commit & deploy
+            </Button>
+          ) : null}
         </div>
       </header>
+      {commitOpen ? (
+        <CommitDialog
+          projectId={projectId}
+          serviceId={serviceId}
+          changes={changes.data?.data ?? []}
+          open
+          onOpenChange={setCommitOpen}
+        />
+      ) : null}
 
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center md:hidden">
         <MonitorIcon className="size-6 text-muted-foreground" aria-hidden="true" />
@@ -204,6 +277,13 @@ export function EditorScreen({ projectId, serviceId }: { projectId: string; serv
                     className="py-2 pr-1 pl-3"
                   >
                     {fileName(path)}
+                    {changed.has(path) ? (
+                      <span
+                        role="img"
+                        aria-label="Changed"
+                        className="ml-1.5 inline-block size-1.5 rounded-full bg-primary align-middle"
+                      />
+                    ) : null}
                   </button>
                   <button
                     type="button"
@@ -245,6 +325,15 @@ export function EditorScreen({ projectId, serviceId }: { projectId: string; serv
             </p>
           ) : null}
         </section>
+        {railOpen ? (
+          <ChangesRail
+            serviceId={serviceId}
+            changes={changes.data?.data ?? []}
+            active={active}
+            canEdit={canEdit}
+            onOpen={open}
+          />
+        ) : null}
       </div>
     </div>
   );
