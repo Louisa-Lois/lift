@@ -14,6 +14,7 @@ import { Diagnosis } from "./schemas/diagnosis";
 import { isKnownProjectEvent } from "./schemas/event";
 import { GithubBranch, GithubFile, GithubRepo, GithubTree } from "./schemas/github";
 import { DeploymentLogEnd, LogLine, LogSnapshot } from "./schemas/logs";
+import { type AddMemberBody, ProjectMember, type UpdateMemberBody } from "./schemas/member";
 import {
   type ApplyPlanBody,
   ApplyPlanResponse,
@@ -63,6 +64,7 @@ const ServicePage = cursorPage(Service);
 const DeploymentPage = cursorPage(Deployment);
 const GithubRepoPage = cursorPage(GithubRepo);
 const GithubBranchPage = cursorPage(GithubBranch);
+const ProjectMemberPage = cursorPage(ProjectMember);
 const ApiTokenPage = cursorPage(ApiToken);
 const VariablePage = cursorPage(Variable);
 const DatabasePage = cursorPage(Database);
@@ -295,6 +297,24 @@ export function createLiftClient(options: LiftClientOptions) {
       /** `GET /databases/:id/credentials` (editors): the connection string and password. */
       credentials: (databaseId: string) =>
         call("GET", `/databases/${segment(databaseId)}/credentials`, DatabaseCredentials),
+    },
+
+    /** BE-15: a project's members; only its owner adds, changes and removes them. */
+    members: {
+      /** `GET /projects/:id/members`: everyone at once, the owner first. */
+      list: (projectId: string) =>
+        call("GET", `/projects/${segment(projectId)}/members`, ProjectMemberPage),
+      /** `POST /projects/:id/members`: by GitHub login; they must have signed in to Lift once. */
+      add: (projectId: string, body: z.input<typeof AddMemberBody>) =>
+        call("POST", `/projects/${segment(projectId)}/members`, ProjectMember, { body }),
+      /** `PATCH /projects/:id/members/:userId`: editor or viewer. */
+      update: (projectId: string, userId: string, body: z.input<typeof UpdateMemberBody>) =>
+        call("PATCH", `/projects/${segment(projectId)}/members/${segment(userId)}`, ProjectMember, {
+          body,
+        }),
+      /** `DELETE /projects/:id/members/:userId`. */
+      remove: (projectId: string, userId: string) =>
+        callVoid("DELETE", `/projects/${segment(projectId)}/members/${segment(userId)}`),
     },
 
     /** BE-14: your personal tokens (`lift_pat_…`). */

@@ -25,6 +25,7 @@ import { githubRoutes } from "./routes/v1/github";
 import { healthRoutes } from "./routes/v1/health";
 import { logRoutes } from "./routes/v1/logs";
 import { meRoutes } from "./routes/v1/me";
+import { memberRoutes } from "./routes/v1/members";
 import { planRoutes } from "./routes/v1/plans";
 import { projectRoutes } from "./routes/v1/projects";
 import { serviceRoutes } from "./routes/v1/services";
@@ -103,6 +104,7 @@ export function buildServer(env: Env, options: ServerOptions = {}) {
   });
   app.register(deploymentRoutes, { prefix: API_BASE_PATH, github, secretBox, publicUrl });
   app.register(variableRoutes, { prefix: API_BASE_PATH, secretBox });
+  app.register(memberRoutes, { prefix: API_BASE_PATH });
   app.register(databaseRoutes, { prefix: API_BASE_PATH, secretBox });
   app.register(webhookRoutes, { prefix: API_BASE_PATH, secretBox });
   app.register(planRoutes, {
