@@ -5,6 +5,8 @@ import {
   type GithubFile,
   type GithubRepo,
   type GithubTree,
+  isLiftApiError,
+  type LiftApiError,
 } from "@lift/shared";
 import { problem } from "../lib/problem";
 
@@ -13,6 +15,18 @@ export const GITHUB_SCOPES = "read:user user:email repo admin:repo_hook";
 
 const WEB = "https://github.com";
 const API = "https://api.github.com";
+
+/** The problems for a token GitHub refused (see `isTokenRefused`). */
+const refusedTokens = new WeakSet<LiftApiError>();
+
+/**
+ * Whether GitHub refused the token a call was made with (401). Signing in to Lift again replaces
+ * it, which only the token's owner can do: the editor reads with the project owner's token, so it
+ * tells everyone else whose token it was.
+ */
+export function isTokenRefused(error: unknown): boolean {
+  return isLiftApiError(error) && refusedTokens.has(error);
+}
 
 /** The parts of `GET /user` Lift keeps. */
 export interface GithubProfile {
@@ -154,10 +168,12 @@ export function createGithub(options: GithubOptions) {
 
   function failure(what: string, response: Response) {
     if (response.status === 401) {
-      return problem(
+      const refused = problem(
         "github_error",
         "GitHub refused the token Lift holds for you. Sign out and sign in again.",
       );
+      refusedTokens.add(refused);
+      return refused;
     }
     return problem("github_error", `GitHub answered ${response.status} to ${what}.`);
   }

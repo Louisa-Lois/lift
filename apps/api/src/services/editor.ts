@@ -24,7 +24,7 @@ import type { CollabClient } from "./collab-client";
 import type { SecretBox } from "./crypto";
 import { cancelDeployment, createDeployment, type DeploymentDeps, queueBuild } from "./deployments";
 import { publishEvents, recordEvent } from "./events";
-import { type Github, type GithubContents, SYMLINK_MODE } from "./github";
+import { type Github, type GithubContents, isTokenRefused, SYMLINK_MODE } from "./github";
 import type { ServiceRow } from "./services";
 import type { UserRow } from "./sessions";
 import { findUserById, githubTokenOf } from "./users";
@@ -79,30 +79,53 @@ function yjsStateOf(text: string): Buffer {
   return Buffer.from(Y.encodeStateAsUpdate(doc));
 }
 
+/** Reads of a service's repo, with its project owner's GitHub token (see `readAsOwner`). */
+interface RepoReader {
+  getFiles(ref: string): ReturnType<Github["getFiles"]>;
+  getContents(path: string, ref: string): ReturnType<Github["getContents"]>;
+  getCommit(ref: string): ReturnType<Github["getCommit"]>;
+}
+
 /**
- * The project owner's GitHub token. The editor reads the repo as its owner, as builds do, so a
- * member who can't see the repo on GitHub can still open its files in Lift.
+ * The editor reads the repo with the project owner's GitHub token, as builds do, so a member who
+ * can't see the repo on GitHub can still open its files in Lift. If GitHub refuses that token,
+ * only the owner can fix it, by signing in again: anyone else is told whose token it is, rather
+ * than to sign in again themselves.
  */
-async function ownerToken(deps: EditorDeps, project: ProjectRow): Promise<string> {
+async function readAsOwner(
+  deps: EditorDeps,
+  service: ServiceRow,
+  project: ProjectRow,
+  user: UserRow,
+): Promise<RepoReader> {
   const owner = await findUserById(deps.db, project.ownerId);
   if (!owner) throw new Error(`project ${project.id} has no owner`);
-  return githubTokenOf(deps.secretBox, owner);
+  const token = githubTokenOf(deps.secretBox, owner);
+  const { repoOwner, repoName } = service;
+  const naming = <T>(read: Promise<T>): Promise<T> =>
+    read.catch((error: unknown) => {
+      if (owner.id === user.id || !isTokenRefused(error)) throw error;
+      throw problem(
+        "github_error",
+        `The editor reads the repo with the project owner's GitHub token, and GitHub refused it. Ask ${owner.login} to sign out of Lift and sign in again.`,
+      );
+    });
+  return {
+    getFiles: (ref) => naming(deps.github.getFiles(token, repoOwner, repoName, ref)),
+    getContents: (path, ref) =>
+      naming(deps.github.getContents(token, repoOwner, repoName, path, ref)),
+    getCommit: (ref) => naming(deps.github.getCommit(token, repoOwner, repoName, ref)),
+  };
 }
 
 /** BE-17: the files the editor lists, at the service's branch unless `ref` says otherwise. */
 export async function editorTree(
   deps: EditorDeps,
-  service: ServiceRow,
-  project: ProjectRow,
-  ref: string | undefined,
+  input: { service: ServiceRow; project: ProjectRow; user: UserRow; ref: string | undefined },
 ): Promise<EditorTree> {
-  const token = await ownerToken(deps, project);
-  const tree = await deps.github.getFiles(
-    token,
-    service.repoOwner,
-    service.repoName,
-    ref ?? service.branch,
-  );
+  const { service, project, user, ref } = input;
+  const reader = await readAsOwner(deps, service, project, user);
+  const tree = await reader.getFiles(ref ?? service.branch);
   if (!tree) {
     const repo = `${service.repoOwner}/${service.repoName}`;
     throw problem(
@@ -206,19 +229,13 @@ async function makeRoom(deps: EditorDeps, serviceId: string): Promise<void> {
 async function createDocument(
   deps: EditorDeps,
   service: ServiceRow,
-  token: string,
+  reader: RepoReader,
   path: string,
 ): Promise<string> {
   if (isBinaryPath(path)) {
     throw cantOpen("The editor can't open binary files.", "Can't edit binary files");
   }
-  const head = await deps.github.getContents(
-    token,
-    service.repoOwner,
-    service.repoName,
-    path,
-    service.branch,
-  );
+  const head = await reader.getContents(path, service.branch);
   const file = editableFile(head, path, service.branch);
   await makeRoom(deps, service.id);
   const [created] = await deps.db
@@ -247,18 +264,12 @@ async function createDocument(
 async function refreshDocument(
   deps: EditorDeps,
   service: ServiceRow,
-  token: string,
+  reader: RepoReader,
   row: DocumentRow,
 ): Promise<string> {
   let head: GithubContents;
   try {
-    head = await deps.github.getContents(
-      token,
-      service.repoOwner,
-      service.repoName,
-      row.path,
-      service.branch,
-    );
+    head = await reader.getContents(row.path, service.branch);
   } catch (error) {
     // The document opens without GitHub; only the reload waits.
     deps.log.warn(
@@ -305,11 +316,11 @@ export async function openSession(
       "The live editor isn't set up on this server (COLLAB_SECRET).",
     );
   }
-  const token = await ownerToken(deps, project);
+  const reader = await readAsOwner(deps, service, project, user);
   const row = await findDocument(deps.db, service.id, path);
   const baseSha = row
-    ? await refreshDocument(deps, service, token, row)
-    : await createDocument(deps, service, token, path);
+    ? await refreshDocument(deps, service, reader, row)
+    : await createDocument(deps, service, reader, path);
   return {
     documentName: editorDocumentName(service.id, path),
     token: await signCollabToken({ sub: user.id, svc: service.id, path, role }, deps.collabSecret),
@@ -414,8 +425,8 @@ export async function commitChanges(
     }
 
     const { repoOwner: owner, repoName: name, branch } = service;
-    const reader = await ownerToken(deps, project);
-    const head = await deps.github.getFiles(reader, owner, name, branch);
+    const reader = await readAsOwner(deps, service, project, user);
+    const head = await reader.getFiles(branch);
     if (!head) throw problem("github_error", `Couldn't read ${branch} in ${owner}/${name}.`);
     const upstream = new Map(head.files.map((file) => [file.path, file]));
     const conflicts: Record<string, string> = {};
@@ -423,7 +434,7 @@ export async function commitChanges(
       let sha = upstream.get(row.path)?.sha;
       // GitHub lists at most 5,000 files of a big repo; ask about the others one by one.
       if (!sha && head.truncated) {
-        const found = await deps.github.getContents(reader, owner, name, row.path, head.sha);
+        const found = await reader.getContents(row.path, head.sha);
         if (found.kind === "file") sha = found.file.sha;
       }
       if (!sha) conflicts[row.path] = "Deleted on GitHub since you opened it";
@@ -462,7 +473,7 @@ export async function commitChanges(
         by: "Lift",
         message: `${branch} didn't move, so nothing was committed`,
       });
-      const now = await deps.github.getCommit(reader, owner, name, branch);
+      const now = await reader.getCommit(branch);
       if (now && now.sha !== head.sha) {
         throw problem(
           "conflict",
@@ -527,9 +538,9 @@ export async function commitChanges(
  */
 export async function discardChanges(
   deps: EditorDeps,
-  input: { service: ServiceRow; project: ProjectRow; paths: string[] | undefined },
+  input: { service: ServiceRow; project: ProjectRow; user: UserRow; paths: string[] | undefined },
 ): Promise<EditorDiscardResponse> {
-  const { service, project } = input;
+  const { service, project, user } = input;
   return oneAtATime(service.id, async () => {
     const rows = input.paths
       ? await deps.db
@@ -544,17 +555,11 @@ export async function discardChanges(
           .orderBy(asc(documents.path))
       : (await draftsOf(deps, service.id)).map(({ row }) => row);
     if (rows.length === 0) return { paths: [] };
-    const token = await ownerToken(deps, project);
+    const reader = await readAsOwner(deps, service, project, user);
     const reloaded: { row: DocumentRow; file: GithubFile }[] = [];
     const gone: string[] = [];
     for (const row of rows) {
-      const head = await deps.github.getContents(
-        token,
-        service.repoOwner,
-        service.repoName,
-        row.path,
-        service.branch,
-      );
+      const head = await reader.getContents(row.path, service.branch);
       if (
         head.kind === "file" &&
         head.file.path === row.path &&

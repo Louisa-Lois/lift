@@ -67,7 +67,7 @@ export const editorRoutes: FastifyPluginAsyncZod<{
     async (request) => {
       const user = requireUser(request);
       const { service, project } = await accessService(app.db, request.params.serviceId, user.id);
-      return editorTree(deps(request.log), service, project, request.query.ref);
+      return editorTree(deps(request.log), { service, project, user, ref: request.query.ref });
     },
   );
 
@@ -175,7 +175,12 @@ export const editorRoutes: FastifyPluginAsyncZod<{
         user.id,
         "editor",
       );
-      return discardChanges(deps(request.log), { service, project, paths: request.body.paths });
+      return discardChanges(deps(request.log), {
+        service,
+        project,
+        user,
+        paths: request.body.paths,
+      });
     },
   );
 };

@@ -44,6 +44,8 @@ export function fakeGitRepo(options: {
     protected: false,
     /** Tokens of people who can read the repo but not push to it. */
     readOnly: new Set<string>(),
+    /** Tokens GitHub no longer accepts, as once revoked: every call with one gets 401. */
+    refused: new Set<string>(),
     /** Runs as GitHub receives the branch update, before it answers. */
     beforeFastForward: null as null | ((sha: string) => Promise<void> | void),
   };
@@ -119,6 +121,10 @@ export function fakeGitRepo(options: {
     body: GitWrite,
     authorization: string | null,
   ): Promise<Response | null> {
+    const token = authorization?.replace(/^Bearer /, "") ?? "";
+    if (state.refused.has(token)) {
+      return Response.json({ message: "Bad credentials" }, { status: 401 });
+    }
     if (request.method === "GET" && rest.startsWith("commits/")) {
       const sha = resolve(rest.slice("commits/".length));
       const commit = sha ? commits.get(sha) : undefined;
@@ -170,7 +176,6 @@ export function fakeGitRepo(options: {
       });
     }
 
-    const token = authorization?.replace(/^Bearer /, "") ?? "";
     if (request.method !== "GET" && state.readOnly.has(token)) return notFound();
     if (request.method === "POST" && rest === "git/blobs") {
       const content =

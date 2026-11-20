@@ -389,6 +389,29 @@ describe("Commit & deploy", () => {
     expect((await changes(serviceId)).map((change) => change.path)).toEqual(["server.js"]);
   });
 
+  it("tells a member whose token it is when GitHub refuses the owner's, and changes nothing", async () => {
+    const serviceId = await newService();
+    await drafts(serviceId, { "server.js": "app.listen(4000);\n" });
+    repo.state.refused.add(OWNER_TOKEN);
+    const collabCalls = collab.calls.length;
+
+    for (const response of [
+      await commit(serviceId, { message: "Use port 4000" }),
+      await call("POST", `/services/${serviceId}/editor/discard`, {}, kofi),
+    ]) {
+      expect(Problem.parse(response.json())).toMatchObject({
+        status: 502,
+        detail:
+          "The editor reads the repo with the project owner's GitHub token, and GitHub refused it. Ask ama-owusu to sign out of Lift and sign in again.",
+      });
+    }
+    expect(repo.calls.filter((entry) => entry.method !== "GET")).toEqual([]);
+    expect(await deploymentsOf(serviceId)).toEqual([]);
+    const resets = collab.calls.slice(collabCalls).filter((entry) => entry.path.endsWith("/reset"));
+    expect(resets).toEqual([]);
+    expect((await changes(serviceId)).map((change) => change.path)).toEqual(["server.js"]);
+  });
+
   it("discards every draft without paths, for everyone editing", async () => {
     const serviceId = await newService();
     await drafts(serviceId, { "server.js": "app.listen(8080);\n", "README.md": "# Mine\n" });
