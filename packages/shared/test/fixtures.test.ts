@@ -12,6 +12,7 @@ import {
   DeploymentDetail,
   Diagnosis,
   Domain,
+  EditorChange,
   EditorSession,
   EditorTree,
   GithubBranch,
@@ -59,6 +60,7 @@ const parsesWith: Record<string, [z.ZodType, unknown]> = {
   diagnosis: [Diagnosis, fixtures.diagnosis],
   editorTree: [EditorTree, fixtures.editorTree],
   editorSession: [EditorSession, fixtures.editorSession],
+  editorChanges: [z.array(EditorChange), fixtures.editorChanges],
 };
 
 describe("every fixture", () => {

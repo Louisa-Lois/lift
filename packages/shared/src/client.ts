@@ -11,7 +11,16 @@ import { cursorPage, HealthResponse } from "./schemas/common";
 import { type CreateDatabaseBody, Database, DatabaseCredentials } from "./schemas/database";
 import { type CreateDeploymentBody, Deployment, DeploymentDetail } from "./schemas/deployment";
 import { Diagnosis } from "./schemas/diagnosis";
-import { EditorSession, type EditorSessionBody, EditorTree } from "./schemas/editor";
+import {
+  EditorChange,
+  type EditorCommitBody,
+  EditorCommitResponse,
+  type EditorDiscardBody,
+  EditorDiscardResponse,
+  EditorSession,
+  type EditorSessionBody,
+  EditorTree,
+} from "./schemas/editor";
 import { isKnownProjectEvent } from "./schemas/event";
 import { GithubBranch, GithubFile, GithubRepo, GithubTree } from "./schemas/github";
 import { DeploymentLogEnd, LogLine, LogSnapshot } from "./schemas/logs";
@@ -66,6 +75,7 @@ const DeploymentPage = cursorPage(Deployment);
 const GithubRepoPage = cursorPage(GithubRepo);
 const GithubBranchPage = cursorPage(GithubBranch);
 const ProjectMemberPage = cursorPage(ProjectMember);
+const EditorChangePage = cursorPage(EditorChange);
 const ApiTokenPage = cursorPage(ApiToken);
 const VariablePage = cursorPage(Variable);
 const DatabasePage = cursorPage(Database);
@@ -313,6 +323,22 @@ export function createLiftClient(options: LiftClientOptions) {
        */
       session: (serviceId: string, body: z.input<typeof EditorSessionBody>) =>
         call("POST", `/services/${segment(serviceId)}/editor/session`, EditorSession, { body }),
+      /** BE-18 `GET /services/:id/editor/changes`: every file with a draft, at once. */
+      changes: (serviceId: string) =>
+        call("GET", `/services/${segment(serviceId)}/editor/changes`, EditorChangePage),
+      /**
+       * `POST /services/:id/editor/commit`: commits the drafts (or `paths`) to the branch as you,
+       * and deploys the commit. A 409 lists the files that changed on GitHub in `fields`.
+       */
+      commit: (serviceId: string, body: z.input<typeof EditorCommitBody>) =>
+        call("POST", `/services/${segment(serviceId)}/editor/commit`, EditorCommitResponse, {
+          body,
+        }),
+      /** `POST /services/:id/editor/discard`: reloads the drafts (or `paths`) from the branch. */
+      discard: (serviceId: string, body: z.input<typeof EditorDiscardBody> = {}) =>
+        call("POST", `/services/${segment(serviceId)}/editor/discard`, EditorDiscardResponse, {
+          body,
+        }),
     },
 
     /** BE-15: a project's members; only its owner adds, changes and removes them. */
