@@ -11,6 +11,7 @@ import { cursorPage, HealthResponse } from "./schemas/common";
 import { type CreateDatabaseBody, Database, DatabaseCredentials } from "./schemas/database";
 import { type CreateDeploymentBody, Deployment, DeploymentDetail } from "./schemas/deployment";
 import { Diagnosis } from "./schemas/diagnosis";
+import { EditorSession, type EditorSessionBody, EditorTree } from "./schemas/editor";
 import { isKnownProjectEvent } from "./schemas/event";
 import { GithubBranch, GithubFile, GithubRepo, GithubTree } from "./schemas/github";
 import { DeploymentLogEnd, LogLine, LogSnapshot } from "./schemas/logs";
@@ -297,6 +298,21 @@ export function createLiftClient(options: LiftClientOptions) {
       /** `GET /databases/:id/credentials` (editors): the connection string and password. */
       credentials: (databaseId: string) =>
         call("GET", `/databases/${segment(databaseId)}/credentials`, DatabaseCredentials),
+    },
+
+    /** BE-17: the live editor. Editing itself goes through the collab server, not the API. */
+    editor: {
+      /** `GET /services/:id/editor/tree?ref=`: without `ref`, the service's branch. */
+      tree: (serviceId: string, params: { ref?: string } = {}) =>
+        call("GET", `/services/${segment(serviceId)}/editor/tree`, EditorTree, {
+          query: { ref: params.ref },
+        }),
+      /**
+       * `POST /services/:id/editor/session`: a collab token for one file, which the first open
+       * loads from GitHub. Ask again for each connection: the token lasts 10 minutes.
+       */
+      session: (serviceId: string, body: z.input<typeof EditorSessionBody>) =>
+        call("POST", `/services/${segment(serviceId)}/editor/session`, EditorSession, { body }),
     },
 
     /** BE-15: a project's members; only its owner adds, changes and removes them. */

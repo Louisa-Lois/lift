@@ -12,6 +12,8 @@ import {
   DeploymentDetail,
   Diagnosis,
   Domain,
+  EditorSession,
+  EditorTree,
   GithubBranch,
   GithubRepo,
   LogEntry,
@@ -55,6 +57,8 @@ const parsesWith: Record<string, [z.ZodType, unknown]> = {
   createdApiToken: [CreatedApiToken, fixtures.createdApiToken],
   onboardingPlan: [OnboardingPlan, fixtures.onboardingPlan],
   diagnosis: [Diagnosis, fixtures.diagnosis],
+  editorTree: [EditorTree, fixtures.editorTree],
+  editorSession: [EditorSession, fixtures.editorSession],
 };
 
 describe("every fixture", () => {
