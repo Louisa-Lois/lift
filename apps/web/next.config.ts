@@ -7,10 +7,19 @@ const rootEnv = path.resolve(process.cwd(), "../../.env");
 if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
 const apiUrl = process.env.API_URL ?? "http://localhost:4000";
+const MONACO_API_FILE = "monaco-editor/esm/vs/editor/editor.api.js";
 
 const nextConfig: NextConfig = {
   // packages/shared ships TypeScript source; Next compiles it along with the app.
   transpilePackages: ["@lift/shared"],
+
+  turbopack: {
+    resolveAlias: {
+      // y-monaco 0.1.6 imports Monaco by a file path that monaco-editor 0.57's exports map no
+      // longer serves; this is the same file under its exported path.
+      [MONACO_API_FILE]: "monaco-editor/editor/editor.api.js",
+    },
+  },
 
   // The development proxy below cuts requests off after 30 s by default, and a plan may take up
   // to 60 s (POST /api/v1/agent/plans). Production doesn't use it: Traefik routes /api.

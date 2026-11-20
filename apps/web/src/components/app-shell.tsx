@@ -17,13 +17,17 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { useMe } from "@/lib/hooks/use-me";
+import { cn } from "@/lib/utils";
 
-/** The frame around every signed-in screen: top bar with logo, navigation and the user menu. */
-export function AppShell({ children }: { children: ReactNode }) {
+/**
+ * The frame around every signed-in screen: top bar with logo, navigation and the user menu.
+ * `wide` gives the page the whole window below the bar, for the editor.
+ */
+export function AppShell({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className={cn("flex min-h-dvh flex-col", wide && "h-dvh")}>
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-6">
+        <div className={cn("mx-auto flex h-14 items-center gap-6 px-6", !wide && "max-w-6xl")}>
           <Link href="/projects" className="font-heading font-semibold text-base tracking-tight">
             Lift
           </Link>
@@ -43,7 +47,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">{children}</main>
+      {wide ? (
+        <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+      ) : (
+        <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">{children}</main>
+      )}
     </div>
   );
 }

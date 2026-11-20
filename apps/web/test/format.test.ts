@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { timeAgo } from "@/lib/format";
+import { formatBytes, timeAgo } from "@/lib/format";
 
 const now = Date.parse("2026-11-19T12:00:00Z");
 const ago = (ms: number) => new Date(now - ms).toISOString();
@@ -22,5 +22,16 @@ describe("timeAgo", () => {
 
   it("treats a time slightly in the future (clock skew) as just now", () => {
     expect(timeAgo(new Date(now + 5_000).toISOString(), now)).toBe("just now");
+  });
+});
+
+describe("formatBytes", () => {
+  it.each([
+    [940, "940 B"],
+    [18_442, "18 KB"],
+    [512 * 1024, "512 KB"],
+    [2_500_000, "2.4 MB"],
+  ])("%d bytes is %s", (bytes, label) => {
+    expect(formatBytes(bytes)).toBe(label);
   });
 });

@@ -11,6 +11,9 @@ import {
   CreateTokenBody,
   type Deployment,
   type DeploymentDetail,
+  EDITOR_LIMITS,
+  EditorSessionBody,
+  editorDocumentName,
   ID_PREFIXES,
   type LogEntry,
   maskVariableValue,
@@ -541,6 +544,21 @@ export const handlers = [
     return detail
       ? HttpResponse.json(detail)
       : problem(404, "not_found", "Not found", "No deployment with that ID.");
+  }),
+  // BE-17: the live editor. Every service lists the demo API's files. A session's token is a
+  // stand-in, so a file connects only to a collab server set up for it (see the editor tests).
+  http.get(api("/services/:serviceId/editor/tree"), () => HttpResponse.json(fixtures.editorTree)),
+  http.post(api("/services/:serviceId/editor/session"), async ({ params, request }) => {
+    const { path } = EditorSessionBody.parse(await request.json());
+    const file = fixtures.editorTree.files.find((entry) => entry.path === path);
+    if (!file) return problem(404, "not_found", "Not found", `There's no ${path} on main.`);
+    if (file.binary || file.size > EDITOR_LIMITS.maxTextFileBytes) {
+      return invalid({ path: file.binary ? "Can't edit binary files" : "Too large to edit here" });
+    }
+    return HttpResponse.json({
+      ...fixtures.editorSession,
+      documentName: editorDocumentName(String(params.serviceId), path),
+    });
   }),
   // FE-16: the demo's failed web build has autofix's diagnosis; other deployments have none.
   http.get(api("/deployments/:deploymentId/diagnosis"), ({ params }) =>

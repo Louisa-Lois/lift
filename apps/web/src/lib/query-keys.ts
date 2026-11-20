@@ -15,6 +15,7 @@ export const queryKeys = {
   members: (projectId: string) => ["members", projectId] as const,
   plan: (planId: string) => ["plan", planId] as const,
   diagnosis: (deploymentId: string) => ["diagnosis", deploymentId] as const,
+  editorTree: (serviceId: string) => ["editor", "tree", serviceId] as const,
   githubRepos: (query: string) => ["github", "repos", query] as const,
   githubBranches: (owner: string, repo: string) => ["github", "branches", owner, repo] as const,
 };
