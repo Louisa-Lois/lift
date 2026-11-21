@@ -127,6 +127,7 @@ All public routes sit under `/api/v1`, need a session or bearer token unless mar
 | `POST /agent/actions/:id/approve` · `/reject` | Decide on a proposed write | editor | web |
 | `GET /evals/runs` · `GET /evals/runs/:id` | Evaluation results | any | web |
 | `POST /webhooks/github?service=svc_…` | GitHub push events, signature-checked | public | GitHub |
+| `POST /csp-reports` | The dashboard's Content-Security-Policy violation reports, in either browser format. Each is logged (directive, blocked origin, paths without queries), never stored; always `204`. Not in the OpenAPI document | public | browsers |
 | `GET /health` | Postgres and Redis reachable | public | uptime check |
 | `GET /openapi.json` | The generated spec | public | agent, mcp |
 

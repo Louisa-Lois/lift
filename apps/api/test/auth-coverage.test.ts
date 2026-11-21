@@ -19,6 +19,8 @@ const PUBLIC_ROUTES = [
   "GET /api/v1/auth/github/callback",
   "POST /api/v1/auth/logout",
   "POST /api/v1/webhooks/github",
+  // Browsers send Content-Security-Policy reports without a session; the route only logs them.
+  "POST /api/v1/csp-reports",
 ];
 
 /**

@@ -150,7 +150,7 @@ Pages that update live are client components. There are no Next.js server action
 - Smooth log streaming at 10,000 lines a minute.
 - Every action reachable by keyboard; visible focus rings; `aria-live` on status changes and toasts; WCAG AA contrast.
 - Desktop first (1280 px and up, usable at 1024 px). On phones, the projects list, deployment status and logs stay readable; the editor shows "Open on a larger screen".
-- Security headers in `next.config` (Content-Security-Policy, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`); never render HTML that came from a user or a log.
+- Security headers: `X-Frame-Options: DENY` and `Referrer-Policy: strict-origin-when-cross-origin` in `next.config`, and a Content-Security-Policy with a new nonce on every request in `src/proxy.ts` (report-only until it's shown to block nothing the app needs); never render HTML that came from a user or a log.
 
 ## Requirements, acceptance tests and agent kickoff prompt
 

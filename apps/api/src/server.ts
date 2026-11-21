@@ -18,6 +18,7 @@ import { internalAgentRoutes } from "./routes/internal/agent";
 import { internalDatabaseRoutes } from "./routes/internal/databases";
 import { internalDeploymentRoutes } from "./routes/internal/deployments";
 import { authRoutes } from "./routes/v1/auth";
+import { cspReportRoutes } from "./routes/v1/csp-reports";
 import { databaseRoutes } from "./routes/v1/databases";
 import { deploymentRoutes } from "./routes/v1/deployments";
 import { editorRoutes } from "./routes/v1/editor";
@@ -123,6 +124,7 @@ export function buildServer(env: Env, options: ServerOptions = {}) {
   });
   app.register(databaseRoutes, { prefix: API_BASE_PATH, secretBox });
   app.register(webhookRoutes, { prefix: API_BASE_PATH, secretBox });
+  app.register(cspReportRoutes, { prefix: API_BASE_PATH });
   app.register(planRoutes, {
     prefix: API_BASE_PATH,
     github,

@@ -32,8 +32,8 @@ const nextConfig: NextConfig = {
     return [{ source: "/api/:path*", destination: `${apiUrl}/api/:path*` }];
   },
 
-  // Security headers (docs/prd/02-frontend.md, "Non-functional"). A Content-Security-Policy
-  // follows once the pages that load avatars, the collab WebSocket and Monaco exist.
+  // Security headers (docs/prd/02-frontend.md, "Non-functional"). The Content-Security-Policy is
+  // set in src/proxy.ts instead: it carries a new nonce on every request, which a header here can't.
   async headers() {
     return [
       {
