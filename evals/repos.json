@@ -1,0 +1,287 @@
+[
+  {
+    "id": "next-postgres-official-01",
+    "repo": "nextjs/saas-starter",
+    "ref": "6e33e58b1e553a41fe22e6b941a7229a002de361",
+    "stack": "nextjs",
+    "golden": {
+      "services": [{ "type": "web", "port": 3000, "startCommand": null }],
+      "databases": ["postgres"],
+      "requiredVariables": [
+        "POSTGRES_URL",
+        "AUTH_SECRET",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET"
+      ]
+    },
+    "breakage": null
+  },
+  {
+    "id": "next-postgres-tecsmith-01",
+    "repo": "tecsmith-info/next-enterprise-starter",
+    "ref": "bc011f8c26705046566acf79cef3ebd52c9809c2",
+    "stack": "nextjs",
+    "golden": {
+      "services": [{ "type": "web", "port": 3000, "startCommand": null }],
+      "databases": ["postgres"],
+      "requiredVariables": ["DATABASE_URL", "AUTH_SECRET"]
+    },
+    "breakage": null
+  },
+  {
+    "id": "next-no-db-notahmed-01",
+    "repo": "notahmedwael/nextjs-portfolio",
+    "ref": "abc44de14e723e38e886c3ae41e6926c905f33a9",
+    "stack": "nextjs",
+    "golden": {
+      "services": [{ "type": "web", "port": 3000, "startCommand": null }],
+      "databases": [],
+      "requiredVariables": []
+    },
+    "breakage": null
+  },
+  {
+    "id": "next-no-db-naman-01",
+    "repo": "namanbarkiya/minimal-next-portfolio",
+    "ref": "263950f499005cacf20ffc4812fd2dc563a611de",
+    "stack": "nextjs",
+    "golden": {
+      "services": [{ "type": "web", "port": 3000, "startCommand": null }],
+      "databases": [],
+      "requiredVariables": []
+    },
+    "breakage": null
+  },
+  {
+    "id": "express-no-db-01",
+    "repo": "peterthordimitra/express-demo",
+    "ref": "f7b84e6be449831352c565b309bc947255a8adf7",
+    "stack": "express",
+    "golden": {
+      "services": [{ "type": "web", "port": 3000, "startCommand": "node server.js" }],
+      "databases": [],
+      "requiredVariables": []
+    },
+    "breakage": null
+  },
+  {
+    "id": "express-postgres-01",
+    "repo": "bryanware/render-todo-app",
+    "ref": "ca047ca7088ffd545251f39d2b67b557a2a9dd1c",
+    "stack": "express",
+    "golden": {
+      "services": [{ "type": "web", "port": 3000, "startCommand": "npm start" }],
+      "databases": ["postgres"],
+      "requiredVariables": ["DATABASE_URL"]
+    },
+    "breakage": null
+  },
+  {
+    "id": "fastify-no-db-01",
+    "repo": "smartiniOnGitHub/fastify-example",
+    "ref": "174857c54db974b72ea70bba057b94ddb7e37d77",
+    "stack": "fastify",
+    "golden": {
+      "services": [{ "type": "web", "port": 8000, "startCommand": "npm start" }],
+      "databases": [],
+      "requiredVariables": []
+    },
+    "breakage": null
+  },
+  {
+    "id": "fastify-postgres-01",
+    "repo": "Raffiskender/fastify-auth-boilerplate",
+    "ref": "ee37ce11f22c86f90576007a3c7127f16f2c2457",
+    "stack": "fastify",
+    "golden": {
+      "services": [{ "type": "web", "port": 1234, "startCommand": "npm start" }],
+      "databases": ["postgres"],
+      "requiredVariables": [
+        "DATABASE_URL",
+        "SMTP_HOST",
+        "SMTP_PORT",
+        "SMTP_USER",
+        "SMTP_PASS",
+        "MAIL_FROM",
+        "APP_URL",
+        "FRONT_URL",
+        "JWT_SECRET"
+      ]
+    },
+    "breakage": null
+  },
+  {
+    "id": "vite-static-dan5py-01",
+    "repo": "dan5py/react-vite-shadcn-ui",
+    "ref": "6be1e78987b5cc63706e40fd1a38d02bf6491ae3",
+    "stack": "vite",
+    "golden": {
+      "services": [{ "type": "static", "port": 3000, "startCommand": null }],
+      "databases": [],
+      "requiredVariables": []
+    },
+    "breakage": null
+  },
+  {
+    "id": "vite-static-ricardo-01",
+    "repo": "RicardoValdovinos/vite-react-boilerplate",
+    "ref": "e086793a11203600e109da4db437b140c3255c83",
+    "stack": "vite",
+    "golden": {
+      "services": [{ "type": "static", "port": 3000, "startCommand": null }],
+      "databases": [],
+      "requiredVariables": []
+    },
+    "breakage": null
+  },
+  {
+    "id": "astro-static-blog-01",
+    "repo": "withastro/blog-tutorial-demo",
+    "ref": "b3e12cc12d3292eff8c1237fb14f9b93f31ec33e",
+    "stack": "astro",
+    "golden": {
+      "services": [{ "type": "static", "port": 3000, "startCommand": null }],
+      "databases": [],
+      "requiredVariables": []
+    },
+    "breakage": null
+  },
+  {
+    "id": "astro-static-daisyui-01",
+    "repo": "aholbreich/astro-tailwind-daisyui-starter",
+    "ref": "dfa778c0e1206082c31d83175e9fbca2c5b33f9c",
+    "stack": "astro",
+    "golden": {
+      "services": [{ "type": "static", "port": 3000, "startCommand": null }],
+      "databases": [],
+      "requiredVariables": []
+    },
+    "breakage": null
+  },
+  {
+    "id": "fastapi-sqlite-01",
+    "repo": "iammikek/fastAPI-101",
+    "ref": "225e16335bbb68fe425eec8595fa56113fded432",
+    "stack": "fastapi",
+    "golden": {
+      "services": [
+        {
+          "type": "web",
+          "port": 8000,
+          "startCommand": "uvicorn main:app --host 0.0.0.0 --port 8000"
+        }
+      ],
+      "databases": [],
+      "requiredVariables": []
+    },
+    "breakage": null
+  },
+  {
+    "id": "fastapi-postgres-01",
+    "repo": "justyn-clark/fastapi-sqlalchemy-starter",
+    "ref": "fe9616bc6ea6cac68c7cd226ce36a8932c4fe8d8",
+    "stack": "fastapi",
+    "golden": {
+      "services": [
+        {
+          "type": "web",
+          "port": 8000,
+          "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port 8000"
+        }
+      ],
+      "databases": ["postgres"],
+      "requiredVariables": ["DATABASE_URL"]
+    },
+    "breakage": null
+  },
+  {
+    "id": "flask-postgres-01",
+    "repo": "alisezer/flask-template",
+    "ref": "387d3ee006eee71d714861cb08bf5cb7b2ca4a80",
+    "stack": "flask",
+    "golden": {
+      "services": [
+        {
+          "type": "web",
+          "port": 8000,
+          "startCommand": "gunicorn --config gunicorn.conf.py 'app:create_app()'"
+        }
+      ],
+      "databases": ["postgres"],
+      "requiredVariables": ["DATABASE_URL", "SECRET_KEY"]
+    },
+    "breakage": null
+  },
+  {
+    "id": "flask-sqlite-waimea-01",
+    "repo": "waimea-dt/flask-starter",
+    "ref": "32254eebee9ee26b21b605d9564564fdbb9cc59d",
+    "stack": "flask",
+    "golden": {
+      "services": [{ "type": "web", "port": 5000, "startCommand": "flask run" }],
+      "databases": [],
+      "requiredVariables": ["FLASK_SECRET_KEY"]
+    },
+    "breakage": null
+  },
+  {
+    "id": "django-no-db-egorsmkv-01",
+    "repo": "egorsmkv/simple-django-login-and-register",
+    "ref": "a7a9b1a60257468c2a3172960a2ee87d92c88868",
+    "stack": "django",
+    "golden": {
+      "services": [
+        {
+          "type": "web",
+          "port": 8000,
+          "startCommand": "python source/manage.py runserver 0.0.0.0:8000"
+        }
+      ],
+      "databases": [],
+      "requiredVariables": []
+    },
+    "breakage": null
+  },
+  {
+    "id": "django-postgres-coleman-01",
+    "repo": "mrsarm/django-coleman",
+    "ref": "42e063371ccca74d24746c70cd1854149cffc3a5",
+    "stack": "django",
+    "golden": {
+      "services": [
+        {
+          "type": "web",
+          "port": 8000,
+          "startCommand": "./manage.py collectstatic --no-input && uwsgi uwsgi.ini"
+        }
+      ],
+      "databases": ["postgres"],
+      "requiredVariables": ["DATABASE_URL"]
+    },
+    "breakage": null
+  },
+  {
+    "id": "go-net-http-postgres-01",
+    "repo": "gultekinmakif/go-http-server",
+    "ref": "e1be1c34893fc19927197f3189c0227275e8f6a3",
+    "stack": "go-net-http",
+    "golden": {
+      "services": [{ "type": "web", "port": 3000, "startCommand": null }],
+      "databases": ["postgres"],
+      "requiredVariables": ["DATABASE_URL"]
+    },
+    "breakage": null
+  },
+  {
+    "id": "dockerfile-static-01",
+    "repo": "SayedAtwh/deploy-simple-website-use-nginx",
+    "ref": "5a6470411b0798c0ed694929e35ba647836009e2",
+    "stack": "dockerfile",
+    "golden": {
+      "services": [{ "type": "static", "port": 80, "startCommand": null }],
+      "databases": [],
+      "requiredVariables": []
+    },
+    "breakage": null
+  }
+]
