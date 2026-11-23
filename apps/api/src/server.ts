@@ -18,6 +18,7 @@ import { internalAgentRoutes } from "./routes/internal/agent";
 import { internalDatabaseRoutes } from "./routes/internal/databases";
 import { internalDeploymentRoutes } from "./routes/internal/deployments";
 import { authRoutes } from "./routes/v1/auth";
+import { cliLoginRoutes } from "./routes/v1/cli-logins";
 import { cspReportRoutes } from "./routes/v1/csp-reports";
 import { databaseRoutes } from "./routes/v1/databases";
 import { deploymentRoutes } from "./routes/v1/deployments";
@@ -94,6 +95,7 @@ export function buildServer(env: Env, options: ServerOptions = {}) {
 
   app.register(healthRoutes, { prefix: API_BASE_PATH });
   app.register(authRoutes, { prefix: API_BASE_PATH, env, github, secretBox });
+  app.register(cliLoginRoutes, { prefix: API_BASE_PATH, env });
   app.register(meRoutes, { prefix: API_BASE_PATH });
   app.register(tokenRoutes, { prefix: API_BASE_PATH });
   app.register(githubRoutes, { prefix: API_BASE_PATH, github, secretBox });

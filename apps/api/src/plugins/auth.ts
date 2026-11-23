@@ -55,8 +55,21 @@ export function cookieAttributes(env: Pick<Env, "PUBLIC_URL">) {
 }
 
 /** The value of `Authorization: Bearer …`, or null. */
-function bearerOf(header: string | undefined): string | null {
+export function bearerOf(header: string | undefined): string | null {
   return /^Bearer\s+(\S+)\s*$/i.exec(header ?? "")?.[1] ?? null;
+}
+
+/**
+ * 403 unless the request comes from the dashboard's own pages: its `Origin` must be PUBLIC_URL's.
+ * SameSite=Lax doesn't cover this: apps deployed at *.{APPS_DOMAIN} are the same site as the
+ * dashboard, so their requests carry its session cookie too. Browsers send `Origin` on every POST.
+ */
+export function requireDashboardOrigin(
+  request: FastifyRequest,
+  env: Pick<Env, "PUBLIC_URL">,
+): void {
+  if (request.headers.origin === new URL(env.PUBLIC_URL).origin) return;
+  throw problem("forbidden", "This can only be done from the Lift dashboard's own pages.");
 }
 
 /**

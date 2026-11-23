@@ -141,6 +141,13 @@ Worker-only internal routes are listed in `docs/contracts.md`. The agent service
 2. The callback checks `state`, exchanges the code, fetches the profile and primary email, upserts the user and stores the GitHub token encrypted.
 3. It creates a session, sets `lift_session` (httpOnly, Secure, SameSite=Lax, 14 days, sliding) and redirects to the `next` path given to `/auth/github/start` (only same-site paths), or to `/projects`.
 
+### CLI login and token sign-in (BE-14)
+
+1. `POST /auth/cli` returns a code (8 consonants, shown as `BCDF-GHJK`), `verifyUrl` (`/cli-auth?code=…`), a poll secret stored only as its SHA-256, and `expiresAt`, 10 minutes ahead. At most 30 logins start a minute.
+2. The user approves or denies the code at `verifyUrl`. Only a dashboard session can, and only with an `Origin` equal to `PUBLIC_URL`'s: deployed apps at `*.{APPS_DOMAIN}` are the same site as the dashboard, so SameSite=Lax alone doesn't stop them.
+3. The CLI polls `GET /auth/cli/:code` with `Authorization: Bearer {pollSecret}`. The first poll after approval gets a new personal token: the approver's, `admin` scope, named `lift login · {date}`. Later polls get `expired`. An approved login can be collected until 30 seconds after `expiresAt`. An unknown code and a wrong secret get the same 404.
+4. `POST /auth/session` turns a personal token with `admin` scope into an ordinary session, for end-to-end tests. Lesser scopes get 403, since a session may do everything the user's role allows.
+
 ### Creating a service
 
 1. Check the user can read the repo with their token; otherwise fail with `github_error`.
