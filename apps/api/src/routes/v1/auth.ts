@@ -1,13 +1,20 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { API_BASE_PATH, GithubSignInQuery, RedirectPath, SESSION_COOKIE } from "@lift/shared";
+import {
+  API_BASE_PATH,
+  CreateSessionResponse,
+  GithubSignInQuery,
+  RedirectPath,
+  SESSION_COOKIE,
+} from "@lift/shared";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { type Env, isAllowedLogin } from "../../env";
-import { cookieAttributes } from "../../plugins/auth";
+import { problem } from "../../lib/problem";
+import { cookieAttributes, requireUser } from "../../plugins/auth";
 import type { SecretBox } from "../../services/crypto";
 import type { Github, GithubProfile } from "../../services/github";
 import { createSession, deleteSession } from "../../services/sessions";
-import { upsertGithubUser } from "../../services/users";
+import { toUser, upsertGithubUser } from "../../services/users";
 
 /** Holds the OAuth `state` and where to go afterwards, signed, for 10 minutes. */
 const STATE_COOKIE = "lift_oauth";
@@ -151,6 +158,38 @@ export const authRoutes: FastifyPluginAsyncZod<AuthRoutesOptions> = async (
       if (request.sessionId) await deleteSession(app.db, request.sessionId);
       reply.clearCookie(SESSION_COOKIE, cookieAttributes(env));
       return reply.code(204).send();
+    },
+  );
+
+  app.post(
+    "/auth/session",
+    {
+      // Not public: the route guard asks a token for admin scope, the default for writes, so a
+      // read or deploy token can't turn itself into a session that may do everything.
+      schema: {
+        summary: "Swap a personal token (admin scope) for a browser session, for end-to-end tests",
+        description:
+          "Sets lift_session like GitHub sign-in does. Only a personal token may call it; a session gets 403.",
+        tags: ["auth"],
+        response: { 200: CreateSessionResponse },
+      },
+    },
+    async (request, reply) => {
+      const user = requireUser(request);
+      if (request.credential?.via !== "token") {
+        throw problem("forbidden", "Send a personal token: this route turns one into a session.");
+      }
+      const session = await createSession(app.db, {
+        userId: user.id,
+        ip: request.ip ?? null,
+        userAgent: request.headers["user-agent"] ?? null,
+      });
+      reply.setCookie(SESSION_COOKIE, session.token, {
+        ...cookieAttributes(env),
+        expires: session.expiresAt,
+      });
+      request.log.info({ tokenId: request.credential.tokenId }, "session created from a token");
+      return { user: toUser(user), expiresAt: session.expiresAt.toISOString() };
     },
   );
 };

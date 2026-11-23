@@ -7,6 +7,12 @@ import {
   type ProjectStreamEvent,
   STREAM_PATHS,
 } from "./events";
+import {
+  CliLoginDecisionResponse,
+  CreateSessionResponse,
+  PollCliLoginResponse,
+  StartCliLoginResponse,
+} from "./schemas/auth";
 import { cursorPage, HealthResponse } from "./schemas/common";
 import { type CreateDatabaseBody, Database, DatabaseCredentials } from "./schemas/database";
 import { type CreateDeploymentBody, Deployment, DeploymentDetail } from "./schemas/deployment";
@@ -110,11 +116,16 @@ export function createLiftClient(options: LiftClientOptions) {
     return `${baseUrl}${path}${search ? `?${search}` : ""}`;
   }
 
-  function headers(extra: Record<string, string>): Record<string, string> {
-    return options.token ? { ...extra, Authorization: `Bearer ${options.token}` } : extra;
+  /** `bearer` replaces the client's token for one call: the CLI login's poll secret. */
+  function headers(extra: Record<string, string>, bearer = options.token): Record<string, string> {
+    return bearer ? { ...extra, Authorization: `Bearer ${bearer}` } : extra;
   }
 
-  async function send(method: string, path: string, init: { query?: Query; body?: unknown }) {
+  async function send(
+    method: string,
+    path: string,
+    init: { query?: Query; body?: unknown; bearer?: string },
+  ) {
     const hasBody = init.body !== undefined;
     const response = await fetcher(url(path, init.query), {
       method,
@@ -122,6 +133,7 @@ export function createLiftClient(options: LiftClientOptions) {
         hasBody
           ? { Accept: "application/json", "Content-Type": "application/json" }
           : { Accept: "application/json" },
+        init.bearer,
       ),
       body: hasBody ? JSON.stringify(init.body) : undefined,
     });
@@ -133,7 +145,7 @@ export function createLiftClient(options: LiftClientOptions) {
     method: string,
     path: string,
     schema: S,
-    init: { query?: Query; body?: unknown } = {},
+    init: { query?: Query; body?: unknown; bearer?: string } = {},
   ): Promise<z.output<S>> {
     const response = await send(method, path, init);
     return check(schema, await response.text(), method, path, response.status);
@@ -200,6 +212,11 @@ export function createLiftClient(options: LiftClientOptions) {
     me: () => call("GET", "/me", User),
     /** `POST /auth/logout`. */
     logout: () => callVoid("POST", "/auth/logout"),
+    /**
+     * `POST /auth/session`: swaps this client's personal token (admin scope) for a browser
+     * session, set as the `lift_session` cookie. For end-to-end tests.
+     */
+    createSession: () => call("POST", "/auth/session", CreateSessionResponse),
 
     github: {
       /** `GET /github/repos?query=`. */
@@ -369,6 +386,27 @@ export function createLiftClient(options: LiftClientOptions) {
         call("POST", "/tokens", CreatedApiToken, { body }),
       /** `DELETE /tokens/:id`: the token stops working at once. */
       revoke: (tokenId: string) => callVoid("DELETE", `/tokens/${segment(tokenId)}`),
+    },
+
+    /**
+     * BE-14: `lift login` through the browser. The CLI starts a login and opens its `verifyUrl`;
+     * the user approves the code in the dashboard; the CLI polls until it gets its token.
+     */
+    cliLogins: {
+      /** `POST /auth/cli` (public): the code to show, the page to open and the poll secret. */
+      start: () => call("POST", "/auth/cli", StartCliLoginResponse),
+      /**
+       * `GET /auth/cli/:code` (public), with the poll secret as the bearer for this call only:
+       * `pending` until the user decides, then `approved` with a new token, which comes once.
+       */
+      poll: (code: string, pollSecret: string) =>
+        call("GET", `/auth/cli/${segment(code)}`, PollCliLoginResponse, { bearer: pollSecret }),
+      /** `POST /auth/cli/:code/approve`: the signed-in user lets that CLI sign in as them. */
+      approve: (code: string) =>
+        call("POST", `/auth/cli/${segment(code)}/approve`, CliLoginDecisionResponse),
+      /** `POST /auth/cli/:code/deny`. */
+      deny: (code: string) =>
+        call("POST", `/auth/cli/${segment(code)}/deny`, CliLoginDecisionResponse),
     },
 
     /** BE-19 and BE-20: the assistant's deployment plan for a repo, and applying it. */

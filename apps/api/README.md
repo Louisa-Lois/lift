@@ -35,13 +35,17 @@ The REST API every client and the worker go through. **Owner:** WS1 Back end & A
   - A push to the service's branch deploys its head commit with `trigger: push`, once per commit: a redelivered push changes nothing.
   - Other branches, branch deletions, other repos and other events get a 202 with the reason, for GitHub's delivery log.
 
-- **API tokens (BE-14, tokens part):**
+- **API tokens (BE-14):**
   - `GET /tokens`, `POST /tokens` and `DELETE /tokens/:id`: personal tokens (`lift_pat_` and 32 characters) for the CLI, the MCP server and scripts. The plaintext is in the answer to `POST` only; the database keeps its SHA-256 and the first 12 characters. Revoking takes effect at the next request.
   - Any route takes `Authorization: Bearer lift_pat_…` instead of the cookie, and a token wins over a cookie. A token whose login leaves `ALLOWED_GITHUB_LOGINS` stops working but isn't revoked; signing out with a token revokes nothing.
   - Deny by default (`src/plugins/scopes.ts`): every `/api/v1` route needs a session or a token unless it is marked `config: { public: true }`. `test/auth-coverage.test.ts` walks every route to keep it that way.
   - Scopes are levels: `read` (GET), `deploy` (also deploy, roll back, cancel and restart) and `admin` (everything the user's role allows, including creating tokens). A route names its scope with `config: { scope }`; the default is `read` for GET and `admin` otherwise. The project role is checked as for a session.
   - A token deploys with `trigger: cli`, a session with `manual`. Tokens for one project (`projectId`) get 400 for now.
-  - The CLI's browser login (`/auth/cli…`) and `POST /auth/session` come after Nov 26.
+  - `lift login` through the browser (`src/routes/v1/cli-logins.ts`):
+    - `POST /auth/cli` (public) starts a login: a code like `BCDF-GHJK` that lasts 10 minutes, the dashboard page to approve it on, and a poll secret the database keeps only as a SHA-256. It deletes logins that expired over a day ago, and allows 30 starts a minute across all callers (429 past that).
+    - `GET /auth/cli/:code` (public) is the CLI's poll, with `Authorization: Bearer {pollSecret}`: `pending`, `denied`, `expired`, or `approved` with a new admin token named `lift login · {date}`. The first poll after approval gets the token, under the login's row lock; later polls get `expired`. An unknown code and a wrong or missing secret get the same 404. If the approver's login has left `ALLOWED_GITHUB_LOGINS`, the CLI gets `denied` and no token.
+    - `POST /auth/cli/:code/approve` and `/deny` take a dashboard session only (a token gets 403), and only with `Origin` equal to `PUBLIC_URL`'s: deployed apps at `*.{APPS_DOMAIN}` are the same site as the dashboard, so SameSite=Lax alone doesn't keep them from approving their author's code as a visitor. An unknown code gets 404; an expired or decided one 409.
+  - `POST /auth/session` swaps a personal token with `admin` scope for a 14-day session, setting `lift_session` as GitHub sign-in does, for end-to-end tests. A `read` or `deploy` token, or a session, gets 403.
 
 - **Variables (BE-09):**
   - `GET /services/:id/variables` lists every variable, sorted by key, each value masked as `••••` and its last 4 characters. `?reveal=true` shows the values to editors (and to admin tokens).

@@ -26,7 +26,7 @@ A single Node binary (`apps/cli`, bundled with tsup), built on `commander`, with
 
 | Command | What it does | API |
 | --- | --- | --- |
-| `lift login` | Starts a CLI login, prints the code, opens `/cli-auth?code=…` in the browser, polls every 2 s for up to 5 minutes, saves the token. `--token lift_pat_…` skips the browser, for CI | `/auth/cli` |
+| `lift login` | Starts a CLI login, prints the code, opens `/cli-auth?code=…` in the browser, polls every 2 s until the answer is `approved`, `denied` or `expired` (a code lasts 10 minutes), saves the token. `--token lift_pat_…` skips the browser, for CI | `/auth/cli` |
 | `lift logout` · `lift whoami` | Remove the saved token · show the signed-in user | `/me` |
 | `lift init` | In a git repo with a GitHub remote: name the project, ask the AI for a plan (`--no-ai` for the manual form), show it as a table, apply on confirm, link the folder | `/agent/plans`, apply |
 | `lift link` | Pick an existing project and service; writes `.lift/project.json` and adds `.lift/` to `.gitignore` | projects, services |

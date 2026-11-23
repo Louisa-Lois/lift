@@ -59,6 +59,15 @@ const activeId = web.activeDeploymentId ?? "";
 const activeDetail = fx.deploymentDetails[activeId];
 const sha = "0123456789abcdef0123456789abcdef01234567";
 
+const cliCode = "BCDF-GHJK";
+const startedCliLogin = {
+  code: cliCode,
+  verifyUrl: `http://localhost:3000/cli-auth?code=${cliCode}`,
+  pollSecret: "p".repeat(43),
+  expiresAt: "2026-11-22T10:10:00Z",
+};
+const createdSession = { user: fx.me, expiresAt: "2026-12-06T10:00:00Z" };
+
 type Case = {
   name: string;
   call: (client: LiftClient) => Promise<unknown>;
@@ -247,6 +256,46 @@ const cases: Case[] = [
     response: () => json(200, { data: fx.buildLog }),
     returns: { data: fx.buildLog },
   },
+  {
+    name: "createSession",
+    call: (c) => c.createSession(),
+    method: "POST",
+    path: "/auth/session",
+    response: () => json(200, createdSession),
+    returns: createdSession,
+  },
+  {
+    name: "cliLogins.start",
+    call: (c) => c.cliLogins.start(),
+    method: "POST",
+    path: "/auth/cli",
+    response: () => json(201, startedCliLogin),
+    returns: startedCliLogin,
+  },
+  {
+    name: "cliLogins.poll",
+    call: (c) => c.cliLogins.poll(cliCode, startedCliLogin.pollSecret),
+    method: "GET",
+    path: `/auth/cli/${cliCode}`,
+    response: () => json(200, { status: "pending" }),
+    returns: { status: "pending" },
+  },
+  {
+    name: "cliLogins.approve",
+    call: (c) => c.cliLogins.approve(cliCode),
+    method: "POST",
+    path: `/auth/cli/${cliCode}/approve`,
+    response: () => json(200, { code: cliCode, status: "approved" }),
+    returns: { code: cliCode, status: "approved" },
+  },
+  {
+    name: "cliLogins.deny",
+    call: (c) => c.cliLogins.deny(cliCode),
+    method: "POST",
+    path: `/auth/cli/${cliCode}/deny`,
+    response: () => json(200, { code: cliCode, status: "denied" }),
+    returns: { code: cliCode, status: "denied" },
+  },
 ];
 
 describe("requests", () => {
@@ -267,6 +316,24 @@ describe("requests", () => {
     expect(headers?.get("authorization")).toBe(`Bearer ${TOKEN}`);
     expect(headers?.get("accept")).toBe("application/json");
     expect(headers?.get("content-type")).toBe("application/json");
+  });
+
+  it("polls a CLI login with its poll secret, and only that call", async () => {
+    const { fetch, calls } = mockFetch(
+      json(200, { status: "approved", token: TOKEN }),
+      json(200, fx.me),
+    );
+    const ownToken = `lift_pat_${"b".repeat(32)}`;
+    const client = createLiftClient({ baseUrl: BASE, token: ownToken, fetch });
+
+    await expect(client.cliLogins.poll(cliCode, startedCliLogin.pollSecret)).resolves.toEqual({
+      status: "approved",
+      token: TOKEN,
+    });
+    await client.me();
+
+    expect(calls[0]?.headers.get("authorization")).toBe(`Bearer ${startedCliLogin.pollSecret}`);
+    expect(calls[1]?.headers.get("authorization")).toBe(`Bearer ${ownToken}`);
   });
 
   it("sends no Authorization header without a token, so the browser's cookie is used", async () => {

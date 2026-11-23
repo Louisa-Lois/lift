@@ -10,6 +10,7 @@ import {
   type TokenScope,
 } from "@lift/shared";
 import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
+import type { DbOrTx } from "./events";
 import type { UserRow } from "./sessions";
 
 export type ApiTokenRow = typeof schema.apiTokens.$inferSelect;
@@ -64,9 +65,12 @@ export function toApiToken(row: ApiTokenRow): ApiToken {
   };
 }
 
-/** Creates a personal token. The answer is the only place its plaintext ever appears. */
+/**
+ * Creates a personal token. The answer is the only place its plaintext ever appears. It can run in
+ * a transaction: a CLI login creates its token while it holds the login's row.
+ */
 export async function createToken(
-  db: Db,
+  db: DbOrTx,
   input: { userId: string; name: string; scopes: readonly TokenScope[] },
 ): Promise<CreatedApiToken> {
   const token = generateToken();

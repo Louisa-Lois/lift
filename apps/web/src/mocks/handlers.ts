@@ -232,6 +232,12 @@ export const handlers = [
   http.get(api("/health"), () => HttpResponse.json({ status: "ok" })),
   http.get(api("/me"), () => HttpResponse.json(fixtures.me)),
   http.post(api("/auth/logout"), () => new HttpResponse(null, { status: 204 })),
+  http.post(api("/auth/cli/:code/approve"), ({ params }) =>
+    HttpResponse.json({ code: String(params.code), status: "approved" }),
+  ),
+  http.post(api("/auth/cli/:code/deny"), ({ params }) =>
+    HttpResponse.json({ code: String(params.code), status: "denied" }),
+  ),
 
   http.get(api("/projects"), () => HttpResponse.json(fixtures.page(projects.map(toListItem)))),
   http.post(api("/projects"), async ({ request }) => {

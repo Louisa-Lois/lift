@@ -18,6 +18,9 @@ const PUBLIC_ROUTES = [
   "GET /api/v1/auth/github/start",
   "GET /api/v1/auth/github/callback",
   "POST /api/v1/auth/logout",
+  // `lift login` starts a login and polls it with its own poll secret, before it has a token.
+  "POST /api/v1/auth/cli",
+  "GET /api/v1/auth/cli/:code",
   "POST /api/v1/webhooks/github",
   // Browsers send Content-Security-Policy reports without a session; the route only logs them.
   "POST /api/v1/csp-reports",
@@ -40,6 +43,7 @@ const SAMPLE_PARAMS: Record<string, string> = {
   userId: newId("usr"),
   owner: "lift-demo",
   repo: "next-hello",
+  code: "BCDF-GHJK",
 };
 
 interface Route {
