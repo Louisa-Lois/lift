@@ -22,6 +22,8 @@ import { as, signIn } from "./helpers/session";
 type TestApp = Awaited<ReturnType<typeof buildTestApp>>;
 
 const MAIN_SHA = "3f9c2a1b7d4e5f60718293a4b5c6d7e8f9012345";
+/** The fake repo's `dev` head: a commit that isn't `main`'s head. */
+const DEV_SHA = "a".repeat(40);
 const queuePrefix = `test-${randomBytes(4).toString("hex")}`;
 const secretBox = createSecretBox(TEST_ENCRYPTION_KEY);
 const TYPED = "sk_test_typed_by_the_user_123";
@@ -222,6 +224,78 @@ describe("POST /agent/plans", () => {
     expect(agent.calls).toHaveLength(0);
   });
 
+  it("plans the commit it's given, and keeps the branch the service will follow", async () => {
+    agent.calls.length = 0;
+    const atCommit = await call("POST", "/agent/plans", {
+      owner: "lift-demo",
+      repo: "express-postgres",
+      commitSha: DEV_SHA,
+    });
+    expect(atCommit.statusCode).toBe(201);
+    const plan = OnboardingPlan.parse(atCommit.json());
+    expect(plan.repo).toEqual({
+      owner: "lift-demo",
+      name: "express-postgres",
+      branch: "main",
+      commitSha: DEV_SHA,
+    });
+    expect(agent.calls[0]?.body).toEqual({
+      owner: "lift-demo",
+      repo: "express-postgres",
+      branch: "main",
+      commitSha: DEV_SHA,
+    });
+    const [row] = await database.db
+      .select({ commitSha: schema.onboardingPlans.commitSha })
+      .from(schema.onboardingPlans)
+      .where(eq(schema.onboardingPlans.id, plan.id));
+    expect(row?.commitSha).toBe(DEV_SHA);
+
+    const onBranch = await call("POST", "/agent/plans", {
+      owner: "lift-demo",
+      repo: "express-postgres",
+      branch: "dev",
+      commitSha: MAIN_SHA,
+    });
+    expect(OnboardingPlan.parse(onBranch.json()).repo).toMatchObject({
+      branch: "dev",
+      commitSha: MAIN_SHA,
+    });
+  });
+
+  it("checks a commit it's given, and the branch, before asking the agent", async () => {
+    agent.calls.length = 0;
+    const body = { owner: "lift-demo", repo: "express-postgres" };
+    const unknown = await call("POST", "/agent/plans", { ...body, commitSha: "b".repeat(40) });
+    expect(unknown.statusCode).toBe(400);
+    expect(Problem.parse(unknown.json())).toMatchObject({
+      code: "validation_failed",
+      fields: { commitSha: "No such commit" },
+    });
+    const branch = await call("POST", "/agent/plans", {
+      ...body,
+      branch: "nope",
+      commitSha: DEV_SHA,
+    });
+    expect(branch.statusCode).toBe(400);
+    expect(Problem.parse(branch.json())).toMatchObject({
+      code: "validation_failed",
+      fields: { branch: "No such branch" },
+    });
+    // Only a full SHA: a short or uppercase one never reaches GitHub.
+    for (const commitSha of [DEV_SHA.slice(0, 7), DEV_SHA.toUpperCase()]) {
+      const malformed = Problem.parse(
+        (await call("POST", "/agent/plans", { ...body, commitSha })).json(),
+      );
+      expect(malformed).toMatchObject({
+        status: 400,
+        code: "validation_failed",
+        fields: { commitSha: "Expected a full 40-character git SHA" },
+      });
+    }
+    expect(agent.calls).toHaveLength(0);
+  });
+
   it("says when the agent is down or slow, and passes on its budget and plan errors", async () => {
     const body = { owner: "lift-demo", repo: "express-postgres" };
     agent.next = () => Promise.reject(new TypeError("fetch failed"));
@@ -374,6 +448,22 @@ describe("POST /agent/plans/:id/apply", () => {
       status: 409,
       detail: "This plan was already applied.",
     });
+  });
+
+  it("deploys the commit a plan was made at, on the branch the service follows", async () => {
+    const response = await call("POST", "/agent/plans", {
+      owner: "lift-demo",
+      repo: "express-postgres",
+      commitSha: DEV_SHA,
+    });
+    const plan = OnboardingPlan.parse(response.json());
+    const applied = await apply(plan.id, { databases: ["notes-db"], values: typedStripe });
+    expect(applied.statusCode).toBe(201);
+    const { project, serviceId } = ApplyPlanResponse.parse(applied.json());
+    const service = project.services.find((candidate) => candidate.id === serviceId);
+    // A push to main deploys this service; its first deployment is the planned commit.
+    expect(service?.repo.branch).toBe("main");
+    expect(service?.latestDeployment?.commitSha).toBe(DEV_SHA);
   });
 
   it("generates a different secret each time", async () => {

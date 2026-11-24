@@ -121,7 +121,7 @@ All public routes sit under `/api/v1`, need a session or bearer token unless mar
 | `GET /services/:id/editor/changes` | Files whose drafts differ from the last commit | viewer | web |
 | `POST /services/:id/editor/commit` | `{ message, paths? }` → `{ commitSha, deploymentId }` | editor | web |
 | `POST /services/:id/editor/discard` | `{ paths? }` resets drafts to the last commit | editor | web |
-| `POST /agent/plans` | `{ owner, repo, branch? }` → OnboardingPlan (proxied to the agent; up to 60 s) | any | web, cli, mcp |
+| `POST /agent/plans` | `{ owner, repo, branch?, commitSha? }` → OnboardingPlan (proxied to the agent; up to 60 s). With `commitSha` the assistant reads that commit instead of the branch head, and the plan keeps the branch for the service to follow (the evaluation pins a commit per repo) | any | web, cli, mcp, evals |
 | `POST /agent/plans/:id/apply` | Create the project, services, databases and variables from a plan, then the first deploy | any | web, cli, mcp |
 | `POST /projects/:id/agent/messages` | `{ sessionId?, text }` → SSE stream of the assistant's reply | viewer; writes need an editor's approval | web, cli |
 | `POST /agent/actions/:id/approve` · `/reject` | Decide on a proposed write | editor | web |
