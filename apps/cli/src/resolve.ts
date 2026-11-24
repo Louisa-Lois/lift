@@ -29,8 +29,8 @@ export async function resolveTargetProject(
       projectId = firstProject.id;
     } else {
       throw new UsageError(
-        "Multiple projects found. Please specify one with --project <name>.",
-        "Run your command with --project <projectIdOrName> or run `lift link`.",
+        `Found ${projectsPage.data.length} projects. Please specify one with --project <name>.`,
+        "Run your command with --project <projectIdOrSlug>.",
       );
     }
   }
@@ -90,14 +90,12 @@ export async function resolveTargetService(
   }
 
   if (!serviceId) {
-    const firstService = services[0];
-    if (firstService) {
-      return firstService.id;
+    if (services.length === 1 && services[0]) {
+      return services[0].id;
     }
-    throw new CliError(
-      "No services found in this project.",
-      1,
-      "Create a service on the dashboard or run `lift link`.",
+    throw new UsageError(
+      `This project has ${services.length} services. Pass \`--service <name>\`, or link this folder with \`lift link --service <name>\`.`,
+      "Run your command with --service <serviceIdOrName>.",
     );
   }
 

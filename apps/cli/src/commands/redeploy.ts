@@ -18,7 +18,13 @@ export async function redeployCommand(
   const projectId = await resolveTargetProject(client, options);
   const serviceId = await resolveTargetService(client, projectId, options);
 
-  const deployment = await client.deployments.create(serviceId);
+  const deploymentsPage = await client.deployments.list(serviceId, { limit: 10 });
+  const active = deploymentsPage.data.find((d) => d.status === "active") || deploymentsPage.data[0];
+
+  const deployment = await client.deployments.create(
+    serviceId,
+    active?.commitSha ? { commitSha: active.commitSha } : {},
+  );
 
   if (ctx?.json) {
     printJson(deployment, ctx);

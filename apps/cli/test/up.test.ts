@@ -84,6 +84,7 @@ describe("lift up", () => {
       const parsed = JSON.parse(stdout.trim());
       expect(parsed.id).toBeDefined();
       expect(parsed.status).toBe("active");
+      expect(parsed.url).toBeDefined();
     } finally {
       cleanDir(configDir);
       cleanDir(cwd);
@@ -97,6 +98,61 @@ describe("lift up", () => {
       const { exitCode, stderr } = await runCli(["up"], { configDir, cwd });
       expect(exitCode).toBe(3);
       expect(stderr).toContain("Not signed in");
+    } finally {
+      cleanDir(configDir);
+      cleanDir(cwd);
+    }
+  });
+
+  it("fails with actionable message when commit is not pushed to GitHub (400)", async () => {
+    const configDir = createTempDir();
+    const cwd = createTempDir();
+
+    server.use(
+      http.post(api("/services/:serviceId/deployments"), () => {
+        return HttpResponse.json(
+          {
+            type: "about:blank",
+            title: "Bad Request",
+            status: 400,
+            detail: "Commit not found on GitHub",
+            code: "bad_request",
+            fields: { commitSha: "Commit not found on GitHub" },
+          },
+          { status: 400, headers: { "content-type": "application/problem+json" } },
+        );
+      }),
+    );
+
+    try {
+      const configFile = path.join(configDir, "config.json");
+      fs.writeFileSync(
+        configFile,
+        JSON.stringify({
+          token: "lift_pat_test",
+          user: fx.me,
+          apiUrl: "http://localhost:3000",
+        }),
+      );
+
+      const linkDir = path.join(cwd, ".lift");
+      fs.mkdirSync(linkDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(linkDir, "project.json"),
+        JSON.stringify({
+          projectId: fx.fixtureIds.project,
+          serviceId: fx.fixtureIds.services.web,
+        }),
+      );
+
+      const { exitCode, stderr } = await runCli(["up"], {
+        configDir,
+        cwd,
+      });
+
+      expect(exitCode).toBe(1);
+      expect(stderr).toMatch(/isn't on GitHub yet/i);
+      expect(stderr).toMatch(/git push/i);
     } finally {
       cleanDir(configDir);
       cleanDir(cwd);

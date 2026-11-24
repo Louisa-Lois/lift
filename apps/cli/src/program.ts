@@ -154,11 +154,11 @@ export function createProgram(ctxOptions?: ProgramContextOptions): Command {
 
   program
     .command("logs")
-    .description("View deployment build logs or stream live logs")
+    .description("View build logs for a deployment, or the latest deployment's build log")
     .option("-d, --deployment <id>", "deployment ID to view logs for")
     .option("-f, --follow", "follow logs in real time")
-    .option("--tail <lines>", "number of lines to show from the end", (v) => Number.parseInt(v, 10))
-    .action(async (options: { deployment?: string; follow?: boolean; tail?: number }, cmd) => {
+    .option("--tail <lines>", "number of lines to show from the end")
+    .action(async (options: { deployment?: string; follow?: boolean; tail?: string }, cmd) => {
       const globalOpts = cmd.optsWithGlobals() as GlobalOptions;
       const ctx = getOutputContext(cmd);
       await logsCommand(

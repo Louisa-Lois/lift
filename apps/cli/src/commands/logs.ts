@@ -1,5 +1,5 @@
 import { getAuthenticatedClient } from "../client";
-import { CliError } from "../errors";
+import { CliError, UsageError } from "../errors";
 import { type OutputContext, printJson, printText } from "../output";
 import { resolveTargetProject, resolveTargetService } from "../resolve";
 
@@ -11,10 +11,22 @@ export interface LogsOptions {
   cwd?: string;
   deployment?: string;
   follow?: boolean;
-  tail?: number;
+  tail?: string | number;
 }
 
 export async function logsCommand(options: LogsOptions, ctx?: OutputContext): Promise<void> {
+  let tailCount: number | undefined;
+  if (options.tail !== undefined) {
+    const parsed = Number(options.tail);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      throw new UsageError(
+        `Invalid tail count '${options.tail}'. Must be a positive integer.`,
+        "Pass a positive integer for --tail, e.g. `lift logs --tail 100`.",
+      );
+    }
+    tailCount = parsed;
+  }
+
   const { client } = getAuthenticatedClient(options);
 
   let deploymentId = options.deployment;
@@ -50,7 +62,7 @@ export async function logsCommand(options: LogsOptions, ctx?: OutputContext): Pr
     }
   }
 
-  const snapshot = await client.deployments.logs(deploymentId, { tail: options.tail });
+  const snapshot = await client.deployments.logs(deploymentId, { tail: tailCount });
 
   if (ctx?.json) {
     printJson(snapshot.data, ctx);

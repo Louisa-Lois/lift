@@ -59,6 +59,31 @@ describe("lift logs", () => {
     }
   });
 
+  it("fails with exit code 2 when --tail is not a valid number", async () => {
+    const configDir = createTempDir();
+    try {
+      const configFile = path.join(configDir, "config.json");
+      fs.writeFileSync(
+        configFile,
+        JSON.stringify({
+          token: "lift_pat_test",
+          user: fx.me,
+          apiUrl: "http://localhost:3000",
+        }),
+      );
+
+      const { exitCode, stderr } = await runCli(
+        ["logs", "--deployment", fx.fixtureIds.deployments.webActive, "--tail", "abc"],
+        { configDir },
+      );
+
+      expect(exitCode).toBe(2);
+      expect(stderr).toMatch(/invalid tail count/i);
+    } finally {
+      cleanDir(configDir);
+    }
+  });
+
   it("fails with exit code 3 when not signed in", async () => {
     const configDir = createTempDir();
     try {

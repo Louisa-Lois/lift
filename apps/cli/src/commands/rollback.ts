@@ -1,3 +1,4 @@
+import { rollbackTarget } from "@lift/shared";
 import { getAuthenticatedClient } from "../client";
 import { CliError } from "../errors";
 import { type OutputContext, printJson, printText } from "../output";
@@ -25,15 +26,13 @@ export async function rollbackCommand(
     const serviceId = await resolveTargetService(client, projectId, options);
 
     const deploymentsPage = await client.deployments.list(serviceId, { limit: 10 });
-    const target = deploymentsPage.data.find(
-      (d) => d.status === "superseded" || d.status === "active",
-    );
+    const target = deploymentsPage.data.find((d) => rollbackTarget(d, deploymentsPage.data).ok);
 
     if (!target) {
       throw new CliError(
-        "No previous deployment found to roll back to.",
+        "No previous deployment available for rollback.",
         1,
-        "Specify a deployment ID: `lift rollback <deploymentId>` or view deployments with `lift status`.",
+        "Rollback targets must be superseded deployments whose images are still retained. Run `lift status` to inspect deployments.",
       );
     }
     deploymentId = target.id;

@@ -1,4 +1,4 @@
-import { API_BASE_PATH } from "@lift/shared";
+import { API_BASE_PATH, rollbackTarget } from "@lift/shared";
 import * as fx from "@lift/shared/fixtures";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -109,7 +109,25 @@ export const handlers = [
       headers: { "content-type": "text/event-stream" },
     });
   }),
-  http.post(api("/deployments/:id/rollback"), () => {
+  http.post(api("/deployments/:id/rollback"), ({ params }) => {
+    const id = String(params.id);
+    const target = fx.allDeployments.find((d) => d.id === id);
+    if (target) {
+      const serviceDeployments = fx.allDeployments.filter((d) => d.serviceId === target.serviceId);
+      const check = rollbackTarget(target, serviceDeployments);
+      if (!check.ok) {
+        return HttpResponse.json(
+          {
+            type: "about:blank",
+            title: "Conflict",
+            status: 409,
+            detail: check.reason,
+            code: "conflict",
+          },
+          { status: 409, headers: { "content-type": "application/problem+json" } },
+        );
+      }
+    }
     return HttpResponse.json(fx.deployments.web[0], { status: 202 });
   }),
 

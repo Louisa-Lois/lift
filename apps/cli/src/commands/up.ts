@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
-import type { DeploymentStatus } from "@lift/shared";
+import { type Deployment, type DeploymentStatus, LiftApiError } from "@lift/shared";
 import { getAuthenticatedClient } from "../client";
-import { DeploymentFailedError } from "../errors";
+import { CliError, DeploymentFailedError, toCliError } from "../errors";
 import { type OutputContext, printJson, printText } from "../output";
 import { resolveTargetProject, resolveTargetService } from "../resolve";
 
@@ -39,13 +39,31 @@ export async function upCommand(options: UpOptions, ctx?: OutputContext): Promis
       stdio: ["ignore", "pipe", "ignore"],
     });
     if (gitStatus.includes("ahead of")) {
-      printText("Warning: current commit has not been pushed to remote.", ctx);
+      const warnMsg = "Warning: current commit has not been pushed to remote.\n";
+      if (ctx?.stderr) {
+        ctx.stderr(warnMsg);
+      } else {
+        process.stderr.write(warnMsg);
+      }
     }
   } catch {
     // Ignore git status errors
   }
 
-  const deployment = await client.deployments.create(serviceId, commitSha ? { commitSha } : {});
+  let deployment: Deployment;
+  try {
+    deployment = await client.deployments.create(serviceId, commitSha ? { commitSha } : {});
+  } catch (err) {
+    if (err instanceof LiftApiError && err.status === 400 && err.fields?.commitSha) {
+      const shortSha = commitSha ? commitSha.slice(0, 7) : "";
+      throw new CliError(
+        `Commit ${shortSha} isn't on GitHub yet. Push it, then run \`lift up\` again.`,
+        1,
+        "Run `git push` to push your commits to GitHub.",
+      );
+    }
+    throw toCliError(err);
+  }
 
   if (!ctx?.json) {
     printText(`Queued deployment ${deployment.id}...`, ctx);
@@ -68,11 +86,20 @@ export async function upCommand(options: UpOptions, ctx?: OutputContext): Promis
   }
 
   let detail = await client.deployments.get(deployment.id);
+  let pollAttempts = 0;
+  const maxPollAttempts = 150; // 5 minutes at 2s interval
   while (
     !finalStatus &&
     (detail.status === "queued" || detail.status === "building" || detail.status === "deploying")
   ) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    if (++pollAttempts > maxPollAttempts) {
+      throw new CliError(
+        `Deployment ${deployment.id} did not complete within timeout.`,
+        1,
+        `Run \`lift logs --deployment ${deployment.id} --follow\` to follow its progress.`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
     detail = await client.deployments.get(deployment.id);
     if (detail.status === "active" || detail.status === "failed" || detail.status === "canceled") {
       finalStatus = detail.status;
@@ -84,7 +111,7 @@ export async function upCommand(options: UpOptions, ctx?: OutputContext): Promis
   if (finalStatus === "active") {
     const service = await client.services.get(serviceId);
     if (ctx?.json) {
-      printJson(detail, ctx);
+      printJson({ ...detail, url: service.url }, ctx);
     } else {
       printText(`Deployment live at ${service.url}`, ctx);
     }
