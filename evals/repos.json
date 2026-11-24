@@ -204,7 +204,7 @@
         {
           "type": "web",
           "port": 8000,
-          "startCommand": "gunicorn --config docker/gunicorn.conf.py 'app:create_app()'"
+          "startCommand": "flask deploy && gunicorn --config docker/gunicorn.conf.py 'app:create_app()'"
         }
       ],
       "databases": [],
@@ -252,11 +252,11 @@
         {
           "type": "web",
           "port": 8000,
-          "startCommand": "gunicorn config.wsgi"
+          "startCommand": null
         }
       ],
       "databases": ["postgres"],
-      "requiredVariables": ["DATABASE_URL", "SECRET_KEY"]
+      "requiredVariables": ["DATABASE_URL", "SECRET_KEY", "ALLOWED_HOSTS"]
     },
     "breakage": null
   },
