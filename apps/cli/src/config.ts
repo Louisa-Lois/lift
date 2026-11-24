@@ -74,3 +74,25 @@ export function loadProjectLink(cwd = process.cwd()): LiftProjectLink | null {
     return null;
   }
 }
+
+export function saveProjectLink(link: LiftProjectLink, cwd = process.cwd()): void {
+  const liftDir = path.join(cwd, ".lift");
+  fs.mkdirSync(liftDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(liftDir, "project.json"),
+    `${JSON.stringify(link, null, 2)}\n`,
+    "utf8",
+  );
+
+  const gitignorePath = path.join(cwd, ".gitignore");
+  let gitignoreContent = "";
+  if (fs.existsSync(gitignorePath)) {
+    gitignoreContent = fs.readFileSync(gitignorePath, "utf8");
+  }
+  const lines = gitignoreContent.split(/\r?\n/).map((l) => l.trim());
+  if (!lines.includes(".lift") && !lines.includes(".lift/")) {
+    const trailingNewline =
+      gitignoreContent.length === 0 || gitignoreContent.endsWith("\n") ? "" : "\n";
+    fs.appendFileSync(gitignorePath, `${trailingNewline}.lift/\n`, "utf8");
+  }
+}

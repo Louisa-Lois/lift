@@ -70,6 +70,74 @@ export const handlers = [
   http.get(api(`/services/${fx.fixtureIds.services.api}`), () => {
     return HttpResponse.json(fx.services.api);
   }),
+
+  // Deployments
+  http.get(api("/services/:serviceId/deployments"), () => {
+    return HttpResponse.json(fx.page(fx.deployments.web));
+  }),
+  http.post(api("/services/:serviceId/deployments"), async ({ request }) => {
+    try {
+      const body = (await request.json()) as { commitSha?: string };
+      if (body?.commitSha === "fail_sha") {
+        const failedDep = fx.deployments.web.find((d) => d.status === "failed");
+        return HttpResponse.json(failedDep || fx.deployments.web[0], { status: 202 });
+      }
+    } catch {
+      // Ignore body parsing error
+    }
+    const activeDep = fx.deployments.web.find((d) => d.status === "active");
+    return HttpResponse.json(activeDep || fx.deployments.web[0], { status: 202 });
+  }),
+  http.get(api("/deployments/:id"), ({ params }) => {
+    const id = String(params.id);
+    const detail =
+      fx.deploymentDetails[id] ||
+      fx.deploymentDetails[fx.fixtureIds.deployments.webActive] ||
+      Object.values(fx.deploymentDetails)[0];
+    return HttpResponse.json(detail);
+  }),
+  http.get(api("/deployments/:id/logs"), ({ params }) => {
+    const id = String(params.id);
+    const lines = fx.deploymentLogs[id] || fx.buildLog;
+    return HttpResponse.json({ data: lines });
+  }),
+  http.get(api("/deployments/:id/logs/stream"), ({ params }) => {
+    const id = String(params.id);
+    const line = (fx.deploymentLogs[id] || fx.buildLog)[0];
+    const streamText = `event: log\ndata: ${JSON.stringify(line)}\n\nevent: end\ndata: {"status":"active"}\n\n`;
+    return new HttpResponse(streamText, {
+      headers: { "content-type": "text/event-stream" },
+    });
+  }),
+  http.post(api("/deployments/:id/rollback"), () => {
+    return HttpResponse.json(fx.deployments.web[0], { status: 202 });
+  }),
+
+  // Service restart
+  http.post(api("/services/:id/restart"), () => {
+    return HttpResponse.json(fx.services.web, { status: 202 });
+  }),
+
+  // Variables
+  http.get(api("/services/:serviceId/variables"), ({ request }) => {
+    const url = new URL(request.url);
+    const reveal = url.searchParams.get("reveal") === "true";
+    return HttpResponse.json(fx.page(reveal ? fx.revealedVariables.web : fx.variables.web));
+  }),
+  http.put(api("/services/:serviceId/variables"), () => {
+    return HttpResponse.json({
+      variables: fx.variables.web,
+      requiresRedeploy: true,
+    });
+  }),
+
+  // Databases
+  http.get(api("/projects/:projectId/databases"), () => {
+    return HttpResponse.json(fx.page([fx.database]));
+  }),
+  http.post(api("/projects/:projectId/databases"), () => {
+    return HttpResponse.json(fx.database, { status: 202 });
+  }),
 ];
 
 export const server = setupServer(...handlers);
