@@ -42,7 +42,7 @@ export const planRoutes: FastifyPluginAsyncZod<PlanRoutesOptions> = async (app, 
       schema: {
         summary: "Plan how to deploy a repo; the assistant answers within a minute",
         description:
-          "The assistant reads the repo at its branch head and proposes a service, a Postgres database if the code needs one, and the variables. The plan is stored as a draft.",
+          "The assistant reads the repo at its branch head, or at `commitSha` when it's given, and proposes a service, a Postgres database if the code needs one, and the variables. The plan keeps the branch, which the service follows once the plan is applied; applying it deploys the planned commit first. The plan is stored as a draft.",
         tags: ["agent"],
         body: CreatePlanBody,
         response: { 201: OnboardingPlan },

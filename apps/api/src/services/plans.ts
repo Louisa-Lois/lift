@@ -44,8 +44,10 @@ export interface PlanDeps extends DeploymentDeps {
 }
 
 /**
- * BE-19, `POST /agent/plans`: checks the user can read the repo and finds the commit, then asks
- * the agent to plan it and stores the plan as a draft. The plan holds no value the user typed.
+ * BE-19, `POST /agent/plans`: checks the user can read the repo and finds the commit (the branch's
+ * head, or the `commitSha` given), then asks the agent to plan it and stores the plan as a draft.
+ * The plan keeps the branch either way: it's what the service follows once the plan is applied.
+ * The plan holds no value the user typed.
  */
 export async function createPlan(
   deps: PlanDeps,
@@ -62,12 +64,32 @@ export async function createPlan(
     );
   }
   const branch = body.branch ?? repo.defaultBranch;
-  const commit = await deps.github.getCommit(token, repo.owner, repo.name, branch);
-  if (!commit) {
-    throw problem("validation_failed", `${repo.owner}/${repo.name} has no branch ${branch}.`, {
+  const noBranch = () =>
+    problem("validation_failed", `${repo.owner}/${repo.name} has no branch ${branch}.`, {
       fields: { branch: "No such branch" },
     });
+  // With a commit given, the branch isn't how the commit is found, so it's checked on its own.
+  if (
+    body.commitSha &&
+    body.branch &&
+    !(await deps.github.branchExists(token, repo.owner, repo.name, branch))
+  ) {
+    throw noBranch();
   }
+  const commit = await deps.github.getCommit(
+    token,
+    repo.owner,
+    repo.name,
+    body.commitSha ?? branch,
+  );
+  if (!commit && body.commitSha) {
+    throw problem(
+      "validation_failed",
+      `${repo.owner}/${repo.name} has no commit ${body.commitSha.slice(0, 7)}.`,
+      { fields: { commitSha: "No such commit" } },
+    );
+  }
+  if (!commit) throw noBranch();
   const draft = await deps.agent.plan(user.id, {
     owner: repo.owner,
     repo: repo.name,

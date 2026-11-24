@@ -65,11 +65,16 @@ export const OnboardingPlan = z.object({
 });
 export type OnboardingPlan = z.infer<typeof OnboardingPlan>;
 
-/** `POST /agent/plans`. Without `branch`, the repo's default branch. */
+/**
+ * `POST /agent/plans`. Without `branch`, the repo's default branch. The assistant reads the
+ * branch's head, or `commitSha` when it's given (the evaluation pins one per repo); either way the
+ * plan keeps the branch, which the service it creates follows.
+ */
 export const CreatePlanBody = z.strictObject({
   owner: GithubLogin,
   repo: GithubRepoName,
   branch: BranchName.optional(),
+  commitSha: CommitSha.optional(),
 });
 export type CreatePlanBody = z.infer<typeof CreatePlanBody>;
 
