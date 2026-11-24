@@ -1,17 +1,17 @@
 [
   {
-    "id": "next-postgres-official-01",
-    "repo": "nextjs/saas-starter",
-    "ref": "6e33e58b1e553a41fe22e6b941a7229a002de361",
+    "id": "next-postgres-mabsrencode-01",
+    "repo": "Mabsrencode/nextjs-boilerplate-postgresql",
+    "ref": "4caa75a7b0559ae767448d39e54255e4017767ab",
     "stack": "nextjs",
     "golden": {
       "services": [{ "type": "web", "port": 3000, "startCommand": null }],
       "databases": ["postgres"],
       "requiredVariables": [
-        "POSTGRES_URL",
-        "AUTH_SECRET",
-        "STRIPE_SECRET_KEY",
-        "STRIPE_WEBHOOK_SECRET"
+        "DATABASE_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "NEXT_PUBLIC_APP_URL"
       ]
     },
     "breakage": null
@@ -24,7 +24,7 @@
     "golden": {
       "services": [{ "type": "web", "port": 3000, "startCommand": null }],
       "databases": ["postgres"],
-      "requiredVariables": ["DATABASE_URL", "AUTH_SECRET"]
+      "requiredVariables": ["DATABASE_URL", "AUTH_SECRET", "APP_URL", "AUTH_TRUST_HOST"]
     },
     "breakage": null
   },
@@ -70,7 +70,7 @@
     "ref": "ca047ca7088ffd545251f39d2b67b557a2a9dd1c",
     "stack": "express",
     "golden": {
-      "services": [{ "type": "web", "port": 3000, "startCommand": "npm start" }],
+      "services": [{ "type": "web", "port": 3000, "startCommand": null }],
       "databases": ["postgres"],
       "requiredVariables": ["DATABASE_URL"]
     },
@@ -82,7 +82,7 @@
     "ref": "174857c54db974b72ea70bba057b94ddb7e37d77",
     "stack": "fastify",
     "golden": {
-      "services": [{ "type": "web", "port": 8000, "startCommand": "npm start" }],
+      "services": [{ "type": "web", "port": 8000, "startCommand": null }],
       "databases": [],
       "requiredVariables": []
     },
@@ -94,7 +94,7 @@
     "ref": "ee37ce11f22c86f90576007a3c7127f16f2c2457",
     "stack": "fastify",
     "golden": {
-      "services": [{ "type": "web", "port": 1234, "startCommand": "npm start" }],
+      "services": [{ "type": "web", "port": 1234, "startCommand": null }],
       "databases": ["postgres"],
       "requiredVariables": [
         "DATABASE_URL",
@@ -147,9 +147,9 @@
     "breakage": null
   },
   {
-    "id": "astro-static-daisyui-01",
-    "repo": "aholbreich/astro-tailwind-daisyui-starter",
-    "ref": "dfa778c0e1206082c31d83175e9fbca2c5b33f9c",
+    "id": "astro-static-astroplate-01",
+    "repo": "zeon-studio/astroplate",
+    "ref": "501646d0fede2471105ef0cf3c2a154cbb814c4a",
     "stack": "astro",
     "golden": {
       "services": [{ "type": "static", "port": 3000, "startCommand": null }],
@@ -168,11 +168,11 @@
         {
           "type": "web",
           "port": 8000,
-          "startCommand": "uvicorn main:app --host 0.0.0.0 --port 8000"
+          "startCommand": null
         }
       ],
       "databases": [],
-      "requiredVariables": []
+      "requiredVariables": ["JWT_SECRET"]
     },
     "breakage": null
   },
@@ -195,7 +195,7 @@
     "breakage": null
   },
   {
-    "id": "flask-postgres-01",
+    "id": "flask-sqlite-alisezer-01",
     "repo": "alisezer/flask-template",
     "ref": "387d3ee006eee71d714861cb08bf5cb7b2ca4a80",
     "stack": "flask",
@@ -204,11 +204,11 @@
         {
           "type": "web",
           "port": 8000,
-          "startCommand": "gunicorn --config gunicorn.conf.py 'app:create_app()'"
+          "startCommand": "gunicorn --config docker/gunicorn.conf.py 'app:create_app()'"
         }
       ],
-      "databases": ["postgres"],
-      "requiredVariables": ["DATABASE_URL", "SECRET_KEY"]
+      "databases": [],
+      "requiredVariables": ["SECRET_KEY"]
     },
     "breakage": null
   },
@@ -218,7 +218,7 @@
     "ref": "32254eebee9ee26b21b605d9564564fdbb9cc59d",
     "stack": "flask",
     "golden": {
-      "services": [{ "type": "web", "port": 5000, "startCommand": "flask run" }],
+      "services": [{ "type": "web", "port": 5000, "startCommand": "flask run --host 0.0.0.0" }],
       "databases": [],
       "requiredVariables": ["FLASK_SECRET_KEY"]
     },
@@ -243,20 +243,20 @@
     "breakage": null
   },
   {
-    "id": "django-postgres-coleman-01",
-    "repo": "mrsarm/django-coleman",
-    "ref": "42e063371ccca74d24746c70cd1854149cffc3a5",
+    "id": "django-postgres-fasouto-01",
+    "repo": "fasouto/django-starter-template",
+    "ref": "08843d54ea14bf664ea3c222402e8e61116a87cd",
     "stack": "django",
     "golden": {
       "services": [
         {
           "type": "web",
           "port": 8000,
-          "startCommand": "./manage.py collectstatic --no-input && uwsgi uwsgi.ini"
+          "startCommand": "gunicorn config.wsgi"
         }
       ],
       "databases": ["postgres"],
-      "requiredVariables": ["DATABASE_URL"]
+      "requiredVariables": ["DATABASE_URL", "SECRET_KEY"]
     },
     "breakage": null
   },
@@ -278,7 +278,7 @@
     "ref": "5a6470411b0798c0ed694929e35ba647836009e2",
     "stack": "dockerfile",
     "golden": {
-      "services": [{ "type": "static", "port": 80, "startCommand": null }],
+      "services": [{ "type": "static", "port": 3000, "startCommand": null }],
       "databases": [],
       "requiredVariables": []
     },
