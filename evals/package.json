@@ -5,6 +5,17 @@
   "description": "The AI planner and autofix evaluation (WS3)",
   "type": "module",
   "scripts": {
-    "eval": "node run.ts"
+    "eval": "tsx run.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lift/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

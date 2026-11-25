@@ -1,14 +1,19 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { OnboardingPlan, type OnboardingPlan as Plan, Problem } from "@lift/shared";
 
-type Golden = {
-  services: { type: "web" | "static"; port: number; startCommand: string | null }[];
+export type Golden = {
+  services: {
+    type: "web" | "static";
+    port: number;
+    startCommand: string | string[] | null;
+  }[];
   databases: string[];
   requiredVariables: string[];
 };
 
-type RepoCase = {
+export type RepoCase = {
   id: string;
   repo: string;
   ref: string;
@@ -17,24 +22,8 @@ type RepoCase = {
   breakage: unknown | null;
 };
 
-type Plan = {
-  id: string;
-  repo: { owner: string; name: string; branch: string; commitSha: string };
-  summary: string;
-  framework: string | null;
-  services: {
-    type: "web" | "static";
-    port: number;
-    startCommand: string | null;
-  }[];
-  databases: { type: string }[];
-  variables: { key: string; required: boolean; source: string }[];
-  warnings: string[];
-  confidence: "high" | "medium" | "low";
-};
-
 type Dimension = { passed: boolean; expected: unknown; actual: unknown };
-type CaseResult = {
+export type CaseResult = {
   id: string;
   repo: string;
   ref: string;
@@ -45,11 +34,11 @@ type CaseResult = {
     repo: Plan["repo"];
     framework: string | null;
     confidence: Plan["confidence"];
-    services: Plan["services"];
-    databases: Plan["databases"];
-    variables: { key: string; required: boolean; source: string }[];
+    services: Pick<Plan["services"][number], "type" | "port" | "startCommand">[];
+    databases: Pick<Plan["databases"][number], "type">[];
+    variables: Pick<Plan["variables"][number], "key" | "required" | "source">[];
   };
-  error?: string;
+  error?: { httpStatus?: number; code?: string; detail: string };
 };
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -61,7 +50,7 @@ apiBase.hash = "";
 const apiUrl = apiBase.toString().replace(/\/$/, "");
 const token = process.env.LIFT_TOKEN;
 
-function options(argv: string[]) {
+export function options(argv: string[]) {
   let only: string | undefined;
   let concurrency = 3;
   for (let i = 0; i < argv.length; i += 1) {
@@ -84,12 +73,27 @@ function options(argv: string[]) {
   return { only, concurrency };
 }
 
-function equalCommand(expected: string | null, actual: string | null): boolean {
+export function equalCommand(
+  expected: string | string[] | null,
+  actual: string | null,
+  port: number,
+): boolean {
   if (expected === null || actual === null) return expected === actual;
-  return expected.trim().replace(/\s+/g, " ") === actual.trim().replace(/\s+/g, " ");
+  const alternatives = Array.isArray(expected) ? expected : [expected];
+  return alternatives.some(
+    (candidate) => normalizeCommand(candidate, port) === normalizeCommand(actual, port),
+  );
 }
 
-function score(golden: Golden, plan: Plan) {
+function normalizeCommand(command: string, port: number): string {
+  return command
+    .replace(/\$\{PORT(?::-([^}]+))?\}|\$PORT\b/g, String(port))
+    .replace(/^(npm|pnpm|yarn)\s+start(?=\s|$)/, "$1 run start")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+export function score(golden: Golden, plan: Plan) {
   const expectedService = golden.services[0];
   const actualService = plan.services[0];
   const actualDatabases = [...new Set(plan.databases.map((database) => database.type))].sort();
@@ -111,20 +115,6 @@ function score(golden: Golden, plan: Plan) {
       expected: expectedService?.type,
       actual: actualService?.type,
     },
-    port: {
-      passed: Boolean(expectedService && actualService?.port === expectedService.port),
-      expected: expectedService?.port,
-      actual: actualService?.port,
-    },
-    startCommand: {
-      passed: Boolean(
-        expectedService &&
-          actualService &&
-          equalCommand(expectedService.startCommand, actualService.startCommand),
-      ),
-      expected: expectedService?.startCommand,
-      actual: actualService?.startCommand,
-    },
     databases: {
       passed: JSON.stringify(actualDatabases) === JSON.stringify(expectedDatabases),
       expected: expectedDatabases,
@@ -136,35 +126,65 @@ function score(golden: Golden, plan: Plan) {
       actual: [...actualRequiredVariables].sort(),
     },
   };
+  if (expectedService?.type !== "static") {
+    dimensions.port = {
+      passed: Boolean(expectedService && actualService?.port === expectedService.port),
+      expected: expectedService?.port,
+      actual: actualService?.port,
+    };
+  }
+  dimensions.startCommand = {
+    passed: Boolean(
+      expectedService &&
+        actualService &&
+        equalCommand(
+          expectedService.startCommand,
+          actualService.startCommand,
+          expectedService.port,
+        ),
+    ),
+    expected: expectedService?.startCommand,
+    actual: actualService?.startCommand,
+  };
   const correct = Object.values(dimensions).filter((dimension) => dimension.passed).length;
   const total = Object.keys(dimensions).length;
   return { dimensions, score: { correct, total, passed: correct === total } };
 }
 
-async function planCase(testCase: RepoCase): Promise<CaseResult> {
+export async function planCase(
+  testCase: RepoCase,
+  fetcher: typeof fetch = fetch,
+): Promise<CaseResult> {
   const [owner, repo] = testCase.repo.split("/");
   try {
-    const response = await fetch(`${apiUrl}/agent/plans`, {
+    const response = await fetcher(`${apiUrl}/agent/plans`, {
       method: "POST",
       headers: {
         authorization: `Bearer ${token}`,
         "content-type": "application/json",
       },
-      // GitHub resolves a commit SHA through its commits/{ref} endpoint. Passing the pinned SHA
-      // as the branch/ref keeps this run reproducible rather than following a moving default branch.
-      body: JSON.stringify({ owner, repo, branch: testCase.ref }),
+      // The plan keeps the repo's real branch while the API reads files at the pinned commit.
+      body: JSON.stringify({ owner, repo, commitSha: testCase.ref }),
     });
     if (!response.ok) {
+      const body: unknown = await response.json().catch(() => undefined);
+      const problem = Problem.safeParse(body);
       return {
         id: testCase.id,
         repo: testCase.repo,
         ref: testCase.ref,
         status: "error",
         score: null,
-        error: `Plan request failed with HTTP ${response.status}`,
+        error: {
+          httpStatus: response.status,
+          ...(problem.success ? { code: problem.data.code } : {}),
+          detail: problem.success
+            ? problem.data.detail
+            : `Plan request failed with HTTP ${response.status}`,
+        },
       };
     }
-    const plan = (await response.json()) as Plan;
+    const plan = OnboardingPlan.parse(await response.json());
     if (plan.repo.commitSha.toLowerCase() !== testCase.ref.toLowerCase()) {
       return {
         id: testCase.id,
@@ -172,7 +192,7 @@ async function planCase(testCase: RepoCase): Promise<CaseResult> {
         ref: testCase.ref,
         status: "error",
         score: null,
-        error: `The API planned ${plan.repo.commitSha}, not the pinned commit`,
+        error: { detail: `The API planned ${plan.repo.commitSha}, not the pinned commit` },
       };
     }
     const result = score(testCase.golden, plan);
@@ -203,9 +223,23 @@ async function planCase(testCase: RepoCase): Promise<CaseResult> {
       ref: testCase.ref,
       status: "error",
       score: null,
-      error: error instanceof Error ? error.message.slice(0, 300) : "Unknown request error",
+      error: {
+        detail: error instanceof Error ? error.message.slice(0, 300) : "Unknown request error",
+      },
     };
   }
+}
+
+export function summarize(selected: RepoCase[], results: CaseResult[]) {
+  const scored = results.filter((result) => result.status === "scored");
+  const errors = results.length - scored.length;
+  const exactMatches = scored.filter((result) => result.score?.passed).length;
+  return {
+    scored: scored.length,
+    errors,
+    exactMatches,
+    planAccuracy: selected.length ? exactMatches / selected.length : 0,
+  };
 }
 
 async function main() {
@@ -235,8 +269,7 @@ async function main() {
   await Promise.all(Array.from({ length: Math.min(concurrency, selected.length) }, worker));
   results.sort((a, b) => a.id.localeCompare(b.id));
 
-  const scored = results.filter((result) => result.status === "scored");
-  const passed = scored.filter((result) => result.score?.passed).length;
+  const summary = summarize(selected, results);
   const run = {
     startedAt,
     mode: "healthy-plan-only",
@@ -244,10 +277,7 @@ async function main() {
     counts: {
       healthyCases: selected.length,
       brokenCasesSkipped: cases.length - healthyCases.length,
-      scored: scored.length,
-      errors: results.length - scored.length,
-      exactMatches: passed,
-      planAccuracy: scored.length ? passed / scored.length : 0,
+      ...summary,
     },
     results,
   };
@@ -255,11 +285,15 @@ async function main() {
   await mkdir(resultsDir, { recursive: true });
   const file = resolve(resultsDir, `${run.startedAt.replaceAll(":", "-")}.json`);
   await writeFile(file, `${JSON.stringify(run, null, 2)}\n`, "utf8");
-  console.log(`Exact plan matches: ${passed}/${scored.length}; results saved to ${file}`);
+  console.log(
+    `Exact plan matches: ${summary.exactMatches}/${selected.length}; results saved to ${file}`,
+  );
   if (run.counts.errors > 0) process.exitCode = 1;
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}
