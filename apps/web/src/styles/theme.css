@@ -1,19 +1,26 @@
 /*
- * Lift's theme: every colour, font and radius the dashboard uses. Louisa owns this file
+ * Lift's theme, from Louisa's brand kit (Ground → Atmosphere → Orbit). Louisa owns this file
  * (docs/briefs/louisa-design.md). Components read these variables only through theme classes such
  * as bg-background, text-muted-foreground or bg-status-active, never palette classes or hex values,
  * so changing a value here restyles every screen.
  *
- * Values come from the Lift brand kit (General palette: Deep Space, Frost, Nebula Purple, Coral Kiss,
- * Sunlit Amber, Electric Cyan). Surfaces and borders the palette doesn't name are shades derived
- * from it, marked "derived". Every text pair meets WCAG AA (4.5:1); the ratios are noted beside
- * them. Dark is the default: the root layout puts class="dark" on <html>. :root holds the light
- * set, which /styleguide previews. The names follow shadcn/ui, plus Lift's six status colours;
- * superseded deployments use --status-canceled.
+ * How it's laid out:
+ * 1. --lift-*: every colour in the brand kit, by name. Roles below point at these, so changing a
+ *    palette colour here changes it everywhere it's used.
+ * 2. :root and .dark: the General theme, light and dark, for the app shell, Projects, sign-in and
+ *    the landing page. Dark is the default: the root layout puts class="dark" on <html>.
+ * 3. .zone-ground (the editor), .zone-atmosphere (the AI screens) and .zone-orbit (deployments,
+ *    logs and services): each remaps the same roles to its own palette. Put the class on a screen's
+ *    outer element; light or dark follows <html>. Ground is Morning/Sunset, Atmosphere Day/Twilight,
+ *    Orbit Nebula/Void.
+ * 4. Status colours are the same in every zone, so a status never changes meaning: one set for light
+ *    mode, one for dark, each checked against every zone's surfaces. Always shown next to its name.
+ * 5. Type personality per zone: --heading-weight, --heading-tracking and --label-case.
  *
- * Coral, amber and cyan are brand colours, not shadcn's --secondary or --accent: shadcn paints
- * secondary buttons and every menu hover with those two, so they stay quiet surfaces here. The
- * brand colours are --brand-* below, for marketing pages and illustrations.
+ * Every text pair meets WCAG AA (4.5:1) and every status dot and focus ring 3:1, in every zone and
+ * both modes; the ratios are noted beside them, and /styleguide checks them live. Where a kit colour
+ * can't pass in a role, another kit colour fills that role: dark-mode buttons use Moonlit Lilac with
+ * dark text, because Nebula Purple is only 3:1 as text on dark surfaces.
  */
 
 /* Fonts are served from public/brand/fonts: the Content-Security-Policy (src/lib/csp.ts) only
@@ -55,102 +62,387 @@
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   /* Display and headings. */
   --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
-  /* Brand moments only: the landing hero and empty states. Never body copy or interface chrome. */
+  /* Brand moments only: the landing hero and empty states, mostly in General and Atmosphere. */
   --font-expressive: "Bricolage Grotesque", "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
 
-  /* Brand colours, the same in light and dark. */
-  --brand-purple: #7a3fd1; /* Nebula Purple */
-  --brand-coral: #e75480; /* Coral Kiss */
-  --brand-amber: #ffc857; /* Sunlit Amber */
-  --brand-tangerine: #ff8a5b; /* Tangerine Tide */
-  --brand-cyan: #19c3e6; /* Electric Cyan */
-  --brand-deep-space: #0a0a16; /* Deep Space */
-  --brand-frost: #e6f1fa; /* Frost */
+  /* The brand kit: 46 colours. */
+  /* General · light (a colour shared with an earlier palette is listed there) */
+  --lift-frost: #e6f1fa; /* Frost */
+  --lift-architectural-cream: #e2dac2; /* Architectural Cream */
+  --lift-coral-kiss: #e75480; /* Coral Kiss */
+  --lift-nebula-purple: #7a3fd1; /* Nebula Purple */
+  --lift-sunlit-amber: #ffc857; /* Sunlit Amber */
+  --lift-cobalt-sky: #2e7fe0; /* Cobalt Sky */
+  /* General · dark (a colour shared with an earlier palette is listed there) */
+  --lift-deep-space: #0a0a16; /* Deep Space */
+  --lift-aubergine: #26121b; /* Aubergine */
+  --lift-electric-cyan: #19c3e6; /* Electric Cyan */
+  /* Ground · Morning (a colour shared with an earlier palette is listed there) */
+  --lift-linen-beige: #f2e8d8; /* Linen Beige */
+  --lift-dawn-lavender: #d9c9e8; /* Dawn Lavender */
+  --lift-sky-wash: #bfe0e8; /* Sky Wash */
+  --lift-moss-green: #839958; /* Moss Green */
+  --lift-pistachio: #b9c255; /* Pistachio */
+  --lift-rosy-brown: #d3968c; /* Rosy Brown */
+  --lift-frosted-mint: #e4ffe6; /* Frosted Mint */
+  /* Ground · Sunset (a colour shared with an earlier palette is listed there) */
+  --lift-rain-boots: #fb6734; /* Rain Boots */
+  --lift-heat-marker: #f39120; /* Heat Marker */
+  --lift-madder-lake: #ce3737; /* Madder Lake */
+  --lift-claret: #6b1a34; /* Claret */
+  --lift-dark-green: #0a3323; /* Dark Green */
+  --lift-prussian-blue: #1b3854; /* Prussian Blue */
+  --lift-stormy-teal: #127475; /* Stormy Teal */
+  --lift-shadow-grey: #272838; /* Shadow Grey */
+  /* Atmosphere · Day (a colour shared with an earlier palette is listed there) */
+  --lift-icy-aqua: #b1e4e8; /* Icy Aqua */
+  --lift-sky-blue: #8dc9e8; /* Sky Blue */
+  --lift-iced-denim: #5798d7; /* Iced Denim */
+  --lift-deep-azure: #1b4f9c; /* Deep Azure */
+  /* Atmosphere · Twilight (a colour shared with an earlier palette is listed there) */
+  --lift-vivid-indigo: #3e4be0; /* Vivid Indigo */
+  --lift-twilight-violet: #6a4fc2; /* Twilight Violet */
+  --lift-moonlit-lilac: #8b7fd6; /* Moonlit Lilac */
+  --lift-atmospheric-blue: #668baf; /* Atmospheric Blue */
+  /* Orbit · Nebula (a colour shared with an earlier palette is listed there) */
+  --lift-orchid-dream: #6c2e7b; /* Orchid Dream */
+  --lift-deep-violet: #4b1d91; /* Deep Violet */
+  --lift-signal-red: #e8384a; /* Signal Red */
+  --lift-tangerine-tide: #ff8a5b; /* Tangerine Tide */
+  --lift-starlight-gold: #f2d98a; /* Starlight Gold */
+  --lift-electric-teal: #11878d; /* Electric Teal */
+  /* Orbit · Void (a colour shared with an earlier palette is listed there) */
+  --lift-midnight-nebula: #2b1649; /* Midnight Nebula */
+  --lift-shadow-orchid: #311637; /* Shadow Orchid */
+  --lift-void-indigo: #220d41; /* Void Indigo */
+  --lift-dusk-rose: #451926; /* Dusk Rose */
+  --lift-ember-red: #461116; /* Ember Red */
+  --lift-burnt-tangerine: #472719; /* Burnt Tangerine */
+  --lift-aged-gold: #473818; /* Aged Gold */
+  --lift-abyssal-teal: #083d3f; /* Abyssal Teal */
 
-  /* Light. */
-  --background: #e6f1fa; /* Frost */
-  --foreground: #0a0a16; /* Deep Space, 17.2:1 */
-  --card: #ffffff;
-  --card-foreground: #0a0a16; /* 19.7:1 */
-  --popover: #ffffff;
-  --popover-foreground: #0a0a16;
-  --primary: #7a3fd1; /* Nebula Purple */
-  --primary-foreground: #ffffff; /* 6.1:1 */
-  --secondary: #d9e4f0; /* derived */
-  --secondary-foreground: #0a0a16; /* 15.3:1 */
-  --muted: #d9e4f0; /* derived */
-  --muted-foreground: #4f5361; /* derived; 6.7:1 on the background, 6.0:1 on muted */
-  --accent: #cfdceb; /* derived; hover surface */
-  --accent-foreground: #0a0a16; /* 14.1:1 */
-  --destructive: #a8242c; /* derived from Signal Red; 4.7:1 or more on its 10% tint */
-  --border: #c9d5e3; /* derived */
-  --input: #b7c5d6; /* derived */
-  --ring: #7a3fd1; /* Nebula Purple */
-  --chart-1: #7a3fd1;
-  --chart-2: #0e7490;
-  --chart-3: #4e7a2e;
-  --chart-4: #a15c07;
-  --chart-5: #e75480;
-  --sidebar: #dce8f4; /* derived */
-  --sidebar-foreground: #0a0a16;
-  --sidebar-primary: #7a3fd1;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #cfdceb;
-  --sidebar-accent-foreground: #0a0a16;
-  --sidebar-border: #c9d5e3;
-  --sidebar-ring: #7a3fd1;
-  /* Deeper than the dark set: amber, cyan and pistachio fall under 2:1 on a light background.
-     Each is 3.5:1 or more on every light surface (dots need 3:1), and is always shown next to
-     its status name. */
-  --status-queued: #6a4fc2; /* Twilight Violet */
-  --status-building: #a15c07; /* derived from Sunlit Amber */
-  --status-deploying: #0e7490; /* derived from Electric Cyan */
-  --status-active: #4e7a2e; /* derived from Pistachio */
-  --status-failed: #ce3737; /* Madder Lake */
-  --status-canceled: #5b6478; /* derived */
+  /* Logo gradients: the rocket's body and flame. */
+  --lift-gradient-rocket: linear-gradient(
+    180deg,
+    var(--lift-nebula-purple),
+    var(--lift-coral-kiss)
+  );
+  --lift-gradient-flame: linear-gradient(
+    180deg,
+    var(--lift-tangerine-tide),
+    var(--lift-sunlit-amber)
+  );
+
+  /* General · light. */
+  --background: var(--lift-frost);
+  --foreground: var(--lift-deep-space); /* 17.2:1 */
+  --card: #ffffff; /* neutral white: the one value not in the brand kit */
+  --card-foreground: var(--lift-deep-space); /* 19.7:1 */
+  --popover: #ffffff; /* neutral white: the one value not in the brand kit */
+  --popover-foreground: var(--lift-deep-space);
+  --primary: var(--lift-nebula-purple); /* 5.3:1 as text */
+  --primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
+  --secondary: var(--lift-architectural-cream);
+  --secondary-foreground: var(--lift-deep-space); /* 14.1:1 */
+  --muted: var(--lift-architectural-cream);
+  --muted-foreground: var(--lift-deep-azure); /* 6.9:1; 5.7:1 on muted */
+  --accent: var(--lift-architectural-cream); /* hover surface */
+  --accent-foreground: var(--lift-deep-space); /* 14.1:1 */
+  --destructive: var(--lift-claret); /* 10.1:1 */
+  --border: var(--lift-dawn-lavender);
+  --input: var(--lift-dawn-lavender);
+  --ring: var(--lift-nebula-purple);
+  --chart-1: var(--lift-nebula-purple);
+  --chart-2: var(--lift-coral-kiss);
+  --chart-3: var(--lift-cobalt-sky);
+  --chart-4: var(--lift-stormy-teal);
+  --chart-5: var(--lift-heat-marker);
+  --sidebar: #ffffff; /* neutral white: the one value not in the brand kit */
+  --sidebar-foreground: var(--lift-deep-space);
+  --sidebar-primary: var(--lift-nebula-purple);
+  --sidebar-primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
+  --sidebar-accent: var(--lift-architectural-cream);
+  --sidebar-accent-foreground: var(--lift-deep-space);
+  --sidebar-border: var(--lift-dawn-lavender);
+  --sidebar-ring: var(--lift-nebula-purple);
+  --status-queued: var(--lift-twilight-violet); /* Twilight Violet */
+  --status-building: var(--lift-aged-gold); /* Aged Gold */
+  --status-deploying: var(--lift-stormy-teal); /* Stormy Teal */
+  --status-active: var(--lift-dark-green); /* Dark Green */
+  --status-failed: var(--lift-madder-lake); /* Madder Lake */
+  --status-canceled: var(--lift-shadow-grey); /* Shadow Grey */
+  --heading-weight: 700;
+  --heading-tracking: -0.01em;
+  --label-case: none;
 }
 
 .dark {
-  --background: #0a0a16; /* Deep Space */
-  --foreground: #e6f1fa; /* Frost, 17.2:1 */
-  --card: #15142a; /* derived; raised surfaces */
-  --card-foreground: #e6f1fa; /* 15.7:1 */
-  --popover: #15142a;
-  --popover-foreground: #e6f1fa;
-  /* Nebula Purple lifted for dark mode. Primary is also text here (link buttons, magenta in logs),
-     and #7a3fd1 is only 3:1 on these surfaces; no purple can carry white text and also read as text
-     on Deep Space, so primary buttons take dark text in dark mode. */
-  --primary: #a47bf5; /* derived; 6.3:1 on the background, 4.9:1 on accent */
-  --primary-foreground: #0a0a16; /* 6.3:1 */
-  --secondary: #1c1b33; /* derived */
-  --secondary-foreground: #e6f1fa; /* 14.6:1 */
-  --muted: #1c1b33; /* derived */
-  --muted-foreground: #a3a6b4; /* derived; 8.1:1 on the background, 6.9:1 on muted */
-  --accent: #24223f; /* derived; hover surface */
-  --accent-foreground: #e6f1fa; /* 13.3:1 */
-  --destructive: #ff6b78; /* derived from Signal Red; 4.8:1 or more on its 20% tint */
-  --border: #2a2944; /* derived */
-  --input: #36345a; /* derived */
-  /* Focus rings and selection. */
-  --ring: #8b7fd6; /* Moonlit Lilac */
-  --chart-1: #8b7fd6;
-  --chart-2: #19c3e6;
-  --chart-3: #b9c255;
-  --chart-4: #ffc857;
-  --chart-5: #e75480;
-  --sidebar: #100f21; /* derived */
-  --sidebar-foreground: #e6f1fa;
-  --sidebar-primary: #a47bf5;
-  --sidebar-primary-foreground: #0a0a16;
-  --sidebar-accent: #1c1b33;
-  --sidebar-accent-foreground: #e6f1fa;
-  --sidebar-border: #2a2944;
-  --sidebar-ring: #8b7fd6;
-  /* Palette colours, 4.4:1 or more on every dark surface. Always shown next to the status name. */
-  --status-queued: #8b7fd6; /* Moonlit Lilac */
-  --status-building: #ffc857; /* Sunlit Amber */
-  --status-deploying: #19c3e6; /* Electric Cyan */
-  --status-active: #b9c255; /* Pistachio */
-  --status-failed: #e8384a; /* Signal Red */
-  --status-canceled: #8a8fa3; /* derived */
+  /* General · dark. */
+  --background: var(--lift-deep-space);
+  --foreground: var(--lift-frost); /* 17.2:1 */
+  --card: var(--lift-aubergine);
+  --card-foreground: var(--lift-frost); /* 15.5:1 */
+  --popover: var(--lift-aubergine);
+  --popover-foreground: var(--lift-frost);
+  --primary: var(--lift-moonlit-lilac); /* 5.7:1 as text */
+  --primary-foreground: var(--lift-deep-space); /* 5.7:1 */
+  --secondary: var(--lift-shadow-grey);
+  --secondary-foreground: var(--lift-frost); /* 12.7:1 */
+  --muted: var(--lift-shadow-grey);
+  --muted-foreground: var(--lift-sky-blue); /* 10.9:1; 8.1:1 on muted */
+  --accent: var(--lift-shadow-grey); /* hover surface */
+  --accent-foreground: var(--lift-frost); /* 12.7:1 */
+  --destructive: var(--lift-rain-boots); /* 6.6:1 */
+  --border: var(--lift-shadow-grey);
+  --input: var(--lift-shadow-grey);
+  --ring: var(--lift-moonlit-lilac);
+  --chart-1: var(--lift-moonlit-lilac);
+  --chart-2: var(--lift-coral-kiss);
+  --chart-3: var(--lift-electric-cyan);
+  --chart-4: var(--lift-sunlit-amber);
+  --chart-5: var(--lift-pistachio);
+  --sidebar: var(--lift-aubergine);
+  --sidebar-foreground: var(--lift-frost);
+  --sidebar-primary: var(--lift-moonlit-lilac);
+  --sidebar-primary-foreground: var(--lift-deep-space);
+  --sidebar-accent: var(--lift-shadow-grey);
+  --sidebar-accent-foreground: var(--lift-frost);
+  --sidebar-border: var(--lift-shadow-grey);
+  --sidebar-ring: var(--lift-moonlit-lilac);
+  --status-queued: var(--lift-moonlit-lilac); /* Moonlit Lilac */
+  --status-building: var(--lift-sunlit-amber); /* Sunlit Amber */
+  --status-deploying: var(--lift-electric-cyan); /* Electric Cyan */
+  --status-active: var(--lift-pistachio); /* Pistachio */
+  --status-failed: var(--lift-rain-boots); /* Rain Boots */
+  --status-canceled: var(--lift-atmospheric-blue); /* Atmospheric Blue */
+}
+
+/* A zone paints its own surface, since <body> keeps General's. */
+.zone-ground,
+.zone-atmosphere,
+.zone-orbit {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+/* Ground (the editor): Morning in light mode. */
+.zone-ground {
+  --background: var(--lift-linen-beige);
+  --foreground: var(--lift-dark-green); /* 11.5:1 */
+  --card: var(--lift-frosted-mint);
+  --card-foreground: var(--lift-dark-green); /* 13.1:1 */
+  --popover: var(--lift-frosted-mint);
+  --popover-foreground: var(--lift-dark-green);
+  --primary: var(--lift-stormy-teal); /* 4.6:1 as text */
+  --primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
+  --secondary: var(--lift-architectural-cream);
+  --secondary-foreground: var(--lift-dark-green); /* 10.0:1 */
+  --muted: var(--lift-architectural-cream);
+  --muted-foreground: var(--lift-prussian-blue); /* 9.9:1; 8.6:1 on muted */
+  --accent: var(--lift-dawn-lavender); /* hover surface */
+  --accent-foreground: var(--lift-dark-green); /* 8.9:1 */
+  --destructive: var(--lift-claret); /* 9.5:1 */
+  --border: var(--lift-dawn-lavender);
+  --input: var(--lift-sky-wash);
+  --ring: var(--lift-stormy-teal);
+  --chart-1: var(--lift-moss-green);
+  --chart-2: var(--lift-stormy-teal);
+  --chart-3: var(--lift-rosy-brown);
+  --chart-4: var(--lift-prussian-blue);
+  --chart-5: var(--lift-madder-lake);
+  --sidebar: var(--lift-frosted-mint);
+  --sidebar-foreground: var(--lift-dark-green);
+  --sidebar-primary: var(--lift-stormy-teal);
+  --sidebar-primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
+  --sidebar-accent: var(--lift-dawn-lavender);
+  --sidebar-accent-foreground: var(--lift-dark-green);
+  --sidebar-border: var(--lift-dawn-lavender);
+  --sidebar-ring: var(--lift-stormy-teal);
+  --heading-weight: 500;
+  --heading-tracking: 0;
+  --label-case: none;
+}
+
+/* Ground: Sunset in dark mode. */
+.dark .zone-ground,
+.zone-ground.dark {
+  --background: var(--lift-aubergine);
+  --foreground: var(--lift-linen-beige); /* 14.6:1 */
+  --card: var(--lift-shadow-grey);
+  --card-foreground: var(--lift-linen-beige); /* 12.0:1 */
+  --popover: var(--lift-shadow-grey);
+  --popover-foreground: var(--lift-linen-beige);
+  --primary: var(--lift-heat-marker); /* 7.5:1 as text */
+  --primary-foreground: var(--lift-aubergine); /* 7.5:1 */
+  --secondary: var(--lift-prussian-blue);
+  --secondary-foreground: var(--lift-linen-beige); /* 9.9:1 */
+  --muted: var(--lift-prussian-blue);
+  --muted-foreground: var(--lift-rosy-brown); /* 7.2:1; 4.9:1 on muted */
+  --accent: var(--lift-claret); /* hover surface */
+  --accent-foreground: var(--lift-linen-beige); /* 9.5:1 */
+  --destructive: var(--lift-rain-boots); /* 6.0:1 */
+  --border: var(--lift-claret);
+  --input: var(--lift-claret);
+  --ring: var(--lift-heat-marker);
+  --chart-1: var(--lift-rain-boots);
+  --chart-2: var(--lift-heat-marker);
+  --chart-3: var(--lift-stormy-teal);
+  --chart-4: var(--lift-rosy-brown);
+  --chart-5: var(--lift-pistachio);
+  --sidebar: var(--lift-shadow-grey);
+  --sidebar-foreground: var(--lift-linen-beige);
+  --sidebar-primary: var(--lift-heat-marker);
+  --sidebar-primary-foreground: var(--lift-aubergine);
+  --sidebar-accent: var(--lift-claret);
+  --sidebar-accent-foreground: var(--lift-linen-beige);
+  --sidebar-border: var(--lift-claret);
+  --sidebar-ring: var(--lift-heat-marker);
+}
+
+/* Atmosphere (the AI): Day in light mode. */
+.zone-atmosphere {
+  --background: var(--lift-frost);
+  --foreground: var(--lift-deep-space); /* 17.2:1 */
+  --card: #ffffff; /* neutral white: the one value not in the brand kit */
+  --card-foreground: var(--lift-deep-space); /* 19.7:1 */
+  --popover: #ffffff; /* neutral white: the one value not in the brand kit */
+  --popover-foreground: var(--lift-deep-space);
+  --primary: var(--lift-deep-azure); /* 6.9:1 as text */
+  --primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
+  --secondary: var(--lift-icy-aqua);
+  --secondary-foreground: var(--lift-deep-space); /* 14.2:1 */
+  --muted: var(--lift-icy-aqua);
+  --muted-foreground: var(--lift-deep-azure); /* 6.9:1; 5.7:1 on muted */
+  --accent: var(--lift-icy-aqua); /* hover surface */
+  --accent-foreground: var(--lift-deep-space); /* 14.2:1 */
+  --destructive: var(--lift-claret); /* 10.1:1 */
+  --border: var(--lift-sky-blue);
+  --input: var(--lift-sky-wash);
+  --ring: var(--lift-cobalt-sky);
+  --chart-1: var(--lift-cobalt-sky);
+  --chart-2: var(--lift-electric-cyan);
+  --chart-3: var(--lift-deep-azure);
+  --chart-4: var(--lift-iced-denim);
+  --chart-5: var(--lift-twilight-violet);
+  --sidebar: #ffffff; /* neutral white: the one value not in the brand kit */
+  --sidebar-foreground: var(--lift-deep-space);
+  --sidebar-primary: var(--lift-deep-azure);
+  --sidebar-primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
+  --sidebar-accent: var(--lift-icy-aqua);
+  --sidebar-accent-foreground: var(--lift-deep-space);
+  --sidebar-border: var(--lift-sky-blue);
+  --sidebar-ring: var(--lift-cobalt-sky);
+  --heading-weight: 600;
+  --heading-tracking: 0.01em;
+  --label-case: none;
+}
+
+/* Atmosphere: Twilight in dark mode. */
+.dark .zone-atmosphere,
+.zone-atmosphere.dark {
+  --background: var(--lift-shadow-grey);
+  --foreground: var(--lift-frost); /* 12.7:1 */
+  --card: var(--lift-prussian-blue);
+  --card-foreground: var(--lift-frost); /* 10.5:1 */
+  --popover: var(--lift-prussian-blue);
+  --popover-foreground: var(--lift-frost);
+  --primary: var(--lift-electric-cyan); /* 6.9:1 as text */
+  --primary-foreground: var(--lift-shadow-grey); /* 6.9:1 */
+  --secondary: var(--lift-prussian-blue);
+  --secondary-foreground: var(--lift-frost); /* 10.5:1 */
+  --muted: var(--lift-prussian-blue);
+  --muted-foreground: var(--lift-icy-aqua); /* 10.5:1; 8.7:1 on muted */
+  --accent: var(--lift-deep-azure); /* hover surface */
+  --accent-foreground: var(--lift-frost); /* 6.9:1 */
+  --destructive: var(--lift-tangerine-tide); /* 6.2:1 */
+  --border: var(--lift-deep-azure);
+  --input: var(--lift-deep-azure);
+  --ring: var(--lift-moonlit-lilac);
+  --chart-1: var(--lift-electric-cyan);
+  --chart-2: var(--lift-moonlit-lilac);
+  --chart-3: var(--lift-sky-blue);
+  --chart-4: var(--lift-iced-denim);
+  --chart-5: var(--lift-icy-aqua);
+  --sidebar: var(--lift-prussian-blue);
+  --sidebar-foreground: var(--lift-frost);
+  --sidebar-primary: var(--lift-electric-cyan);
+  --sidebar-primary-foreground: var(--lift-shadow-grey);
+  --sidebar-accent: var(--lift-deep-azure);
+  --sidebar-accent-foreground: var(--lift-frost);
+  --sidebar-border: var(--lift-deep-azure);
+  --sidebar-ring: var(--lift-moonlit-lilac);
+}
+
+/* Orbit (deployments, logs, services): Nebula in light mode. */
+.zone-orbit {
+  --background: var(--lift-starlight-gold);
+  --foreground: var(--lift-deep-space); /* 14.1:1 */
+  --card: #ffffff; /* neutral white: the one value not in the brand kit */
+  --card-foreground: var(--lift-deep-space); /* 19.7:1 */
+  --popover: #ffffff; /* neutral white: the one value not in the brand kit */
+  --popover-foreground: var(--lift-deep-space);
+  --primary: var(--lift-deep-violet); /* 8.0:1 as text */
+  --primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
+  --secondary: var(--lift-sunlit-amber);
+  --secondary-foreground: var(--lift-deep-space); /* 12.8:1 */
+  --muted: var(--lift-sunlit-amber);
+  --muted-foreground: var(--lift-orchid-dream); /* 6.5:1; 5.9:1 on muted */
+  --accent: var(--lift-sunlit-amber); /* hover surface */
+  --accent-foreground: var(--lift-deep-space); /* 12.8:1 */
+  --destructive: var(--lift-ember-red); /* 11.1:1 */
+  --border: var(--lift-sunlit-amber);
+  --input: var(--lift-sunlit-amber);
+  --ring: var(--lift-deep-violet);
+  --chart-1: var(--lift-nebula-purple);
+  --chart-2: var(--lift-coral-kiss);
+  --chart-3: var(--lift-tangerine-tide);
+  --chart-4: var(--lift-electric-teal);
+  --chart-5: var(--lift-orchid-dream);
+  --sidebar: #ffffff; /* neutral white: the one value not in the brand kit */
+  --sidebar-foreground: var(--lift-deep-space);
+  --sidebar-primary: var(--lift-deep-violet);
+  --sidebar-primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
+  --sidebar-accent: var(--lift-sunlit-amber);
+  --sidebar-accent-foreground: var(--lift-deep-space);
+  --sidebar-border: var(--lift-sunlit-amber);
+  --sidebar-ring: var(--lift-deep-violet);
+  --heading-weight: 700;
+  --heading-tracking: 0.04em;
+  --label-case: uppercase;
+}
+
+/* Orbit: Void in dark mode. */
+.dark .zone-orbit,
+.zone-orbit.dark {
+  --background: var(--lift-deep-space);
+  --foreground: var(--lift-starlight-gold); /* 14.1:1 */
+  --card: var(--lift-midnight-nebula);
+  --card-foreground: var(--lift-starlight-gold); /* 11.5:1 */
+  --popover: var(--lift-midnight-nebula);
+  --popover-foreground: var(--lift-starlight-gold);
+  --primary: var(--lift-coral-kiss); /* 5.6:1 as text */
+  --primary-foreground: var(--lift-deep-space); /* 5.6:1 */
+  --secondary: var(--lift-void-indigo);
+  --secondary-foreground: var(--lift-starlight-gold); /* 12.5:1 */
+  --muted: var(--lift-void-indigo);
+  --muted-foreground: var(--lift-moonlit-lilac); /* 5.7:1; 5.1:1 on muted */
+  --accent: var(--lift-shadow-orchid); /* hover surface */
+  --accent-foreground: var(--lift-starlight-gold); /* 11.6:1 */
+  --destructive: var(--lift-tangerine-tide); /* 8.5:1 */
+  --border: var(--lift-dusk-rose);
+  --input: var(--lift-dusk-rose);
+  --ring: var(--lift-tangerine-tide);
+  --chart-1: var(--lift-coral-kiss);
+  --chart-2: var(--lift-tangerine-tide);
+  --chart-3: var(--lift-starlight-gold);
+  --chart-4: var(--lift-electric-teal);
+  --chart-5: var(--lift-sunlit-amber);
+  --sidebar: var(--lift-midnight-nebula);
+  --sidebar-foreground: var(--lift-starlight-gold);
+  --sidebar-primary: var(--lift-coral-kiss);
+  --sidebar-primary-foreground: var(--lift-deep-space);
+  --sidebar-accent: var(--lift-shadow-orchid);
+  --sidebar-accent-foreground: var(--lift-starlight-gold);
+  --sidebar-border: var(--lift-dusk-rose);
+  --sidebar-ring: var(--lift-tangerine-tide);
 }

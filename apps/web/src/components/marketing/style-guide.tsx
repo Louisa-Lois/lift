@@ -2,8 +2,15 @@
 
 import { DeploymentStatus } from "@lift/shared";
 import { Rocket, RotateCcw } from "lucide-react";
-import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
-import { STATUS_STYLES, StatusBadge } from "@/components/status-badge";
+import {
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,90 +43,192 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import { contrastRatio, parseRgb, type Rgb, toHex } from "./contrast";
 
 type Mode = "dark" | "light";
+type ZoneId = "general" | "ground" | "atmosphere" | "orbit";
 
-/** The six statuses the brief asks for (superseded reuses canceled's colour). */
-const STATUSES = DeploymentStatus.options.filter((status) => status !== "superseded");
-
-const COLOUR_GROUPS: { title: string; note: string; tokens: string[] }[] = [
+/** The brand kit's four zones. Ground, Atmosphere and Orbit are classes from theme.css. */
+const ZONES: {
+  id: ZoneId;
+  name: string;
+  className: string;
+  where: string;
+  light: string;
+  dark: string;
+  personality: string;
+}[] = [
   {
-    title: "Surfaces",
-    note: "Page, raised surfaces, quiet fills and hover.",
-    tokens: ["background", "card", "popover", "muted", "secondary", "accent", "sidebar"],
+    id: "general",
+    name: "General",
+    className: "",
+    where: "App shell, Projects, sign-in, landing page",
+    light: "Light",
+    dark: "Dark",
+    personality: "The full voice. Bold headings, and Bricolage Grotesque for brand moments.",
   },
   {
-    title: "Text",
-    note: "Each sits on the surface its name pairs with.",
-    tokens: [
-      "foreground",
-      "muted-foreground",
-      "card-foreground",
-      "secondary-foreground",
-      "accent-foreground",
-      "primary-foreground",
+    id: "ground",
+    name: "Ground",
+    className: "zone-ground",
+    where: "The live editor: writing, building, collaborating",
+    light: "Morning",
+    dark: "Sunset",
+    personality: "Quietest weights and generous spacing, for reading for hours. No Expressive.",
+  },
+  {
+    id: "atmosphere",
+    name: "Atmosphere",
+    className: "zone-atmosphere",
+    where: "The AI: plans, diagnoses, the ops chat",
+    light: "Day",
+    dark: "Twilight",
+    personality: "Medium weight, slightly looser tracking: conversational rather than declarative.",
+  },
+  {
+    id: "orbit",
+    name: "Orbit",
+    className: "zone-orbit",
+    where: "Deployments, logs and services: live and monitored",
+    light: "Nebula",
+    dark: "Void",
+    personality: "Bold, tight-tracked caps for labels. Precise, never cute. No Expressive.",
+  },
+];
+
+/** Every colour in the brand kit, grouped as the kit groups them (each listed once). */
+const PALETTE: { title: string; colours: string[] }[] = [
+  {
+    title: "General · light",
+    colours: [
+      "frost",
+      "architectural-cream",
+      "coral-kiss",
+      "nebula-purple",
+      "sunlit-amber",
+      "cobalt-sky",
+    ],
+  },
+  { title: "General · dark", colours: ["deep-space", "aubergine", "electric-cyan"] },
+  {
+    title: "Ground · Morning",
+    colours: [
+      "linen-beige",
+      "dawn-lavender",
+      "sky-wash",
+      "moss-green",
+      "pistachio",
+      "rosy-brown",
+      "frosted-mint",
     ],
   },
   {
-    title: "Interaction",
-    note: "Primary actions, focus rings, errors and edges.",
-    tokens: ["primary", "ring", "destructive", "border", "input"],
+    title: "Ground · Sunset",
+    colours: [
+      "rain-boots",
+      "heat-marker",
+      "madder-lake",
+      "claret",
+      "dark-green",
+      "prussian-blue",
+      "stormy-teal",
+      "shadow-grey",
+    ],
+  },
+  { title: "Atmosphere · Day", colours: ["icy-aqua", "sky-blue", "iced-denim", "deep-azure"] },
+  {
+    title: "Atmosphere · Twilight",
+    colours: ["vivid-indigo", "twilight-violet", "moonlit-lilac", "atmospheric-blue"],
   },
   {
-    title: "Status",
-    note: "Always shown next to the status name, never on its own.",
-    tokens: STATUSES.map((status) => `status-${status}`),
+    title: "Orbit · Nebula",
+    colours: [
+      "orchid-dream",
+      "deep-violet",
+      "signal-red",
+      "tangerine-tide",
+      "starlight-gold",
+      "electric-teal",
+    ],
   },
-  { title: "Charts", note: "", tokens: ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"] },
   {
-    title: "Brand",
-    note: "The same in both modes. For marketing pages and illustrations, not interface chrome.",
-    tokens: [
-      "brand-purple",
-      "brand-coral",
-      "brand-amber",
-      "brand-tangerine",
-      "brand-cyan",
-      "brand-deep-space",
-      "brand-frost",
+    title: "Orbit · Void",
+    colours: [
+      "midnight-nebula",
+      "shadow-orchid",
+      "void-indigo",
+      "dusk-rose",
+      "ember-red",
+      "burnt-tangerine",
+      "aged-gold",
+      "abyssal-teal",
     ],
   },
 ];
 
-/** Text on a surface: must reach 4.5:1 (WCAG AA for body text). */
+const STATUSES = DeploymentStatus.options.filter((status) => status !== "superseded");
+
+const ROLE_GROUPS: { title: string; tokens: string[] }[] = [
+  {
+    title: "Surfaces",
+    tokens: ["background", "card", "muted", "accent", "border", "input"],
+  },
+  {
+    title: "Text and actions",
+    tokens: [
+      "foreground",
+      "muted-foreground",
+      "primary",
+      "primary-foreground",
+      "destructive",
+      "ring",
+    ],
+  },
+  { title: "Status", tokens: STATUSES.map((status) => `status-${status}`) },
+  { title: "Charts", tokens: ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"] },
+];
+
+/** Text on a surface: 4.5:1 (WCAG AA). */
 const TEXT_PAIRS: [string, string][] = [
   ["foreground", "background"],
   ["foreground", "card"],
-  ["card-foreground", "card"],
-  ["popover-foreground", "popover"],
+  ["foreground", "muted"],
+  ["foreground", "accent"],
   ["muted-foreground", "background"],
   ["muted-foreground", "card"],
   ["muted-foreground", "muted"],
   ["primary-foreground", "primary"],
-  ["secondary-foreground", "secondary"],
-  ["accent-foreground", "accent"],
+  ["primary", "background"],
+  ["primary", "card"],
   ["destructive", "background"],
   ["destructive", "card"],
-  ["primary", "card"],
 ];
 
-/** Non-text marks (status dots, focus rings): must reach 3:1 (WCAG 1.4.11). */
+/** Non-text marks (status dots, focus rings): 3:1 (WCAG 1.4.11). */
 const MARK_PAIRS: [string, string][] = [
-  ...STATUSES.flatMap(
-    (status) =>
-      [
-        [`status-${status}`, "background"],
-        [`status-${status}`, "card"],
-      ] as [string, string][],
+  ...STATUSES.flatMap((status) =>
+    (["background", "card", "muted"] as const).map(
+      (surface) => [`status-${status}`, surface] as [string, string],
+    ),
   ),
   ["ring", "background"],
+  ["ring", "card"],
+];
+
+const TOKENS = [
+  ...new Set([
+    ...ROLE_GROUPS.flatMap((group) => group.tokens),
+    ...TEXT_PAIRS.flat(),
+    ...MARK_PAIRS.flat(),
+    ...PALETTE.flatMap((group) => group.colours.map((name) => `lift-${name}`)),
+  ]),
 ];
 
 const TYPE_SCALE: {
   token: string;
   font: string;
-  weight: number;
+  weight: string;
   size: string;
   lineHeight: number;
   sample: string;
@@ -128,7 +237,7 @@ const TYPE_SCALE: {
   {
     token: "display",
     font: "--font-display",
-    weight: 700,
+    weight: "700",
     size: "48px",
     lineHeight: 1.1,
     sample: "Ground to Orbit.",
@@ -136,23 +245,25 @@ const TYPE_SCALE: {
   {
     token: "h1",
     font: "--font-display",
-    weight: 600,
+    weight: "var(--heading-weight)",
     size: "32px",
     lineHeight: 1.2,
     sample: "Your projects",
+    extra: { letterSpacing: "var(--heading-tracking)" },
   },
   {
     token: "h2",
     font: "--font-display",
-    weight: 600,
+    weight: "var(--heading-weight)",
     size: "22px",
     lineHeight: 1.25,
     sample: "Deployments",
+    extra: { letterSpacing: "var(--heading-tracking)" },
   },
   {
     token: "h3",
     font: "--font-display",
-    weight: 500,
+    weight: "500",
     size: "17px",
     lineHeight: 1.3,
     sample: "Environment variables",
@@ -160,7 +271,7 @@ const TYPE_SCALE: {
   {
     token: "body",
     font: "--font-sans",
-    weight: 400,
+    weight: "400",
     size: "15px",
     lineHeight: 1.6,
     sample: "Paste a repo. The AI plans the deployment, and it's live at its own HTTPS address.",
@@ -168,7 +279,7 @@ const TYPE_SCALE: {
   {
     token: "body-sm",
     font: "--font-sans",
-    weight: 400,
+    weight: "400",
     size: "13px",
     lineHeight: 1.5,
     sample: "Last deployed 4 minutes ago from main.",
@@ -176,7 +287,7 @@ const TYPE_SCALE: {
   {
     token: "ui",
     font: "--font-sans",
-    weight: 500,
+    weight: "500",
     size: "14px",
     lineHeight: 1.4,
     sample: "Deploy from GitHub",
@@ -184,7 +295,7 @@ const TYPE_SCALE: {
   {
     token: "label",
     font: "--font-sans",
-    weight: 600,
+    weight: "600",
     size: "11px",
     lineHeight: 1.2,
     sample: "Build logs",
@@ -193,7 +304,7 @@ const TYPE_SCALE: {
   {
     token: "mono",
     font: "--font-mono",
-    weight: 450,
+    weight: "450",
     size: "13px",
     lineHeight: 1.6,
     sample: "$ lift up  →  live at myapp.trylift.dev  (a1b2c3d, 0Ol1I)",
@@ -201,7 +312,7 @@ const TYPE_SCALE: {
   {
     token: "expressive",
     font: "--font-expressive",
-    weight: 800,
+    weight: "800",
     size: "44px",
     lineHeight: 1.05,
     sample: "Liftoff.",
@@ -222,31 +333,37 @@ const DEPLOYMENTS: {
   { sha: "3e2d1c0", message: "Revert logging", status: "canceled", when: "Yesterday" },
 ];
 
-/** Resolves a theme variable to the colour the browser actually paints. */
-function resolve(token: string): Rgb | null {
+const headingStyle: CSSProperties = {
+  fontFamily: "var(--font-display)",
+  fontWeight: "var(--heading-weight)" as CSSProperties["fontWeight"],
+  letterSpacing: "var(--heading-tracking)",
+};
+
+const labelStyle: CSSProperties = {
+  textTransform: "var(--label-case)" as CSSProperties["textTransform"],
+  letterSpacing: "0.04em",
+};
+
+/** Resolves a theme variable, inside `container`, to the colour the browser actually paints. */
+function resolve(token: string, container: HTMLElement): Rgb | null {
   const probe = document.createElement("span");
   probe.style.color = `var(--${token})`;
   probe.style.display = "none";
-  document.body.appendChild(probe);
+  container.appendChild(probe);
   const value = getComputedStyle(probe).color;
   probe.remove();
   return parseRgb(value);
 }
 
-const TOKENS = [
-  ...new Set([
-    ...COLOUR_GROUPS.flatMap((group) => group.tokens),
-    ...TEXT_PAIRS.flat(),
-    ...MARK_PAIRS.flat(),
-  ]),
-];
-
 /**
  * Previews light mode by taking the dark class off <html> (and puts it back on the way out), then
- * reads every token's painted colour in the mode now showing.
+ * reads every token's painted colour inside the zone preview.
  */
-function useMode(): [Mode, (mode: Mode) => void, Record<string, Rgb | null>] {
-  const [mode, setMode] = useState<Mode>("dark");
+function useThemeColours(
+  mode: Mode,
+  zone: ZoneId,
+  container: RefObject<HTMLDivElement | null>,
+): Record<string, Rgb | null> {
   const [colours, setColours] = useState<Record<string, Rgb | null>>({});
   useEffect(() => {
     const root = document.documentElement;
@@ -257,13 +374,45 @@ function useMode(): [Mode, (mode: Mode) => void, Record<string, Rgb | null>] {
   }, []);
   useEffect(() => {
     document.documentElement.classList.toggle("dark", mode === "dark");
-    // Read on the next frame, once the browser has applied the new class.
+    // Read on the next frame, once the browser has applied the new classes. The zone is read from
+    // the container's class, which React has already updated by now.
     const frame = requestAnimationFrame(() => {
-      setColours(Object.fromEntries(TOKENS.map((token) => [token, resolve(token)])));
+      const element = container.current;
+      if (!element || element.dataset.zone !== zone) return;
+      setColours(Object.fromEntries(TOKENS.map((token) => [token, resolve(token, element)])));
     });
     return () => cancelAnimationFrame(frame);
-  }, [mode]);
-  return [mode, setMode, colours];
+  }, [mode, zone, container]);
+  return colours;
+}
+
+function Segmented<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
+}) {
+  return (
+    <fieldset className="inline-flex flex-wrap rounded-lg border border-border bg-muted p-[3px]">
+      <legend className="sr-only">{label}</legend>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={value === option.value}
+          onClick={() => onChange(option.value)}
+          className="rounded-md px-3 py-1 font-medium text-muted-foreground text-sm transition-colors focus-visible:outline-2 focus-visible:outline-ring aria-pressed:bg-background aria-pressed:text-foreground"
+        >
+          {option.label}
+        </button>
+      ))}
+    </fieldset>
+  );
 }
 
 function Section({
@@ -274,16 +423,12 @@ function Section({
 }: {
   id: string;
   title: string;
-  intro?: string;
+  intro?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section id={id} aria-labelledby={`${id}-title`} className="border-border border-t pt-10">
-      <h2
-        id={`${id}-title`}
-        className="font-semibold text-[22px] leading-tight"
-        style={{ fontFamily: "var(--font-display)" }}
-      >
+      <h2 id={`${id}-title`} className="text-[22px] leading-tight" style={headingStyle}>
         {title}
       </h2>
       {intro ? <p className="mt-1 max-w-prose text-muted-foreground">{intro}</p> : null}
@@ -292,15 +437,38 @@ function Section({
   );
 }
 
-function Swatch({ token, rgb }: { token: string; rgb: Rgb | null | undefined }) {
+function SubHeading({ children }: { children: ReactNode }) {
+  return (
+    <h3 className="mb-3 text-[17px]" style={{ ...headingStyle, fontWeight: 500 }}>
+      {children}
+    </h3>
+  );
+}
+
+function Swatch({
+  token,
+  label,
+  rgb,
+}: {
+  token: string;
+  label: string;
+  rgb: Rgb | null | undefined;
+}) {
   return (
     <div className="min-w-0 overflow-hidden rounded-lg border border-border bg-card">
       <div className="h-14 border-border border-b" style={{ background: `var(--${token})` }} />
       <div className="px-2.5 py-2">
-        <p className="truncate font-medium text-xs">--{token}</p>
+        <p className="truncate font-medium text-card-foreground text-xs">{label}</p>
         <p className="font-mono text-muted-foreground text-xs">{rgb ? toHex(rgb) : "…"}</p>
       </div>
     </div>
+  );
+}
+
+function title(name: string): string {
+  return name.replace(
+    /(^|-)(\w)/g,
+    (_, dash: string, letter: string) => `${dash ? " " : ""}${letter.toUpperCase()}`,
   );
 }
 
@@ -345,8 +513,45 @@ function ContrastRow({
   );
 }
 
+/** A small slice of the product in one zone: used for the side-by-side overview. */
+function ZonePreview({ zone, mode }: { zone: (typeof ZONES)[number]; mode: Mode }) {
+  return (
+    <div className={cn("min-w-0 rounded-xl border border-border p-4", zone.className)}>
+      <p className="font-mono text-muted-foreground text-xs">
+        {zone.name} · {mode === "dark" ? zone.dark : zone.light}
+      </p>
+      <p className="mt-2 text-[20px] leading-tight" style={headingStyle}>
+        {zone.name}
+      </p>
+      <p className="mt-1 text-muted-foreground text-sm">{zone.where}</p>
+      <div className="mt-4 rounded-lg border border-border bg-card p-3 text-card-foreground">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-medium text-sm">web</span>
+          <StatusBadge status="active" />
+        </div>
+        <p className="mt-1 truncate font-mono text-muted-foreground text-xs">a1b2c3d · main</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button size="sm">Deploy</Button>
+          <Button size="sm" variant="outline">
+            Logs
+          </Button>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {STATUSES.map((status) => (
+          <StatusBadge key={status} status={status} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function StyleGuide() {
-  const [mode, setMode, colours] = useMode();
+  const [mode, setMode] = useState<Mode>("dark");
+  const [zoneId, setZoneId] = useState<ZoneId>("general");
+  const zone = ZONES.find((item) => item.id === zoneId) ?? ZONES[0];
+  const preview = useRef<HTMLDivElement>(null);
+  const colours = useThemeColours(mode, zoneId, preview);
   const failures = [
     ...TEXT_PAIRS.map((pair) => [...pair, 4.5] as const),
     ...MARK_PAIRS.map((pair) => [...pair, 3] as const),
@@ -355,11 +560,12 @@ export function StyleGuide() {
     const b = colours[bg];
     return a && b && contrastRatio(a, b) < min;
   });
+  const zoneMode = mode === "dark" ? zone?.dark : zone?.light;
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
-      <header className="border-border border-b">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
+      <header className="sticky top-0 z-10 border-border border-b bg-background/95 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="flex items-center gap-4">
             {/* biome-ignore lint/performance/noImgElement: a static SVG from public/, no optimisation needed */}
             <img
@@ -373,60 +579,73 @@ export function StyleGuide() {
             />
             <span className="text-muted-foreground">Style guide</span>
           </div>
-          <fieldset className="inline-flex rounded-lg border border-border bg-muted p-[3px]">
-            <legend className="sr-only">Preview mode</legend>
-            {(["dark", "light"] as const).map((option) => (
-              <button
-                key={option}
-                type="button"
-                aria-pressed={mode === option}
-                onClick={() => setMode(option)}
-                className="rounded-md px-3 py-1 font-medium text-muted-foreground text-sm capitalize transition-colors aria-pressed:bg-background aria-pressed:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-              >
-                {option}
-              </button>
-            ))}
-          </fieldset>
+          <div className="flex flex-wrap items-center gap-2">
+            <Segmented
+              label="Zone"
+              value={zoneId}
+              onChange={setZoneId}
+              options={ZONES.map((item) => ({ value: item.id, label: item.name }))}
+            />
+            <Segmented
+              label="Mode"
+              value={mode}
+              onChange={setMode}
+              options={[
+                { value: "dark", label: "Dark" },
+                { value: "light", label: "Light" },
+              ]}
+            />
+          </div>
         </div>
       </header>
 
       <main className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-10 sm:px-6">
         <div className="max-w-2xl">
-          <h1
-            className="font-semibold text-[32px] leading-tight"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
+          <h1 className="text-[32px] leading-tight" style={headingStyle}>
             Lift's theme
           </h1>
           <p className="mt-2 text-base text-muted-foreground">
-            Every colour, font and component the dashboard uses, read live from{" "}
-            <code className="font-mono text-foreground text-sm">src/styles/theme.css</code>. Switch
-            between dark and light to check both.
+            Ground → Atmosphere → Orbit, from the brand kit, read live from{" "}
+            <code className="font-mono text-foreground text-sm">src/styles/theme.css</code>. Pick a
+            zone and a mode at the top: everything from "Theme roles" down shows that zone.
           </p>
         </div>
 
         <Section
-          id="colours"
-          title="Colours"
-          intro="The hex under each swatch is what the browser paints right now, in the selected mode."
+          id="zones"
+          title="Four zones"
+          intro={`Each zone is the same set of roles painted from its own palette. In ${mode} mode:`}
+        >
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-[repeat(2,minmax(0,1fr))] lg:grid-cols-[repeat(4,minmax(0,1fr))]">
+            {ZONES.map((item) => (
+              <ZonePreview key={item.id} zone={item} mode={mode} />
+            ))}
+          </div>
+          <p className="mt-4 text-muted-foreground text-sm">
+            To put a screen in a zone, add its class to the screen's outer element:{" "}
+            <code className="font-mono text-foreground">zone-ground</code>,{" "}
+            <code className="font-mono text-foreground">zone-atmosphere</code> or{" "}
+            <code className="font-mono text-foreground">zone-orbit</code>. No class means General.
+          </p>
+        </Section>
+
+        <Section
+          id="palette"
+          title="Brand palette"
+          intro="Every colour in the brand kit, each once, under the first palette it belongs to. These are the --lift-* variables; the themes are built only from them."
         >
           <div className="flex flex-col gap-8">
-            {COLOUR_GROUPS.map((group) => (
+            {PALETTE.map((group) => (
               <div key={group.title}>
-                <h3
-                  className="font-medium text-[17px]"
-                  style={{ fontFamily: "var(--font-display)" }}
-                >
-                  {group.title}
-                </h3>
-                {group.note ? (
-                  <p className="mb-3 text-muted-foreground text-sm">{group.note}</p>
-                ) : (
-                  <div className="mb-3" />
-                )}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-                  {group.tokens.map((token) => (
-                    <Swatch key={token} token={token} rgb={colours[token]} />
+                <SubHeading>{group.title}</SubHeading>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+                  {group.colours.map((name) => (
+                    <Swatch
+                      key={name}
+                      token={`lift-${name}`}
+                      label={title(name)}
+                      rgb={colours[`lift-${name}`]}
+                    />
                   ))}
                 </div>
               </div>
@@ -434,292 +653,321 @@ export function StyleGuide() {
           </div>
         </Section>
 
-        <Section
-          id="contrast"
-          title="Contrast"
-          intro="Text needs 4.5:1 against what it sits on (WCAG AA). Status dots and focus rings need 3:1. Worked out live from the values above."
+        <div
+          ref={preview}
+          data-zone={zoneId}
+          className={cn("-mx-4 rounded-2xl px-4 py-2 sm:-mx-6 sm:px-6", zone?.className)}
         >
-          <p
-            role="status"
-            className={
-              failures.length
-                ? "mb-4 font-medium text-destructive"
-                : "mb-4 font-medium text-foreground"
-            }
-          >
-            {failures.length
-              ? `${failures.length} pair${failures.length === 1 ? "" : "s"} below the minimum in ${mode} mode.`
-              : `Every pair passes in ${mode} mode.`}
-          </p>
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Sample</TableHead>
-                  <TableHead>Foreground</TableHead>
-                  <TableHead>Background</TableHead>
-                  <TableHead>Ratio</TableHead>
-                  <TableHead>WCAG</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {TEXT_PAIRS.map(([fg, bg]) => (
-                  <ContrastRow key={`${fg}-${bg}`} fg={fg} bg={bg} min={4.5} colours={colours} />
-                ))}
-                {MARK_PAIRS.map(([fg, bg]) => (
-                  <ContrastRow key={`${fg}-${bg}`} fg={fg} bg={bg} min={3} colours={colours} />
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </Section>
-
-        <Section
-          id="type"
-          title="Type"
-          intro="Space Grotesk for headings, Inter for body and interface, JetBrains Mono for code and logs, Bricolage Grotesque for brand moments only."
-        >
-          <div className="divide-y divide-border rounded-lg border border-border bg-card">
-            {TYPE_SCALE.map((row) => (
-              <div
-                key={row.token}
-                className="grid gap-2 px-4 py-4 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-6"
-              >
-                <div className="font-mono text-muted-foreground text-xs leading-relaxed">
-                  <p className="text-foreground">{row.token}</p>
-                  <p>
-                    {row.font.replace("--font-", "")} · {row.weight}
-                  </p>
-                  <p>
-                    {row.size} / {row.lineHeight}
-                  </p>
-                </div>
-                <p
-                  className="min-w-0 break-words"
-                  style={{
-                    fontFamily: `var(${row.font})`,
-                    fontWeight: row.weight,
-                    fontSize: row.size,
-                    lineHeight: row.lineHeight,
-                    ...row.extra,
-                  }}
-                >
-                  {row.sample}
-                </p>
-              </div>
-            ))}
-          </div>
-        </Section>
-
-        <Section
-          id="components"
-          title="Components"
-          intro="The shadcn/ui parts the dashboard uses, styled only by the theme."
-        >
-          <div className="grid grid-cols-[minmax(0,1fr)] gap-10">
-            <div>
-              <h3
-                className="mb-3 font-medium text-[17px]"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                Buttons
-              </h3>
-              <div className="flex flex-wrap items-center gap-3">
-                <Button>
-                  <Rocket data-icon="inline-start" />
-                  Deploy from GitHub
-                </Button>
-                <Button variant="secondary">Secondary</Button>
-                <Button variant="outline">Outline</Button>
-                <Button variant="ghost">Ghost</Button>
-                <Button variant="destructive">Delete service</Button>
-                <Button variant="link">Link</Button>
-                <Button disabled>Disabled</Button>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <Button size="xs">Extra small</Button>
-                <Button size="sm">Small</Button>
-                <Button>Default</Button>
-                <Button size="lg">Large</Button>
-              </div>
-            </div>
-
-            <div>
-              <h3
-                className="mb-3 font-medium text-[17px]"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                Status badges
-              </h3>
-              <div className="flex flex-wrap items-center gap-3">
-                {STATUSES.map((status) => (
-                  <StatusBadge key={status} status={status} />
-                ))}
-              </div>
-              <p className="mt-3 text-muted-foreground text-sm">
-                The dashboard's own <code className="font-mono text-foreground">StatusBadge</code>.
-                Building and deploying pulse. Superseded shows as{" "}
-                {STATUS_STYLES.superseded.label.toLowerCase()} in canceled's colour.
+          <div className="flex flex-col gap-12">
+            <div className="pt-8">
+              <p className="font-mono text-muted-foreground text-xs" style={labelStyle}>
+                Showing
               </p>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <Badge>Default</Badge>
-                <Badge variant="secondary">Secondary</Badge>
-                <Badge variant="outline">Outline</Badge>
-                <Badge variant="destructive">Destructive</Badge>
-              </div>
+              <p className="mt-1 text-[28px] leading-tight" style={headingStyle}>
+                {zone?.name} · {zoneMode}
+              </p>
+              <p className="mt-1 max-w-prose text-muted-foreground">
+                {zone?.where}. {zone?.personality}
+              </p>
             </div>
 
-            <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-              <div>
-                <h3
-                  className="mb-3 font-medium text-[17px]"
-                  style={{ fontFamily: "var(--font-display)" }}
-                >
-                  Card
-                </h3>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>web</CardTitle>
-                    <CardDescription>github.com/lift-demo/next-hello · main</CardDescription>
-                    <CardAction>
-                      <StatusBadge status="active" />
-                    </CardAction>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="font-mono text-muted-foreground text-xs">
-                      https://next-hello.apps.trylift.dev
-                    </p>
-                  </CardContent>
-                  <CardFooter className="justify-between">
-                    <span className="text-muted-foreground text-xs">Deployed 2 min ago</span>
-                    <Button size="sm" variant="outline">
-                      View logs
-                    </Button>
-                  </CardFooter>
-                </Card>
+            <Section
+              id="roles"
+              title="Theme roles"
+              intro="What each role resolves to in this zone and mode."
+            >
+              <div className="flex flex-col gap-8">
+                {ROLE_GROUPS.map((group) => (
+                  <div key={group.title}>
+                    <SubHeading>{group.title}</SubHeading>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                      {group.tokens.map((token) => (
+                        <Swatch
+                          key={token}
+                          token={token}
+                          label={`--${token}`}
+                          rgb={colours[token]}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
+              <p className="mt-4 text-muted-foreground text-sm">
+                Status colours are the same in every zone, one set per mode, so a status never
+                changes meaning.
+              </p>
+            </Section>
 
-              <div>
-                <h3
-                  className="mb-3 font-medium text-[17px]"
-                  style={{ fontFamily: "var(--font-display)" }}
-                >
-                  Input
-                </h3>
-                <div className="grid gap-4 rounded-xl border border-border bg-card p-4">
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="sg-repo">Repository</Label>
-                    <Input id="sg-repo" placeholder="github.com/you/your-app" />
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="sg-port">Port</Label>
-                    <Input
-                      id="sg-port"
-                      defaultValue="80800"
-                      aria-invalid="true"
-                      aria-describedby="sg-port-error"
-                    />
-                    <p id="sg-port-error" className="text-destructive text-xs">
-                      Ports go up to 65535. Try 8080.
+            <Section
+              id="contrast"
+              title="Contrast"
+              intro="Text needs 4.5:1 against what it sits on (WCAG AA). Status dots and focus rings need 3:1. Worked out live."
+            >
+              <p
+                role="status"
+                className={cn(
+                  "mb-4 font-medium",
+                  failures.length ? "text-destructive" : "text-foreground",
+                )}
+              >
+                {failures.length
+                  ? `${failures.length} pair${failures.length === 1 ? "" : "s"} below the minimum in ${zone?.name} · ${zoneMode}.`
+                  : `Every pair passes in ${zone?.name} · ${zoneMode}.`}
+              </p>
+              <div className="overflow-x-auto rounded-lg border border-border bg-card">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Sample</TableHead>
+                      <TableHead>Foreground</TableHead>
+                      <TableHead>Background</TableHead>
+                      <TableHead>Ratio</TableHead>
+                      <TableHead>WCAG</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {TEXT_PAIRS.map(([fg, bg]) => (
+                      <ContrastRow
+                        key={`${fg}-${bg}`}
+                        fg={fg}
+                        bg={bg}
+                        min={4.5}
+                        colours={colours}
+                      />
+                    ))}
+                    {MARK_PAIRS.map(([fg, bg]) => (
+                      <ContrastRow key={`${fg}-${bg}`} fg={fg} bg={bg} min={3} colours={colours} />
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </Section>
+
+            <Section
+              id="type"
+              title="Type"
+              intro="Space Grotesk for headings, Inter for body and interface, JetBrains Mono for code and logs, Bricolage Grotesque for brand moments. Headings and labels take this zone's personality."
+            >
+              <div className="divide-y divide-border rounded-lg border border-border bg-card text-card-foreground">
+                {TYPE_SCALE.map((row) => (
+                  <div
+                    key={row.token}
+                    className="grid gap-2 px-4 py-4 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-6"
+                  >
+                    <div className="font-mono text-muted-foreground text-xs leading-relaxed">
+                      <p className="text-card-foreground">{row.token}</p>
+                      <p>
+                        {row.font.replace("--font-", "")} ·{" "}
+                        {row.weight.startsWith("var") ? "zone weight" : row.weight}
+                      </p>
+                      <p>
+                        {row.size} / {row.lineHeight}
+                      </p>
+                    </div>
+                    <p
+                      className="min-w-0 break-words"
+                      style={{
+                        fontFamily: `var(${row.font})`,
+                        fontWeight: row.weight as CSSProperties["fontWeight"],
+                        fontSize: row.size,
+                        lineHeight: row.lineHeight,
+                        ...row.extra,
+                      }}
+                    >
+                      {row.sample}
                     </p>
                   </div>
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="sg-disabled">Region</Label>
-                    <Input id="sg-disabled" defaultValue="eu-west-1" disabled />
+                ))}
+              </div>
+            </Section>
+
+            <Section
+              id="components"
+              title="Components"
+              intro="The shadcn/ui parts the dashboard uses, styled only by the theme."
+            >
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-10">
+                <div>
+                  <SubHeading>Buttons</SubHeading>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button>
+                      <Rocket data-icon="inline-start" />
+                      Deploy from GitHub
+                    </Button>
+                    <Button variant="secondary">Secondary</Button>
+                    <Button variant="outline">Outline</Button>
+                    <Button variant="ghost">Ghost</Button>
+                    <Button variant="destructive">Delete service</Button>
+                    <Button variant="link">Link</Button>
+                    <Button disabled>Disabled</Button>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <Button size="xs">Extra small</Button>
+                    <Button size="sm">Small</Button>
+                    <Button>Default</Button>
+                    <Button size="lg">Large</Button>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            <div>
-              <h3
-                className="mb-3 font-medium text-[17px]"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                Tabs and table
-              </h3>
-              <Tabs defaultValue="deployments">
-                <TabsList>
-                  <TabsTrigger value="deployments">Deployments</TabsTrigger>
-                  <TabsTrigger value="variables">Variables</TabsTrigger>
-                  <TabsTrigger value="settings">Settings</TabsTrigger>
-                </TabsList>
-                <TabsContent value="deployments" className="min-w-0">
-                  <div className="overflow-x-auto rounded-lg border border-border bg-card">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Commit</TableHead>
-                          <TableHead>Message</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">When</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {DEPLOYMENTS.map((deployment) => (
-                          <TableRow key={deployment.sha}>
-                            <TableCell className="font-mono text-xs">{deployment.sha}</TableCell>
-                            <TableCell>{deployment.message}</TableCell>
-                            <TableCell>
-                              <StatusBadge status={deployment.status} />
-                            </TableCell>
-                            <TableCell className="text-right text-muted-foreground tabular-nums">
-                              {deployment.when}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                <div>
+                  <SubHeading>Status badges</SubHeading>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {STATUSES.map((status) => (
+                      <StatusBadge key={status} status={status} />
+                    ))}
                   </div>
-                </TabsContent>
-                <TabsContent value="variables">
-                  <p className="rounded-lg border border-border bg-card p-4 font-mono text-sm">
-                    DATABASE_URL = ••••••••
+                  <p className="mt-3 text-muted-foreground text-sm">
+                    The dashboard's own{" "}
+                    <code className="font-mono text-foreground">StatusBadge</code>: always the name
+                    next to its colour. Building and deploying pulse; superseded uses canceled's
+                    colour.
                   </p>
-                </TabsContent>
-                <TabsContent value="settings">
-                  <p className="rounded-lg border border-border bg-card p-4 text-muted-foreground">
-                    Service settings go here.
-                  </p>
-                </TabsContent>
-              </Tabs>
-            </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <Badge>Default</Badge>
+                    <Badge variant="secondary">Secondary</Badge>
+                    <Badge variant="outline">Outline</Badge>
+                    <Badge variant="destructive">Destructive</Badge>
+                  </div>
+                </div>
 
-            <div>
-              <h3
-                className="mb-3 font-medium text-[17px]"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                Dialog
-              </h3>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline">
-                    <RotateCcw data-icon="inline-start" />
-                    Roll back
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Roll back to a1b2c3d?</DialogTitle>
-                    <DialogDescription>
-                      Lift redeploys this commit's image. The current deployment keeps running until
-                      the old one is live.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter>
-                    <DialogClose asChild>
-                      <Button variant="outline">Cancel</Button>
-                    </DialogClose>
-                    <DialogClose asChild>
-                      <Button>Roll back</Button>
-                    </DialogClose>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
+                <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                  <div>
+                    <SubHeading>Card</SubHeading>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>web</CardTitle>
+                        <CardDescription>github.com/lift-demo/next-hello · main</CardDescription>
+                        <CardAction>
+                          <StatusBadge status="active" />
+                        </CardAction>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="font-mono text-muted-foreground text-xs">
+                          https://next-hello.apps.trylift.dev
+                        </p>
+                      </CardContent>
+                      <CardFooter className="justify-between">
+                        <span className="text-muted-foreground text-xs">Deployed 2 min ago</span>
+                        <Button size="sm" variant="outline">
+                          View logs
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  </div>
+
+                  <div>
+                    <SubHeading>Input</SubHeading>
+                    <div className="grid gap-4 rounded-xl border border-border bg-card p-4 text-card-foreground">
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="sg-repo">Repository</Label>
+                        <Input id="sg-repo" placeholder="github.com/you/your-app" />
+                      </div>
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="sg-port">Port</Label>
+                        <Input
+                          id="sg-port"
+                          defaultValue="80800"
+                          aria-invalid="true"
+                          aria-describedby="sg-port-error"
+                        />
+                        <p id="sg-port-error" className="text-destructive text-xs">
+                          Ports go up to 65535. Try 8080.
+                        </p>
+                      </div>
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="sg-disabled">Region</Label>
+                        <Input id="sg-disabled" defaultValue="eu-west-1" disabled />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <SubHeading>Tabs and table</SubHeading>
+                  <Tabs defaultValue="deployments">
+                    <TabsList>
+                      <TabsTrigger value="deployments">Deployments</TabsTrigger>
+                      <TabsTrigger value="variables">Variables</TabsTrigger>
+                      <TabsTrigger value="settings">Settings</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="deployments" className="min-w-0">
+                      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead style={labelStyle}>Commit</TableHead>
+                              <TableHead style={labelStyle}>Message</TableHead>
+                              <TableHead style={labelStyle}>Status</TableHead>
+                              <TableHead className="text-right" style={labelStyle}>
+                                When
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {DEPLOYMENTS.map((deployment) => (
+                              <TableRow key={deployment.sha}>
+                                <TableCell className="font-mono text-xs">
+                                  {deployment.sha}
+                                </TableCell>
+                                <TableCell>{deployment.message}</TableCell>
+                                <TableCell>
+                                  <StatusBadge status={deployment.status} />
+                                </TableCell>
+                                <TableCell className="text-right text-muted-foreground tabular-nums">
+                                  {deployment.when}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="variables">
+                      <p className="rounded-lg border border-border bg-card p-4 font-mono text-sm">
+                        DATABASE_URL = ••••••••
+                      </p>
+                    </TabsContent>
+                    <TabsContent value="settings">
+                      <p className="rounded-lg border border-border bg-card p-4 text-muted-foreground">
+                        Service settings go here.
+                      </p>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+
+                <div className="pb-10">
+                  <SubHeading>Dialog</SubHeading>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline">
+                        <RotateCcw data-icon="inline-start" />
+                        Roll back
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className={zone?.className}>
+                      <DialogHeader>
+                        <DialogTitle>Roll back to a1b2c3d?</DialogTitle>
+                        <DialogDescription>
+                          Lift redeploys this commit's image. The current deployment keeps running
+                          until the old one is live.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button variant="outline">Cancel</Button>
+                        </DialogClose>
+                        <DialogClose asChild>
+                          <Button>Roll back</Button>
+                        </DialogClose>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </div>
+            </Section>
           </div>
-        </Section>
+        </div>
       </main>
     </div>
   );
