@@ -13,9 +13,13 @@
  *    logs and services): each remaps the same roles to its own palette. Put the class on a screen's
  *    outer element; light or dark follows <html>. Ground is Morning/Sunset, Atmosphere Day/Twilight,
  *    Orbit Nebula/Void.
- * 4. Status colours are the same in every zone, so a status never changes meaning: one set for light
- *    mode, one for dark, each checked against every zone's surfaces. Always shown next to its name.
- * 5. Type personality per zone: --heading-weight, --heading-tracking and --label-case.
+ * 4. Status colours keep the same hue in every zone, so a status never changes meaning: one set for
+ *    light mode, one for dark; Orbit's bright Tangerine page uses their deep Void siblings. Always
+ *    shown next to the status name.
+ * 4b. More roles that put the palette to work: --presence-1..8 (collaborator cursors), --trigger-*,
+ *    --log-*, --source-* and --db-*, each checked at 3:1 or more against every zone's surfaces.
+ * 5. Type personality per zone: --heading-weight, --heading-tracking, --label-case and
+ *    --zone-display-font.
  *
  * Every text pair meets WCAG AA (4.5:1) and every status dot and focus ring 3:1, in every zone and
  * both modes; the ratios are noted beside them, and /styleguide checks them live. Where a kit colour
@@ -171,9 +175,35 @@
   --status-active: var(--lift-dark-green); /* Dark Green */
   --status-failed: var(--lift-madder-lake); /* Madder Lake */
   --status-canceled: var(--lift-shadow-grey); /* Shadow Grey */
+  /* More of the palette at work: collaborator cursors, deployment triggers, log streams, variable sources, databases. */
+  --presence-1: var(--lift-nebula-purple);
+  --presence-2: var(--lift-stormy-teal);
+  --presence-3: var(--lift-deep-azure);
+  --presence-4: var(--lift-claret);
+  --presence-5: var(--lift-orchid-dream);
+  --presence-6: var(--lift-dark-green);
+  --presence-7: var(--lift-burnt-tangerine);
+  --presence-8: var(--lift-deep-violet);
+  --trigger-push: var(--lift-prussian-blue);
+  --trigger-manual: var(--lift-twilight-violet);
+  --trigger-rollback: var(--lift-burnt-tangerine);
+  --trigger-agent: var(--lift-deep-azure);
+  --trigger-editor: var(--lift-dark-green);
+  --trigger-cli: var(--lift-orchid-dream);
+  --log-build: var(--lift-aged-gold);
+  --log-deploy: var(--lift-deep-violet);
+  --log-runtime: var(--lift-stormy-teal);
+  --log-system: var(--lift-shadow-grey);
+  --source-you: var(--lift-nebula-purple);
+  --source-database: var(--lift-stormy-teal);
+  --source-agent: var(--lift-deep-azure);
+  --db-postgres: var(--lift-deep-azure);
+  --db-redis: var(--lift-claret);
   --heading-weight: 700;
   --heading-tracking: -0.01em;
   --label-case: none;
+  /* Zone headlines: Bricolage where Expressive belongs (General, Atmosphere), Space Grotesk elsewhere. */
+  --zone-display-font: var(--font-expressive);
 }
 
 .dark {
@@ -215,6 +245,30 @@
   --status-active: var(--lift-pistachio); /* Pistachio */
   --status-failed: var(--lift-rain-boots); /* Rain Boots */
   --status-canceled: var(--lift-atmospheric-blue); /* Atmospheric Blue */
+  /* More of the palette at work: collaborator cursors, deployment triggers, log streams, variable sources, databases. */
+  --presence-1: var(--lift-coral-kiss);
+  --presence-2: var(--lift-electric-cyan);
+  --presence-3: var(--lift-sunlit-amber);
+  --presence-4: var(--lift-pistachio);
+  --presence-5: var(--lift-moonlit-lilac);
+  --presence-6: var(--lift-tangerine-tide);
+  --presence-7: var(--lift-sky-blue);
+  --presence-8: var(--lift-rosy-brown);
+  --trigger-push: var(--lift-sky-blue);
+  --trigger-manual: var(--lift-moonlit-lilac);
+  --trigger-rollback: var(--lift-heat-marker);
+  --trigger-agent: var(--lift-electric-cyan);
+  --trigger-editor: var(--lift-pistachio);
+  --trigger-cli: var(--lift-rosy-brown);
+  --log-build: var(--lift-sunlit-amber);
+  --log-deploy: var(--lift-coral-kiss);
+  --log-runtime: var(--lift-icy-aqua);
+  --log-system: var(--lift-atmospheric-blue);
+  --source-you: var(--lift-moonlit-lilac);
+  --source-database: var(--lift-pistachio);
+  --source-agent: var(--lift-electric-cyan);
+  --db-postgres: var(--lift-sky-blue);
+  --db-redis: var(--lift-rain-boots);
 }
 
 /* A zone paints its own surface, since <body> keeps General's. */
@@ -261,6 +315,8 @@
   --heading-weight: 500;
   --heading-tracking: 0;
   --label-case: none;
+  /* Zone headlines: Bricolage where Expressive belongs (General, Atmosphere), Space Grotesk elsewhere. */
+  --zone-display-font: var(--font-display);
 }
 
 /* Ground: Sunset in dark mode. */
@@ -301,24 +357,24 @@
 
 /* Atmosphere (the AI): Day in light mode. */
 .zone-atmosphere {
-  --background: var(--lift-frost);
-  --foreground: var(--lift-deep-space); /* 17.2:1 */
+  --background: var(--lift-icy-aqua);
+  --foreground: var(--lift-deep-space); /* 14.2:1 */
   --card: #ffffff; /* neutral white: the one value not in the brand kit */
   --card-foreground: var(--lift-deep-space); /* 19.7:1 */
   --popover: #ffffff; /* neutral white: the one value not in the brand kit */
   --popover-foreground: var(--lift-deep-space);
-  --primary: var(--lift-deep-azure); /* 6.9:1 as text */
+  --primary: var(--lift-deep-azure); /* 5.7:1 as text */
   --primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
-  --secondary: var(--lift-icy-aqua);
-  --secondary-foreground: var(--lift-deep-space); /* 14.2:1 */
-  --muted: var(--lift-icy-aqua);
-  --muted-foreground: var(--lift-deep-azure); /* 6.9:1; 5.7:1 on muted */
-  --accent: var(--lift-icy-aqua); /* hover surface */
-  --accent-foreground: var(--lift-deep-space); /* 14.2:1 */
-  --destructive: var(--lift-claret); /* 10.1:1 */
+  --secondary: var(--lift-frost);
+  --secondary-foreground: var(--lift-deep-space); /* 17.2:1 */
+  --muted: var(--lift-frost);
+  --muted-foreground: var(--lift-deep-azure); /* 5.7:1; 6.9:1 on muted */
+  --accent: var(--lift-sky-wash); /* hover surface */
+  --accent-foreground: var(--lift-deep-space); /* 14.1:1 */
+  --destructive: var(--lift-claret); /* 8.3:1 */
   --border: var(--lift-sky-blue);
-  --input: var(--lift-sky-wash);
-  --ring: var(--lift-cobalt-sky);
+  --input: var(--lift-sky-blue);
+  --ring: var(--lift-deep-azure);
   --chart-1: var(--lift-cobalt-sky);
   --chart-2: var(--lift-electric-cyan);
   --chart-3: var(--lift-deep-azure);
@@ -328,13 +384,15 @@
   --sidebar-foreground: var(--lift-deep-space);
   --sidebar-primary: var(--lift-deep-azure);
   --sidebar-primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
-  --sidebar-accent: var(--lift-icy-aqua);
+  --sidebar-accent: var(--lift-sky-wash);
   --sidebar-accent-foreground: var(--lift-deep-space);
   --sidebar-border: var(--lift-sky-blue);
-  --sidebar-ring: var(--lift-cobalt-sky);
+  --sidebar-ring: var(--lift-deep-azure);
   --heading-weight: 600;
   --heading-tracking: 0.01em;
   --label-case: none;
+  /* Zone headlines: Bricolage where Expressive belongs (General, Atmosphere), Space Grotesk elsewhere. */
+  --zone-display-font: var(--font-expressive);
 }
 
 /* Atmosphere: Twilight in dark mode. */
@@ -375,23 +433,23 @@
 
 /* Orbit (deployments, logs, services): Nebula in light mode. */
 .zone-orbit {
-  --background: var(--lift-starlight-gold);
-  --foreground: var(--lift-deep-space); /* 14.1:1 */
+  --background: var(--lift-tangerine-tide);
+  --foreground: var(--lift-deep-space); /* 8.5:1 */
   --card: #ffffff; /* neutral white: the one value not in the brand kit */
   --card-foreground: var(--lift-deep-space); /* 19.7:1 */
   --popover: #ffffff; /* neutral white: the one value not in the brand kit */
   --popover-foreground: var(--lift-deep-space);
-  --primary: var(--lift-deep-violet); /* 8.0:1 as text */
+  --primary: var(--lift-deep-violet); /* 4.8:1 as text */
   --primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
-  --secondary: var(--lift-sunlit-amber);
-  --secondary-foreground: var(--lift-deep-space); /* 12.8:1 */
-  --muted: var(--lift-sunlit-amber);
-  --muted-foreground: var(--lift-orchid-dream); /* 6.5:1; 5.9:1 on muted */
-  --accent: var(--lift-sunlit-amber); /* hover surface */
-  --accent-foreground: var(--lift-deep-space); /* 12.8:1 */
-  --destructive: var(--lift-ember-red); /* 11.1:1 */
-  --border: var(--lift-sunlit-amber);
-  --input: var(--lift-sunlit-amber);
+  --secondary: var(--lift-starlight-gold);
+  --secondary-foreground: var(--lift-deep-space); /* 14.1:1 */
+  --muted: var(--lift-starlight-gold);
+  --muted-foreground: var(--lift-deep-violet); /* 4.8:1; 8.0:1 on muted */
+  --accent: var(--lift-starlight-gold); /* hover surface */
+  --accent-foreground: var(--lift-deep-space); /* 14.1:1 */
+  --destructive: var(--lift-ember-red); /* 6.7:1 */
+  --border: var(--lift-coral-kiss);
+  --input: var(--lift-coral-kiss);
   --ring: var(--lift-deep-violet);
   --chart-1: var(--lift-nebula-purple);
   --chart-2: var(--lift-coral-kiss);
@@ -402,13 +460,28 @@
   --sidebar-foreground: var(--lift-deep-space);
   --sidebar-primary: var(--lift-deep-violet);
   --sidebar-primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
-  --sidebar-accent: var(--lift-sunlit-amber);
+  --sidebar-accent: var(--lift-starlight-gold);
   --sidebar-accent-foreground: var(--lift-deep-space);
-  --sidebar-border: var(--lift-sunlit-amber);
+  --sidebar-border: var(--lift-coral-kiss);
   --sidebar-ring: var(--lift-deep-violet);
+  /* Tangerine is a bright page, so statuses and a few roles take their deep Void siblings here. */
+  --status-queued: var(--lift-void-indigo); /* Void Indigo */
+  --status-building: var(--lift-burnt-tangerine); /* Burnt Tangerine */
+  --status-deploying: var(--lift-abyssal-teal); /* Abyssal Teal */
+  --status-active: var(--lift-dark-green); /* Dark Green */
+  --status-failed: var(--lift-ember-red); /* Ember Red */
+  --status-canceled: var(--lift-shadow-grey); /* Shadow Grey */
+  --presence-1: var(--lift-midnight-nebula);
+  --presence-2: var(--lift-abyssal-teal);
+  --trigger-manual: var(--lift-void-indigo);
+  --log-runtime: var(--lift-abyssal-teal);
+  --source-you: var(--lift-deep-violet);
+  --source-database: var(--lift-abyssal-teal);
   --heading-weight: 700;
-  --heading-tracking: 0.04em;
+  --heading-tracking: 0.06em;
   --label-case: uppercase;
+  /* Zone headlines: Bricolage where Expressive belongs (General, Atmosphere), Space Grotesk elsewhere. */
+  --zone-display-font: var(--font-display);
 }
 
 /* Orbit: Void in dark mode. */
@@ -445,4 +518,17 @@
   --sidebar-accent-foreground: var(--lift-starlight-gold);
   --sidebar-border: var(--lift-dusk-rose);
   --sidebar-ring: var(--lift-tangerine-tide);
+  /* Back to the dark statuses and roles (Nebula's deep versions are for its bright page). */
+  --status-queued: var(--lift-moonlit-lilac);
+  --status-building: var(--lift-sunlit-amber);
+  --status-deploying: var(--lift-electric-cyan);
+  --status-active: var(--lift-pistachio);
+  --status-failed: var(--lift-rain-boots);
+  --status-canceled: var(--lift-atmospheric-blue);
+  --presence-1: var(--lift-coral-kiss);
+  --presence-2: var(--lift-electric-cyan);
+  --trigger-manual: var(--lift-moonlit-lilac);
+  --log-runtime: var(--lift-icy-aqua);
+  --source-you: var(--lift-moonlit-lilac);
+  --source-database: var(--lift-pistachio);
 }

@@ -97,7 +97,7 @@ const ZONES: {
   },
 ];
 
-/** Every colour in the brand kit, grouped as the kit groups them (each listed once). */
+/** Every palette in the brand kit, complete and in the kit's order. Shared colours appear in each. */
 const PALETTE: { title: string; colours: string[] }[] = [
   {
     title: "General · light",
@@ -110,7 +110,17 @@ const PALETTE: { title: string; colours: string[] }[] = [
       "cobalt-sky",
     ],
   },
-  { title: "General · dark", colours: ["deep-space", "aubergine", "electric-cyan"] },
+  {
+    title: "General · dark",
+    colours: [
+      "deep-space",
+      "aubergine",
+      "coral-kiss",
+      "nebula-purple",
+      "sunlit-amber",
+      "electric-cyan",
+    ],
+  },
   {
     title: "Ground · Morning",
     colours: [
@@ -120,6 +130,7 @@ const PALETTE: { title: string; colours: string[] }[] = [
       "moss-green",
       "pistachio",
       "rosy-brown",
+      "architectural-cream",
       "frosted-mint",
     ],
   },
@@ -130,26 +141,50 @@ const PALETTE: { title: string; colours: string[] }[] = [
       "heat-marker",
       "madder-lake",
       "claret",
+      "aubergine",
       "dark-green",
       "prussian-blue",
       "stormy-teal",
       "shadow-grey",
     ],
   },
-  { title: "Atmosphere · Day", colours: ["icy-aqua", "sky-blue", "iced-denim", "deep-azure"] },
+  {
+    title: "Atmosphere · Day",
+    colours: [
+      "cobalt-sky",
+      "electric-cyan",
+      "icy-aqua",
+      "sky-blue",
+      "iced-denim",
+      "frost",
+      "deep-azure",
+    ],
+  },
   {
     title: "Atmosphere · Twilight",
-    colours: ["vivid-indigo", "twilight-violet", "moonlit-lilac", "atmospheric-blue"],
+    colours: [
+      "vivid-indigo",
+      "twilight-violet",
+      "moonlit-lilac",
+      "deep-azure",
+      "atmospheric-blue",
+      "electric-cyan",
+      "shadow-grey",
+    ],
   },
   {
     title: "Orbit · Nebula",
     colours: [
+      "nebula-purple",
       "orchid-dream",
       "deep-violet",
+      "coral-kiss",
       "signal-red",
       "tangerine-tide",
+      "sunlit-amber",
       "starlight-gold",
       "electric-teal",
+      "deep-space",
     ],
   },
   {
@@ -162,7 +197,51 @@ const PALETTE: { title: string; colours: string[] }[] = [
       "ember-red",
       "burnt-tangerine",
       "aged-gold",
+      "starlight-gold",
       "abyssal-teal",
+      "deep-space",
+    ],
+  },
+];
+
+/** More of the palette at work, beyond surfaces and statuses. 3:1 against every surface. */
+const PALETTE_AT_WORK: { title: string; note: string; tokens: [string, string][] }[] = [
+  {
+    title: "Collaborator cursors",
+    note: "Each person in the live editor gets one, with their name on a flag.",
+    tokens: Array.from({ length: 8 }, (_, index) => [
+      `presence-${index + 1}`,
+      `Person ${index + 1}`,
+    ]),
+  },
+  {
+    title: "Deployment triggers",
+    note: "The icon on each row of the deployments list. Agent takes Atmosphere's colour, editor takes Ground's.",
+    tokens: ["push", "manual", "rollback", "agent", "editor", "cli"].map((name) => [
+      `trigger-${name}`,
+      name === "cli" ? "CLI" : title(name),
+    ]),
+  },
+  {
+    title: "Log streams",
+    note: "The faint label at the start of each log line.",
+    tokens: ["build", "deploy", "runtime", "system"].map((name) => [`log-${name}`, title(name)]),
+  },
+  {
+    title: "Variable sources",
+    note: "Who set each variable.",
+    tokens: [
+      ["source-you", "You"],
+      ["source-database", "Database"],
+      ["source-agent", "Agent"],
+    ],
+  },
+  {
+    title: "Databases",
+    note: "The type icon on database cards.",
+    tokens: [
+      ["db-postgres", "Postgres"],
+      ["db-redis", "Redis"],
     ],
   },
 ];
@@ -214,11 +293,21 @@ const MARK_PAIRS: [string, string][] = [
   ),
   ["ring", "background"],
   ["ring", "card"],
+  ...PALETTE_AT_WORK.flatMap((group) =>
+    group.tokens.flatMap(
+      ([token]) =>
+        [
+          [token, "background"],
+          [token, "card"],
+        ] as [string, string][],
+    ),
+  ),
 ];
 
 const TOKENS = [
   ...new Set([
     ...ROLE_GROUPS.flatMap((group) => group.tokens),
+    ...PALETTE_AT_WORK.flatMap((group) => group.tokens.map(([token]) => token)),
     ...TEXT_PAIRS.flat(),
     ...MARK_PAIRS.flat(),
     ...PALETTE.flatMap((group) => group.colours.map((name) => `lift-${name}`)),
@@ -337,6 +426,14 @@ const headingStyle: CSSProperties = {
   fontFamily: "var(--font-display)",
   fontWeight: "var(--heading-weight)" as CSSProperties["fontWeight"],
   letterSpacing: "var(--heading-tracking)",
+};
+
+/** A zone's headline: Bricolage in General and Atmosphere, Space Grotesk in Ground and Orbit. */
+const zoneDisplayStyle: CSSProperties = {
+  fontFamily: "var(--zone-display-font)",
+  fontWeight: "var(--heading-weight)" as CSSProperties["fontWeight"],
+  letterSpacing: "var(--heading-tracking)",
+  textTransform: "var(--label-case)" as CSSProperties["textTransform"],
 };
 
 const labelStyle: CSSProperties = {
@@ -520,7 +617,7 @@ function ZonePreview({ zone, mode }: { zone: (typeof ZONES)[number]; mode: Mode 
       <p className="font-mono text-muted-foreground text-xs">
         {zone.name} · {mode === "dark" ? zone.dark : zone.light}
       </p>
-      <p className="mt-2 text-[20px] leading-tight" style={headingStyle}>
+      <p className="mt-2 text-[22px] leading-tight" style={zoneDisplayStyle}>
         {zone.name}
       </p>
       <p className="mt-1 text-muted-foreground text-sm">{zone.where}</p>
@@ -632,7 +729,7 @@ export function StyleGuide() {
         <Section
           id="palette"
           title="Brand palette"
-          intro="Every colour in the brand kit, each once, under the first palette it belongs to. These are the --lift-* variables; the themes are built only from them."
+          intro="Every palette in the brand kit, complete, exactly as the kit groups them: 46 colours in all. These are the --lift-* variables; the themes are built only from them."
         >
           <div className="flex flex-col gap-8">
             {PALETTE.map((group) => (
@@ -663,7 +760,7 @@ export function StyleGuide() {
               <p className="font-mono text-muted-foreground text-xs" style={labelStyle}>
                 Showing
               </p>
-              <p className="mt-1 text-[28px] leading-tight" style={headingStyle}>
+              <p className="mt-1 text-[32px] leading-tight" style={zoneDisplayStyle}>
                 {zone?.name} · {zoneMode}
               </p>
               <p className="mt-1 max-w-prose text-muted-foreground">
@@ -694,9 +791,52 @@ export function StyleGuide() {
                 ))}
               </div>
               <p className="mt-4 text-muted-foreground text-sm">
-                Status colours are the same in every zone, one set per mode, so a status never
-                changes meaning.
+                Status colours keep the same hue in every zone, so a status never changes meaning.
+                Orbit's bright Tangerine page uses their deep Void siblings.
               </p>
+            </Section>
+
+            <Section
+              id="palette-at-work"
+              title="The palette at work"
+              intro="More jobs for the kit's colours beyond surfaces and statuses. Each comes in a light and a dark set, and is checked in the contrast table below."
+            >
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                {PALETTE_AT_WORK.map((group) => (
+                  <div
+                    key={group.title}
+                    className="min-w-0 rounded-xl border border-border bg-card p-4 text-card-foreground"
+                  >
+                    <SubHeading>{group.title}</SubHeading>
+                    <p className="-mt-2 mb-3 text-muted-foreground text-sm">{group.note}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {group.tokens.map(([token, label]) =>
+                        token.startsWith("presence-") ? (
+                          <span
+                            key={token}
+                            className="inline-flex items-center gap-1 rounded-sm rounded-bl-none px-1.5 py-0.5 font-medium text-xs"
+                            style={{ background: `var(--${token})`, color: "var(--background)" }}
+                          >
+                            {label}
+                          </span>
+                        ) : (
+                          <span
+                            key={token}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 font-mono text-xs"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="size-2.5 rounded-full"
+                              style={{ background: `var(--${token})` }}
+                            />
+                            {label}
+                          </span>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </Section>
 
             <Section
