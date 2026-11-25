@@ -1,0 +1,36 @@
+# CODEOWNERS
+# GitHub applies these top-to-bottom and the LAST matching line wins — so the
+# catch-all for Hakim goes first, and everyone else's more specific paths come
+# after it, overriding the default just for their own files. These paths are
+# copied from each person's own brief in docs/briefs/, not guessed.
+#
+# ⚠️ Replace every placeholder below with the real GitHub handle for that
+# person — none of these exist anywhere in the repo yet, so these are
+# unverified guesses at the username, not just the path.
+
+*                                    @hakim-placeholder
+
+# Louisa — brand, theme, landing page (docs/briefs/louisa-design.md)
+/apps/web/src/styles/theme.css       @Louisa-Lois
+/apps/web/src/app/(marketing)/       @Louisa-Lois
+
+# David — the CLI (docs/briefs/david-cli.md)
+/apps/cli/                           @david-placeholder
+
+# Lyse — AI test set and prompt content (docs/briefs/lyse-ai-evals.md)
+/evals/                              @lyse-placeholder
+/apps/agent/src/prompts/*.md         @lyse-placeholder
+
+# Esbert — quality, CI and delivery (docs/briefs/esbert-quality-delivery.md)
+/.github/                            @EsbertEfuaBorden
+/e2e/                                @EsbertEfuaBorden
+/docs/demo.md                        @EsbertEfuaBorden
+/docs/report/                        @EsbertEfuaBorden
+/packages/config/                    @EsbertEfuaBorden
+/biome.json                          @EsbertEfuaBorden
+/turbo.json                          @EsbertEfuaBorden
+/tsconfig.base.json                  @EsbertEfuaBorden
+/package.json                        @EsbertEfuaBorden
+
+# Hakim keeps the shared contracts explicitly, even under the catch-all above
+/packages/shared/                    @hakim-placeholder
