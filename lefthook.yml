@@ -1,0 +1,15 @@
+# lefthook.yml — pre-commit checks, kept fast on purpose.
+# Install: pnpm add -D lefthook -w && pnpm lefthook install
+# (also add "prepare": "lefthook install" to the root package.json so every
+# teammate's hooks install automatically on `pnpm install`)
+
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: "*.{js,jsx,ts,tsx,json,jsonc}"
+      run: pnpm biome check --write {staged_files}
+      stage_fixed: true
+    typecheck-changed:
+      # Only typechecks packages touched since the last commit — not the whole repo.
+      run: pnpm turbo run typecheck --filter='...[HEAD^1]'

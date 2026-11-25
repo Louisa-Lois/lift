@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  TURBO_TELEMETRY_DISABLED: "1"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  checks:
+    name: lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: lift
+          POSTGRES_PASSWORD: lift
+          POSTGRES_DB: lift
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U lift -d lift"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    # These two match the defaults already baked into packages/db/src/testing.ts and
+    # apps/api/src/env.ts (the same ones `pnpm stack:up` uses locally), so no app code
+    # needs to know it's running in CI versus against the local Docker stack.
+    env:
+      DATABASE_URL: postgres://lift:lift@localhost:5432/lift
+      REDIS_URL: redis://localhost:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+  gitleaks:
+    name: secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
