@@ -52,6 +52,11 @@ describe("theme.css", () => {
     }
   });
 
+  it("gives headings the display font", () => {
+    expect(declared(theme, ":root").has("--font-display")).toBe(true);
+    expect(globals).toContain("--font-heading: var(--font-display);");
+  });
+
   it("is mapped to a Tailwind colour for every status", () => {
     for (const status of STATUSES) {
       expect(globals).toContain(`--color-status-${status}: var(--status-${status});`);

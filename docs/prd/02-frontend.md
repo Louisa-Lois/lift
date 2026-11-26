@@ -54,11 +54,11 @@
 - **Theme:** dark by default (light is on the cut list). Background `zinc-950`, raised surfaces `zinc-900`, borders `zinc-800`, primary text `zinc-100`, secondary text `zinc-400`.
 - **Accent:** one colour, `violet-500`, for primary buttons, focus rings and selection only.
 - **Status colours:** `queued` zinc-400 · `building` amber-400 with a pulsing dot · `deploying` sky-400 pulsing · `active` emerald-500 · `failed` red-500 · `canceled` and `superseded` zinc-500. Always pair the colour with a text label.
-- **Type:** Geist Sans for the interface, Geist Mono for logs, IDs and code (the `geist` package). 14 px base, 12.5 px logs.
+- **Type:** Geist Sans for the interface, Geist Mono for logs, IDs and code. 14 px base, 12.5 px logs.
 - **Shape and space:** 8 px radius, 4 px spacing scale, 36 px table rows, 1 px borders instead of shadows.
 - **Components:** shadcn/ui throughout: Button, Card, Sheet, Tabs, Table, Dialog, DropdownMenu, Command, Tooltip, Badge, Skeleton, and sonner for toasts.
 
-These are starting values. Louisa owns them in `src/styles/theme.css`, along with the status variables `--status-queued` to `--status-canceled`. Components use only the theme's classes and variables, never palette classes or hex values, so her theme restyles every screen.
+These are starting values. Louisa owns them in `src/styles/theme.css`, along with the status variables `--status-queued` to `--status-canceled`. Since UI-01 her brand theme replaces them, with fonts (Inter, JetBrains Mono and Space Grotesk for headings) self-hosted in `public/brand/fonts`, and `/styleguide` shows every value. Components use only the theme's classes and variables, never palette classes or hex values, so her theme restyles every screen.
 
 **Build these shared components first:** `AppShell` (top bar with logo, project switcher, ⌘K hint, user menu) · `StatusBadge` · `ServiceCard` · `DatabaseCard` · `DeploymentRow` · `LogViewer` · `Timeline` · `EnvTable` · `CopyButton` · `EmptyState` · `ConfirmDialog` · `DiffView` (Monaco diff editor) · `PresenceAvatars`.
 
