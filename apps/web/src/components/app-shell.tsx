@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Wordmark } from "@/components/wordmark";
 import { api } from "@/lib/api";
 import { useMe } from "@/lib/hooks/use-me";
 import { cn } from "@/lib/utils";
@@ -28,8 +29,8 @@ export function AppShell({ children, wide = false }: { children: ReactNode; wide
     <div className={cn("flex min-h-dvh flex-col", wide && "h-dvh")}>
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
         <div className={cn("mx-auto flex h-14 items-center gap-6 px-6", !wide && "max-w-6xl")}>
-          <Link href="/projects" className="font-heading font-semibold text-base tracking-tight">
-            Lift
+          <Link href="/projects" className="shrink-0">
+            <Wordmark className="h-8" />
           </Link>
           <nav aria-label="Main" className="flex items-center gap-4 text-muted-foreground">
             <Link href="/projects" className="transition-colors hover:text-foreground">

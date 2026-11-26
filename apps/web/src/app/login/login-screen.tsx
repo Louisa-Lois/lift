@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { LoginMessage } from "@/components/login-message";
 import { Button } from "@/components/ui/button";
+import { Wordmark } from "@/components/wordmark";
 import { api } from "@/lib/api";
 import { safeNext } from "@/lib/auth";
 import { useMe } from "@/lib/hooks/use-me";
@@ -24,7 +25,9 @@ export function LoginScreen() {
     <main className="flex min-h-dvh items-center justify-center px-6">
       <div className="flex w-full max-w-sm flex-col gap-6">
         <div className="flex flex-col gap-2">
-          <h1 className="font-heading font-semibold text-2xl tracking-tight">Lift</h1>
+          <h1>
+            <Wordmark className="h-10" />
+          </h1>
           <p className="text-muted-foreground">
             Deploy from GitHub, watch it run, and let the AI fix it.
           </p>

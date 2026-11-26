@@ -12,8 +12,9 @@
 
 @theme inline {
   /* --font-sans and --font-mono need no mapping: theme.css sets them on :root, outside any
-     layer, which overrides Tailwind's defaults for font-sans and font-mono. */
-  --font-heading: var(--font-sans);
+     layer, which overrides Tailwind's defaults for font-sans and font-mono. Headings (the
+     font-heading class) take theme.css's display font. */
+  --font-heading: var(--font-display);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
