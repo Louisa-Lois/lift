@@ -1,102 +1,534 @@
 /*
- * Lift's theme: every colour, font and radius the dashboard uses. Louisa owns this file
+ * Lift's theme, from Louisa's brand kit (Ground → Atmosphere → Orbit). Louisa owns this file
  * (docs/briefs/louisa-design.md). Components read these variables only through theme classes such
  * as bg-background, text-muted-foreground or bg-status-active, never palette classes or hex values,
  * so changing a value here restyles every screen.
  *
- * Starting values from docs/prd/02-frontend.md ("Tokens"), as Tailwind's palette in oklch. Dark
- * is the default: the root layout puts class="dark" on <html>. :root also holds a light set for
- * when light mode lands (it is on the cut list). The names follow shadcn/ui, plus Lift's six
- * status colours; superseded deployments use --status-canceled.
+ * How it's laid out:
+ * 1. --lift-*: every colour in the brand kit, by name. Roles below point at these, so changing a
+ *    palette colour here changes it everywhere it's used.
+ * 2. :root and .dark: the General theme, light and dark, for the app shell, Projects, sign-in and
+ *    the landing page. Dark is the default: the root layout puts class="dark" on <html>.
+ * 3. .zone-ground (the editor), .zone-atmosphere (the AI screens) and .zone-orbit (deployments,
+ *    logs and services): each remaps the same roles to its own palette. Put the class on a screen's
+ *    outer element; light or dark follows <html>. Ground is Morning/Sunset, Atmosphere Day/Twilight,
+ *    Orbit Nebula/Void.
+ * 4. Status colours keep the same hue in every zone, so a status never changes meaning: one set for
+ *    light mode, one for dark; Orbit's bright Tangerine page uses their deep Void siblings. Always
+ *    shown next to the status name.
+ * 4b. More roles that put the palette to work: --presence-1..8 (collaborator cursors), --trigger-*,
+ *    --log-*, --source-* and --db-*, each checked at 3:1 or more against every zone's surfaces.
+ * 5. Type personality per zone: --heading-weight, --heading-tracking, --label-case and
+ *    --zone-display-font.
+ *
+ * Every text pair meets WCAG AA (4.5:1) and every status dot and focus ring 3:1, in every zone and
+ * both modes; the ratios are noted beside them, and /styleguide checks them live. Where a kit colour
+ * can't pass in a role, another kit colour fills that role: dark-mode buttons use Moonlit Lilac with
+ * dark text, because Nebula Purple is only 3:1 as text on dark surfaces.
  */
 
-:root {
-  --radius: 0.5rem;
-  /* --font-geist-sans and --font-geist-mono are set on <html> by the geist package. */
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+/* Fonts are served from public/brand/fonts: the Content-Security-Policy (src/lib/csp.ts) only
+   allows fonts from this origin. All four are variable fonts under the SIL Open Font License. */
+@font-face {
+  font-family: "Inter";
+  src: url("/brand/fonts/inter-latin-wght-normal.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/brand/fonts/space-grotesk-latin-wght-normal.woff2") format("woff2");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/brand/fonts/jetbrains-mono-latin-wght-normal.woff2") format("woff2");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/brand/fonts/bricolage-grotesque-latin-wght-normal.woff2") format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
 
-  /* Light (not in use yet). */
-  --background: oklch(100% 0 0);
-  --foreground: oklch(14.1% 0.005 285.823);
-  --card: oklch(100% 0 0);
-  --card-foreground: oklch(14.1% 0.005 285.823);
-  --popover: oklch(100% 0 0);
-  --popover-foreground: oklch(14.1% 0.005 285.823);
-  --primary: oklch(54.1% 0.281 293.009);
-  --primary-foreground: oklch(98.5% 0 0);
-  --secondary: oklch(96.7% 0.001 286.375);
-  --secondary-foreground: oklch(21% 0.006 285.885);
-  --muted: oklch(96.7% 0.001 286.375);
-  --muted-foreground: oklch(44.2% 0.017 285.786);
-  --accent: oklch(96.7% 0.001 286.375);
-  --accent-foreground: oklch(21% 0.006 285.885);
-  --destructive: oklch(57.7% 0.245 27.325);
-  --border: oklch(92% 0.004 286.32);
-  --input: oklch(92% 0.004 286.32);
-  --ring: oklch(60.6% 0.25 292.717);
-  --chart-1: oklch(54.1% 0.281 293.009);
-  --chart-2: oklch(58.8% 0.158 241.966);
-  --chart-3: oklch(59.6% 0.145 163.225);
-  --chart-4: oklch(66.6% 0.179 58.318);
-  --chart-5: oklch(57.7% 0.245 27.325);
-  --sidebar: oklch(98.5% 0 0);
-  --sidebar-foreground: oklch(14.1% 0.005 285.823);
-  --sidebar-primary: oklch(54.1% 0.281 293.009);
-  --sidebar-primary-foreground: oklch(98.5% 0 0);
-  --sidebar-accent: oklch(96.7% 0.001 286.375);
-  --sidebar-accent-foreground: oklch(21% 0.006 285.885);
-  --sidebar-border: oklch(92% 0.004 286.32);
-  --sidebar-ring: oklch(60.6% 0.25 292.717);
-  --status-queued: oklch(55.2% 0.016 285.938);
-  --status-building: oklch(66.6% 0.179 58.318);
-  --status-deploying: oklch(58.8% 0.158 241.966);
-  --status-active: oklch(59.6% 0.145 163.225);
-  --status-failed: oklch(57.7% 0.245 27.325);
-  --status-canceled: oklch(70.5% 0.015 286.067);
+:root {
+  --radius: 0.75rem;
+  /* Body and interface. */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  /* Code, logs, the CLI, IDs. */
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  /* Display and headings. */
+  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+  /* Brand moments only: the landing hero and empty states, mostly in General and Atmosphere. */
+  --font-expressive: "Bricolage Grotesque", "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+
+  /* The brand kit: 46 colours. */
+  /* General · light (a colour shared with an earlier palette is listed there) */
+  --lift-frost: #e6f1fa; /* Frost */
+  --lift-architectural-cream: #e2dac2; /* Architectural Cream */
+  --lift-coral-kiss: #e75480; /* Coral Kiss */
+  --lift-nebula-purple: #7a3fd1; /* Nebula Purple */
+  --lift-sunlit-amber: #ffc857; /* Sunlit Amber */
+  --lift-cobalt-sky: #2e7fe0; /* Cobalt Sky */
+  /* General · dark (a colour shared with an earlier palette is listed there) */
+  --lift-deep-space: #0a0a16; /* Deep Space */
+  --lift-aubergine: #26121b; /* Aubergine */
+  --lift-electric-cyan: #19c3e6; /* Electric Cyan */
+  /* Ground · Morning (a colour shared with an earlier palette is listed there) */
+  --lift-linen-beige: #f2e8d8; /* Linen Beige */
+  --lift-dawn-lavender: #d9c9e8; /* Dawn Lavender */
+  --lift-sky-wash: #bfe0e8; /* Sky Wash */
+  --lift-moss-green: #839958; /* Moss Green */
+  --lift-pistachio: #b9c255; /* Pistachio */
+  --lift-rosy-brown: #d3968c; /* Rosy Brown */
+  --lift-frosted-mint: #e4ffe6; /* Frosted Mint */
+  /* Ground · Sunset (a colour shared with an earlier palette is listed there) */
+  --lift-rain-boots: #fb6734; /* Rain Boots */
+  --lift-heat-marker: #f39120; /* Heat Marker */
+  --lift-madder-lake: #ce3737; /* Madder Lake */
+  --lift-claret: #6b1a34; /* Claret */
+  --lift-dark-green: #0a3323; /* Dark Green */
+  --lift-prussian-blue: #1b3854; /* Prussian Blue */
+  --lift-stormy-teal: #127475; /* Stormy Teal */
+  --lift-shadow-grey: #272838; /* Shadow Grey */
+  /* Atmosphere · Day (a colour shared with an earlier palette is listed there) */
+  --lift-icy-aqua: #b1e4e8; /* Icy Aqua */
+  --lift-sky-blue: #8dc9e8; /* Sky Blue */
+  --lift-iced-denim: #5798d7; /* Iced Denim */
+  --lift-deep-azure: #1b4f9c; /* Deep Azure */
+  /* Atmosphere · Twilight (a colour shared with an earlier palette is listed there) */
+  --lift-vivid-indigo: #3e4be0; /* Vivid Indigo */
+  --lift-twilight-violet: #6a4fc2; /* Twilight Violet */
+  --lift-moonlit-lilac: #8b7fd6; /* Moonlit Lilac */
+  --lift-atmospheric-blue: #668baf; /* Atmospheric Blue */
+  /* Orbit · Nebula (a colour shared with an earlier palette is listed there) */
+  --lift-orchid-dream: #6c2e7b; /* Orchid Dream */
+  --lift-deep-violet: #4b1d91; /* Deep Violet */
+  --lift-signal-red: #e8384a; /* Signal Red */
+  --lift-tangerine-tide: #ff8a5b; /* Tangerine Tide */
+  --lift-starlight-gold: #f2d98a; /* Starlight Gold */
+  --lift-electric-teal: #11878d; /* Electric Teal */
+  /* Orbit · Void (a colour shared with an earlier palette is listed there) */
+  --lift-midnight-nebula: #2b1649; /* Midnight Nebula */
+  --lift-shadow-orchid: #311637; /* Shadow Orchid */
+  --lift-void-indigo: #220d41; /* Void Indigo */
+  --lift-dusk-rose: #451926; /* Dusk Rose */
+  --lift-ember-red: #461116; /* Ember Red */
+  --lift-burnt-tangerine: #472719; /* Burnt Tangerine */
+  --lift-aged-gold: #473818; /* Aged Gold */
+  --lift-abyssal-teal: #083d3f; /* Abyssal Teal */
+
+  /* Logo gradients: the rocket's body and flame. */
+  --lift-gradient-rocket: linear-gradient(
+    180deg,
+    var(--lift-nebula-purple),
+    var(--lift-coral-kiss)
+  );
+  --lift-gradient-flame: linear-gradient(
+    180deg,
+    var(--lift-tangerine-tide),
+    var(--lift-sunlit-amber)
+  );
+
+  /* General · light. */
+  --background: var(--lift-frost);
+  --foreground: var(--lift-deep-space); /* 17.2:1 */
+  --card: #ffffff; /* neutral white: the one value not in the brand kit */
+  --card-foreground: var(--lift-deep-space); /* 19.7:1 */
+  --popover: #ffffff; /* neutral white: the one value not in the brand kit */
+  --popover-foreground: var(--lift-deep-space);
+  --primary: var(--lift-nebula-purple); /* 5.3:1 as text */
+  --primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
+  --secondary: var(--lift-architectural-cream);
+  --secondary-foreground: var(--lift-deep-space); /* 14.1:1 */
+  --muted: var(--lift-architectural-cream);
+  --muted-foreground: var(--lift-deep-azure); /* 6.9:1; 5.7:1 on muted */
+  --accent: var(--lift-architectural-cream); /* hover surface */
+  --accent-foreground: var(--lift-deep-space); /* 14.1:1 */
+  --destructive: var(--lift-claret); /* 10.1:1 */
+  --border: var(--lift-dawn-lavender);
+  --input: var(--lift-dawn-lavender);
+  --ring: var(--lift-nebula-purple);
+  --chart-1: var(--lift-nebula-purple);
+  --chart-2: var(--lift-coral-kiss);
+  --chart-3: var(--lift-cobalt-sky);
+  --chart-4: var(--lift-stormy-teal);
+  --chart-5: var(--lift-heat-marker);
+  --sidebar: #ffffff; /* neutral white: the one value not in the brand kit */
+  --sidebar-foreground: var(--lift-deep-space);
+  --sidebar-primary: var(--lift-nebula-purple);
+  --sidebar-primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
+  --sidebar-accent: var(--lift-architectural-cream);
+  --sidebar-accent-foreground: var(--lift-deep-space);
+  --sidebar-border: var(--lift-dawn-lavender);
+  --sidebar-ring: var(--lift-nebula-purple);
+  --status-queued: var(--lift-twilight-violet); /* Twilight Violet */
+  --status-building: var(--lift-aged-gold); /* Aged Gold */
+  --status-deploying: var(--lift-stormy-teal); /* Stormy Teal */
+  --status-active: var(--lift-dark-green); /* Dark Green */
+  --status-failed: var(--lift-madder-lake); /* Madder Lake */
+  --status-canceled: var(--lift-shadow-grey); /* Shadow Grey */
+  /* More of the palette at work: collaborator cursors, deployment triggers, log streams, variable sources, databases. */
+  --presence-1: var(--lift-nebula-purple);
+  --presence-2: var(--lift-stormy-teal);
+  --presence-3: var(--lift-deep-azure);
+  --presence-4: var(--lift-claret);
+  --presence-5: var(--lift-orchid-dream);
+  --presence-6: var(--lift-dark-green);
+  --presence-7: var(--lift-burnt-tangerine);
+  --presence-8: var(--lift-deep-violet);
+  --trigger-push: var(--lift-prussian-blue);
+  --trigger-manual: var(--lift-twilight-violet);
+  --trigger-rollback: var(--lift-burnt-tangerine);
+  --trigger-agent: var(--lift-deep-azure);
+  --trigger-editor: var(--lift-dark-green);
+  --trigger-cli: var(--lift-orchid-dream);
+  --log-build: var(--lift-aged-gold);
+  --log-deploy: var(--lift-deep-violet);
+  --log-runtime: var(--lift-stormy-teal);
+  --log-system: var(--lift-shadow-grey);
+  --source-you: var(--lift-nebula-purple);
+  --source-database: var(--lift-stormy-teal);
+  --source-agent: var(--lift-deep-azure);
+  --db-postgres: var(--lift-deep-azure);
+  --db-redis: var(--lift-claret);
+  --heading-weight: 700;
+  --heading-tracking: -0.01em;
+  --label-case: none;
+  /* Zone headlines: Bricolage where Expressive belongs (General, Atmosphere), Space Grotesk elsewhere. */
+  --zone-display-font: var(--font-expressive);
 }
 
 .dark {
-  /* zinc-950 background, zinc-900 raised surfaces, zinc-800 borders, zinc-100 and zinc-400 text. */
-  --background: oklch(14.1% 0.005 285.823);
-  --foreground: oklch(96.7% 0.001 286.375);
-  --card: oklch(21% 0.006 285.885);
-  --card-foreground: oklch(96.7% 0.001 286.375);
-  --popover: oklch(21% 0.006 285.885);
-  --popover-foreground: oklch(96.7% 0.001 286.375);
-  /* violet-600 rather than the PRD's violet-500, so white button text passes WCAG AA (5.7:1). */
-  --primary: oklch(54.1% 0.281 293.009);
-  --primary-foreground: oklch(98.5% 0 0);
-  --secondary: oklch(27.4% 0.006 286.033);
-  --secondary-foreground: oklch(96.7% 0.001 286.375);
-  --muted: oklch(27.4% 0.006 286.033);
-  --muted-foreground: oklch(70.5% 0.015 286.067);
-  --accent: oklch(27.4% 0.006 286.033);
-  --accent-foreground: oklch(96.7% 0.001 286.375);
-  --destructive: oklch(70.4% 0.191 22.216);
-  --border: oklch(27.4% 0.006 286.033);
-  --input: oklch(37% 0.013 285.805);
-  /* The one accent colour, violet-500, for focus rings and selection. */
-  --ring: oklch(60.6% 0.25 292.717);
-  --chart-1: oklch(60.6% 0.25 292.717);
-  --chart-2: oklch(74.6% 0.16 232.661);
-  --chart-3: oklch(69.6% 0.17 162.48);
-  --chart-4: oklch(82.8% 0.189 84.429);
-  --chart-5: oklch(70.4% 0.191 22.216);
-  --sidebar: oklch(21% 0.006 285.885);
-  --sidebar-foreground: oklch(96.7% 0.001 286.375);
-  --sidebar-primary: oklch(54.1% 0.281 293.009);
-  --sidebar-primary-foreground: oklch(98.5% 0 0);
-  --sidebar-accent: oklch(27.4% 0.006 286.033);
-  --sidebar-accent-foreground: oklch(96.7% 0.001 286.375);
-  --sidebar-border: oklch(27.4% 0.006 286.033);
-  --sidebar-ring: oklch(60.6% 0.25 292.717);
-  /* queued zinc-400, building amber-400, deploying sky-400, active emerald-500, failed red-500,
-     canceled (and superseded) zinc-500. Always shown next to the status name. */
-  --status-queued: oklch(70.5% 0.015 286.067);
-  --status-building: oklch(82.8% 0.189 84.429);
-  --status-deploying: oklch(74.6% 0.16 232.661);
-  --status-active: oklch(69.6% 0.17 162.48);
-  --status-failed: oklch(63.7% 0.237 25.331);
-  --status-canceled: oklch(55.2% 0.016 285.938);
+  /* General · dark. */
+  --background: var(--lift-deep-space);
+  --foreground: var(--lift-frost); /* 17.2:1 */
+  --card: var(--lift-aubergine);
+  --card-foreground: var(--lift-frost); /* 15.5:1 */
+  --popover: var(--lift-aubergine);
+  --popover-foreground: var(--lift-frost);
+  --primary: var(--lift-moonlit-lilac); /* 5.7:1 as text */
+  --primary-foreground: var(--lift-deep-space); /* 5.7:1 */
+  --secondary: var(--lift-shadow-grey);
+  --secondary-foreground: var(--lift-frost); /* 12.7:1 */
+  --muted: var(--lift-shadow-grey);
+  --muted-foreground: var(--lift-sky-blue); /* 10.9:1; 8.1:1 on muted */
+  --accent: var(--lift-shadow-grey); /* hover surface */
+  --accent-foreground: var(--lift-frost); /* 12.7:1 */
+  --destructive: var(--lift-tangerine-tide); /* 8.5:1; 5.3:1 as a button on a card */
+  --border: var(--lift-shadow-grey);
+  --input: var(--lift-shadow-grey);
+  --ring: var(--lift-moonlit-lilac);
+  --chart-1: var(--lift-moonlit-lilac);
+  --chart-2: var(--lift-coral-kiss);
+  --chart-3: var(--lift-electric-cyan);
+  --chart-4: var(--lift-sunlit-amber);
+  --chart-5: var(--lift-pistachio);
+  --sidebar: var(--lift-aubergine);
+  --sidebar-foreground: var(--lift-frost);
+  --sidebar-primary: var(--lift-moonlit-lilac);
+  --sidebar-primary-foreground: var(--lift-deep-space);
+  --sidebar-accent: var(--lift-shadow-grey);
+  --sidebar-accent-foreground: var(--lift-frost);
+  --sidebar-border: var(--lift-shadow-grey);
+  --sidebar-ring: var(--lift-moonlit-lilac);
+  --status-queued: var(--lift-moonlit-lilac); /* Moonlit Lilac */
+  --status-building: var(--lift-sunlit-amber); /* Sunlit Amber */
+  --status-deploying: var(--lift-electric-cyan); /* Electric Cyan */
+  --status-active: var(--lift-pistachio); /* Pistachio */
+  --status-failed: var(--lift-rain-boots); /* Rain Boots */
+  --status-canceled: var(--lift-atmospheric-blue); /* Atmospheric Blue */
+  /* More of the palette at work: collaborator cursors, deployment triggers, log streams, variable sources, databases. */
+  --presence-1: var(--lift-coral-kiss);
+  --presence-2: var(--lift-electric-cyan);
+  --presence-3: var(--lift-sunlit-amber);
+  --presence-4: var(--lift-pistachio);
+  --presence-5: var(--lift-moonlit-lilac);
+  --presence-6: var(--lift-tangerine-tide);
+  --presence-7: var(--lift-sky-blue);
+  --presence-8: var(--lift-rosy-brown);
+  --trigger-push: var(--lift-sky-blue);
+  --trigger-manual: var(--lift-moonlit-lilac);
+  --trigger-rollback: var(--lift-heat-marker);
+  --trigger-agent: var(--lift-electric-cyan);
+  --trigger-editor: var(--lift-pistachio);
+  --trigger-cli: var(--lift-rosy-brown);
+  --log-build: var(--lift-sunlit-amber);
+  --log-deploy: var(--lift-coral-kiss);
+  --log-runtime: var(--lift-icy-aqua);
+  --log-system: var(--lift-atmospheric-blue);
+  --source-you: var(--lift-moonlit-lilac);
+  --source-database: var(--lift-pistachio);
+  --source-agent: var(--lift-electric-cyan);
+  --db-postgres: var(--lift-sky-blue);
+  --db-redis: var(--lift-rain-boots);
+}
+
+/* A zone paints its own surface, since <body> keeps General's. */
+.zone-ground,
+.zone-atmosphere,
+.zone-orbit {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+/* Ground (the editor): Morning in light mode. */
+.zone-ground {
+  --background: var(--lift-linen-beige);
+  --foreground: var(--lift-dark-green); /* 11.5:1 */
+  --card: var(--lift-frosted-mint);
+  --card-foreground: var(--lift-dark-green); /* 13.1:1 */
+  --popover: var(--lift-frosted-mint);
+  --popover-foreground: var(--lift-dark-green);
+  --primary: var(--lift-stormy-teal); /* 4.6:1 as text */
+  --primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
+  --secondary: var(--lift-architectural-cream);
+  --secondary-foreground: var(--lift-dark-green); /* 10.0:1 */
+  --muted: var(--lift-architectural-cream);
+  --muted-foreground: var(--lift-prussian-blue); /* 9.9:1; 8.6:1 on muted */
+  --accent: var(--lift-dawn-lavender); /* hover surface */
+  --accent-foreground: var(--lift-dark-green); /* 8.9:1 */
+  --destructive: var(--lift-claret); /* 9.5:1 */
+  --border: var(--lift-dawn-lavender);
+  --input: var(--lift-sky-wash);
+  --ring: var(--lift-stormy-teal);
+  --chart-1: var(--lift-moss-green);
+  --chart-2: var(--lift-stormy-teal);
+  --chart-3: var(--lift-rosy-brown);
+  --chart-4: var(--lift-prussian-blue);
+  --chart-5: var(--lift-madder-lake);
+  --sidebar: var(--lift-frosted-mint);
+  --sidebar-foreground: var(--lift-dark-green);
+  --sidebar-primary: var(--lift-stormy-teal);
+  --sidebar-primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
+  --sidebar-accent: var(--lift-dawn-lavender);
+  --sidebar-accent-foreground: var(--lift-dark-green);
+  --sidebar-border: var(--lift-dawn-lavender);
+  --sidebar-ring: var(--lift-stormy-teal);
+  --heading-weight: 500;
+  --heading-tracking: 0;
+  --label-case: none;
+  /* Zone headlines: Bricolage where Expressive belongs (General, Atmosphere), Space Grotesk elsewhere. */
+  --zone-display-font: var(--font-display);
+}
+
+/* Ground: Sunset in dark mode. */
+.dark .zone-ground,
+.zone-ground.dark {
+  --background: var(--lift-aubergine);
+  --foreground: var(--lift-linen-beige); /* 14.6:1 */
+  --card: var(--lift-shadow-grey);
+  --card-foreground: var(--lift-linen-beige); /* 12.0:1 */
+  --popover: var(--lift-shadow-grey);
+  --popover-foreground: var(--lift-linen-beige);
+  --primary: var(--lift-heat-marker); /* 7.5:1 as text */
+  --primary-foreground: var(--lift-aubergine); /* 7.5:1 */
+  --secondary: var(--lift-prussian-blue);
+  --secondary-foreground: var(--lift-linen-beige); /* 9.9:1 */
+  --muted: var(--lift-prussian-blue);
+  --muted-foreground: var(--lift-rosy-brown); /* 7.2:1; 4.9:1 on muted */
+  --accent: var(--lift-claret); /* hover surface */
+  --accent-foreground: var(--lift-linen-beige); /* 9.5:1 */
+  --destructive: var(--lift-rain-boots); /* 6.0:1 */
+  --border: var(--lift-claret);
+  --input: var(--lift-claret);
+  --ring: var(--lift-heat-marker);
+  --chart-1: var(--lift-rain-boots);
+  --chart-2: var(--lift-heat-marker);
+  --chart-3: var(--lift-stormy-teal);
+  --chart-4: var(--lift-rosy-brown);
+  --chart-5: var(--lift-pistachio);
+  --sidebar: var(--lift-shadow-grey);
+  --sidebar-foreground: var(--lift-linen-beige);
+  --sidebar-primary: var(--lift-heat-marker);
+  --sidebar-primary-foreground: var(--lift-aubergine);
+  --sidebar-accent: var(--lift-claret);
+  --sidebar-accent-foreground: var(--lift-linen-beige);
+  --sidebar-border: var(--lift-claret);
+  --sidebar-ring: var(--lift-heat-marker);
+}
+
+/* Atmosphere (the AI): Day in light mode. */
+.zone-atmosphere {
+  --background: var(--lift-icy-aqua);
+  --foreground: var(--lift-deep-space); /* 14.2:1 */
+  --card: #ffffff; /* neutral white: the one value not in the brand kit */
+  --card-foreground: var(--lift-deep-space); /* 19.7:1 */
+  --popover: #ffffff; /* neutral white: the one value not in the brand kit */
+  --popover-foreground: var(--lift-deep-space);
+  --primary: var(--lift-deep-azure); /* 5.7:1 as text */
+  --primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
+  --secondary: var(--lift-frost);
+  --secondary-foreground: var(--lift-deep-space); /* 17.2:1 */
+  --muted: var(--lift-frost);
+  --muted-foreground: var(--lift-deep-azure); /* 5.7:1; 6.9:1 on muted */
+  --accent: var(--lift-sky-wash); /* hover surface */
+  --accent-foreground: var(--lift-deep-space); /* 14.1:1 */
+  --destructive: var(--lift-claret); /* 8.3:1 */
+  --border: var(--lift-sky-blue);
+  --input: var(--lift-sky-blue);
+  --ring: var(--lift-deep-azure);
+  --chart-1: var(--lift-cobalt-sky);
+  --chart-2: var(--lift-electric-cyan);
+  --chart-3: var(--lift-deep-azure);
+  --chart-4: var(--lift-iced-denim);
+  --chart-5: var(--lift-twilight-violet);
+  --sidebar: #ffffff; /* neutral white: the one value not in the brand kit */
+  --sidebar-foreground: var(--lift-deep-space);
+  --sidebar-primary: var(--lift-deep-azure);
+  --sidebar-primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
+  --sidebar-accent: var(--lift-sky-wash);
+  --sidebar-accent-foreground: var(--lift-deep-space);
+  --sidebar-border: var(--lift-sky-blue);
+  --sidebar-ring: var(--lift-deep-azure);
+  --heading-weight: 600;
+  --heading-tracking: 0.01em;
+  --label-case: none;
+  /* Zone headlines: Bricolage where Expressive belongs (General, Atmosphere), Space Grotesk elsewhere. */
+  --zone-display-font: var(--font-expressive);
+}
+
+/* Atmosphere: Twilight in dark mode. */
+.dark .zone-atmosphere,
+.zone-atmosphere.dark {
+  --background: var(--lift-shadow-grey);
+  --foreground: var(--lift-frost); /* 12.7:1 */
+  --card: var(--lift-prussian-blue);
+  --card-foreground: var(--lift-frost); /* 10.5:1 */
+  --popover: var(--lift-prussian-blue);
+  --popover-foreground: var(--lift-frost);
+  --primary: var(--lift-electric-cyan); /* 6.9:1 as text */
+  --primary-foreground: var(--lift-shadow-grey); /* 6.9:1 */
+  --secondary: var(--lift-prussian-blue);
+  --secondary-foreground: var(--lift-frost); /* 10.5:1 */
+  --muted: var(--lift-prussian-blue);
+  --muted-foreground: var(--lift-icy-aqua); /* 10.5:1; 8.7:1 on muted */
+  --accent: var(--lift-deep-azure); /* hover surface */
+  --accent-foreground: var(--lift-frost); /* 6.9:1 */
+  --destructive: var(--lift-tangerine-tide); /* 6.2:1 */
+  --border: var(--lift-deep-azure);
+  --input: var(--lift-deep-azure);
+  --ring: var(--lift-moonlit-lilac);
+  --chart-1: var(--lift-electric-cyan);
+  --chart-2: var(--lift-moonlit-lilac);
+  --chart-3: var(--lift-sky-blue);
+  --chart-4: var(--lift-iced-denim);
+  --chart-5: var(--lift-icy-aqua);
+  --sidebar: var(--lift-prussian-blue);
+  --sidebar-foreground: var(--lift-frost);
+  --sidebar-primary: var(--lift-electric-cyan);
+  --sidebar-primary-foreground: var(--lift-shadow-grey);
+  --sidebar-accent: var(--lift-deep-azure);
+  --sidebar-accent-foreground: var(--lift-frost);
+  --sidebar-border: var(--lift-deep-azure);
+  --sidebar-ring: var(--lift-moonlit-lilac);
+}
+
+/* Orbit (deployments, logs, services): Nebula in light mode. */
+.zone-orbit {
+  --background: var(--lift-tangerine-tide);
+  --foreground: var(--lift-deep-space); /* 8.5:1 */
+  --card: #ffffff; /* neutral white: the one value not in the brand kit */
+  --card-foreground: var(--lift-deep-space); /* 19.7:1 */
+  --popover: #ffffff; /* neutral white: the one value not in the brand kit */
+  --popover-foreground: var(--lift-deep-space);
+  --primary: var(--lift-deep-violet); /* 4.8:1 as text */
+  --primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
+  --secondary: var(--lift-starlight-gold);
+  --secondary-foreground: var(--lift-deep-space); /* 14.1:1 */
+  --muted: var(--lift-starlight-gold);
+  --muted-foreground: var(--lift-deep-violet); /* 4.8:1; 8.0:1 on muted */
+  --accent: var(--lift-starlight-gold); /* hover surface */
+  --accent-foreground: var(--lift-deep-space); /* 14.1:1 */
+  --destructive: var(--lift-ember-red); /* 6.7:1 */
+  --border: var(--lift-coral-kiss);
+  --input: var(--lift-coral-kiss);
+  --ring: var(--lift-deep-violet);
+  --chart-1: var(--lift-nebula-purple);
+  --chart-2: var(--lift-coral-kiss);
+  --chart-3: var(--lift-tangerine-tide);
+  --chart-4: var(--lift-electric-teal);
+  --chart-5: var(--lift-orchid-dream);
+  --sidebar: #ffffff; /* neutral white: the one value not in the brand kit */
+  --sidebar-foreground: var(--lift-deep-space);
+  --sidebar-primary: var(--lift-deep-violet);
+  --sidebar-primary-foreground: #ffffff; /* neutral white: the one value not in the brand kit */
+  --sidebar-accent: var(--lift-starlight-gold);
+  --sidebar-accent-foreground: var(--lift-deep-space);
+  --sidebar-border: var(--lift-coral-kiss);
+  --sidebar-ring: var(--lift-deep-violet);
+  /* Tangerine is a bright page, so statuses and a few roles take their deep Void siblings here. */
+  --status-queued: var(--lift-void-indigo); /* Void Indigo */
+  --status-building: var(--lift-burnt-tangerine); /* Burnt Tangerine */
+  --status-deploying: var(--lift-abyssal-teal); /* Abyssal Teal */
+  --status-active: var(--lift-dark-green); /* Dark Green */
+  --status-failed: var(--lift-ember-red); /* Ember Red */
+  --status-canceled: var(--lift-shadow-grey); /* Shadow Grey */
+  --presence-1: var(--lift-midnight-nebula);
+  --presence-2: var(--lift-abyssal-teal);
+  --trigger-manual: var(--lift-void-indigo);
+  --log-runtime: var(--lift-abyssal-teal);
+  --source-you: var(--lift-deep-violet);
+  --source-database: var(--lift-abyssal-teal);
+  --heading-weight: 700;
+  --heading-tracking: 0.06em;
+  --label-case: uppercase;
+  /* Zone headlines: Bricolage where Expressive belongs (General, Atmosphere), Space Grotesk elsewhere. */
+  --zone-display-font: var(--font-display);
+}
+
+/* Orbit: Void in dark mode. */
+.dark .zone-orbit,
+.zone-orbit.dark {
+  --background: var(--lift-deep-space);
+  --foreground: var(--lift-starlight-gold); /* 14.1:1 */
+  --card: var(--lift-midnight-nebula);
+  --card-foreground: var(--lift-starlight-gold); /* 11.5:1 */
+  --popover: var(--lift-midnight-nebula);
+  --popover-foreground: var(--lift-starlight-gold);
+  --primary: var(--lift-coral-kiss); /* 5.6:1 as text */
+  --primary-foreground: var(--lift-deep-space); /* 5.6:1 */
+  --secondary: var(--lift-void-indigo);
+  --secondary-foreground: var(--lift-starlight-gold); /* 12.5:1 */
+  --muted: var(--lift-void-indigo);
+  --muted-foreground: var(--lift-moonlit-lilac); /* 5.7:1; 5.1:1 on muted */
+  --accent: var(--lift-shadow-orchid); /* hover surface */
+  --accent-foreground: var(--lift-starlight-gold); /* 11.6:1 */
+  --destructive: var(--lift-tangerine-tide); /* 8.5:1 */
+  --border: var(--lift-dusk-rose);
+  --input: var(--lift-dusk-rose);
+  --ring: var(--lift-tangerine-tide);
+  --chart-1: var(--lift-coral-kiss);
+  --chart-2: var(--lift-tangerine-tide);
+  --chart-3: var(--lift-starlight-gold);
+  --chart-4: var(--lift-electric-teal);
+  --chart-5: var(--lift-sunlit-amber);
+  --sidebar: var(--lift-midnight-nebula);
+  --sidebar-foreground: var(--lift-starlight-gold);
+  --sidebar-primary: var(--lift-coral-kiss);
+  --sidebar-primary-foreground: var(--lift-deep-space);
+  --sidebar-accent: var(--lift-shadow-orchid);
+  --sidebar-accent-foreground: var(--lift-starlight-gold);
+  --sidebar-border: var(--lift-dusk-rose);
+  --sidebar-ring: var(--lift-tangerine-tide);
+  /* Back to the dark statuses and roles (Nebula's deep versions are for its bright page). */
+  --status-queued: var(--lift-moonlit-lilac);
+  --status-building: var(--lift-sunlit-amber);
+  --status-deploying: var(--lift-electric-cyan);
+  --status-active: var(--lift-pistachio);
+  --status-failed: var(--lift-rain-boots);
+  --status-canceled: var(--lift-atmospheric-blue);
+  --presence-1: var(--lift-coral-kiss);
+  --presence-2: var(--lift-electric-cyan);
+  --trigger-manual: var(--lift-moonlit-lilac);
+  --log-runtime: var(--lift-icy-aqua);
+  --source-you: var(--lift-moonlit-lilac);
+  --source-database: var(--lift-pistachio);
 }
