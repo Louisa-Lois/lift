@@ -222,7 +222,7 @@
   --muted-foreground: var(--lift-sky-blue); /* 10.9:1; 8.1:1 on muted */
   --accent: var(--lift-shadow-grey); /* hover surface */
   --accent-foreground: var(--lift-frost); /* 12.7:1 */
-  --destructive: var(--lift-rain-boots); /* 6.6:1 */
+  --destructive: var(--lift-tangerine-tide); /* 8.5:1; 5.3:1 as a button on a card */
   --border: var(--lift-shadow-grey);
   --input: var(--lift-shadow-grey);
   --ring: var(--lift-moonlit-lilac);
